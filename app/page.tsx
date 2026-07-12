@@ -1,29 +1,25 @@
+import { Sidebar } from "@/components/layout/sidebar";
+import { StatCard } from "@/components/dashboard/stat-card";
+
 export default function Home() {
   return (
-    <main className="min-h-screen bg-zinc-950 text-white flex items-center justify-center">
-      <div className="text-center">
-        <h1 className="text-6xl font-bold tracking-tight">
-          Faust OS
-        </h1>
+    <main className="flex min-h-screen bg-zinc-950 text-white">
+      <Sidebar />
 
-        <p className="mt-4 text-lg text-zinc-400">
-          Business Operating System
+      <section className="flex-1 p-10">
+        <h1 className="text-4xl font-bold">Dashboard</h1>
+
+        <p className="mt-3 text-zinc-400">
+          Welcome back, Henrry.
         </p>
 
-        <div className="mt-10 rounded-2xl border border-zinc-800 bg-zinc-900 p-8 shadow-xl">
-          <h2 className="text-2xl font-semibold">
-            🚀 Project Initialized
-          </h2>
-
-          <p className="mt-3 text-zinc-500">
-            Welcome, Henrry.
-          </p>
-
-          <p className="mt-1 text-zinc-500">
-            Let's build something incredible.
-          </p>
+        <div className="mt-8 grid grid-cols-4 gap-6">
+          <StatCard title="Revenue Today" value="$0.00" />
+          <StatCard title="Profit Today" value="$0.00" />
+          <StatCard title="Orders" value="0" />
+          <StatCard title="Cash Available" value="$0.00" />
         </div>
-      </div>
+      </section>
     </main>
   );
 }
