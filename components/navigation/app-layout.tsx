@@ -3,8 +3,8 @@
 import { ReactNode } from "react";
 
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
-import { AppSidebar } from "./app-sidebar";
-import { TopNavigation } from "./top-navigation";
+import { AppSidebar } from "@/components/navigation/app-sidebar";
+import { TopNavigation } from "@/components/navigation/top-navigation";
 
 type AppLayoutProps = {
   children: ReactNode;
