@@ -18,7 +18,7 @@ export function AppLayout({ children }: AppLayoutProps) {
       <SidebarInset>
         <TopNavigation />
 
-        <main className="flex flex-1 flex-col p-6">
+        <main data-testid="app-main" className="flex flex-1 flex-col p-6">
           {children}
         </main>
       </SidebarInset>

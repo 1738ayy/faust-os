@@ -1,4 +1,9 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type APIRequestContext } from "@playwright/test";
+
+async function resetDemo(request: APIRequestContext) {
+  const response = await request.post("/api/operating-system", { data: { action: "reset", mode: "development_demo" } });
+  expect(response.ok()).toBeTruthy(); const data = await response.json(); expect(data.data?.orders?.some((order: { number: string }) => order.number === "FO-1042")).toBeTruthy(); expect(data.data?.balances?.length).toBeGreaterThan(0);
+}
 
 test("authentication screens expose sign in, signup, and recovery", async ({ page }) => {
   await page.goto("/sign-in"); await expect(page.getByRole("heading", { name: /sign in/i })).toBeVisible();
@@ -8,24 +13,26 @@ test("authentication screens expose sign in, signup, and recovery", async ({ pag
 
 test("primary operations pages render dedicated operational views", async ({ page }) => {
   for (const route of ["/", "/inventory", "/orders", "/purchasing", "/shipping", "/listings", "/finance", "/analytics", "/automations", "/ai-center"]) {
-    await page.goto(route); await expect(page.locator("main, body")).toBeVisible(); await expect(page.locator("h1").first()).toBeVisible();
+    await page.goto(route); await expect(page.getByTestId("app-main")).toBeVisible(); await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   }
 });
 
 test("local source-to-sale fixture can be loaded without external credentials", async ({ request, page }) => {
-  const reset = await request.post("/api/operating-system", { data: { action: "reset", mode: "development_demo" } }); expect(reset.ok()).toBeTruthy();
-  await page.goto("/orders"); await expect(page.getByText("FO-1042")).toBeVisible();
+  await resetDemo(request);
+  await page.goto("/orders"); await expect(page.getByRole("heading", { name: /FO-1042 · Depop/i })).toBeVisible();
   await page.goto("/purchasing"); await expect(page.getByText("DEMO-17TRACK-1042")).toBeVisible();
 });
 
 test("inventory exposes audited mutation controls and refreshed balances", async ({ request, page }) => {
-  const reset = await request.post("/api/operating-system", { data: { action: "reset", mode: "development_demo" } }); expect(reset.ok()).toBeTruthy();
+  await resetDemo(request);
   await page.goto("/inventory");
   const panel = page.getByRole("region", { name: "Inventory actions" });
   for (const label of ["Adjust stock", "Transfer", "Cycle count", "Mark damaged", "Move to quarantine", "Release quarantine", "Mark lost", "Record found", "Assign location"]) await expect(panel.getByRole("button", { name: label, exact: true })).toBeVisible();
   await panel.getByRole("button", { name: "Adjust stock", exact: true }).click();
   await panel.locator('input[name="quantity"]').fill("1"); await panel.locator('input[name="reason"]').fill("Browser inventory verification"); await panel.locator('input[name="confirm"]').check();
+  const responsePromise = page.waitForResponse((response) => response.url().includes("/api/inventory/adjust") && response.request().method() === "POST");
   await panel.getByRole("button", { name: /confirm adjust stock/i }).click();
+  const response = await responsePromise; const responseBody = await response.text(); expect(response.ok(), responseBody).toBeTruthy();
   await expect(panel.getByRole("status")).toContainText(/saved/i);
   await expect(page.getByText(/movement history/i).first()).toBeVisible();
   await panel.getByRole("button", { name: "Mark damaged", exact: true }).click();
