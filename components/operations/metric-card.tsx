@@ -1,0 +1,2 @@
+import type { ReactNode } from "react";
+export function MetricCard({ label, value, detail, icon }: { label: string; value: string; detail: string; icon?: ReactNode }) { return <article className="border border-border bg-card p-4 shadow-sm"><div className="flex items-center justify-between text-xs uppercase tracking-[0.16em] text-muted-foreground"><span>{label}</span>{icon}</div><p className="mt-3 font-mono text-2xl font-semibold tabular-nums">{value}</p><p className="mt-1 text-xs text-muted-foreground">{detail}</p></article>; }

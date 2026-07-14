@@ -1,0 +1,16 @@
+import assert from "node:assert/strict";
+import { adjustStock, markDamaged, markLost, moveToQuarantine, recordFound, reconcileCycleCount, releaseFromQuarantine, transferStock } from "../lib/inventory-actions";
+import type { StockBalance } from "../domain/business";
+const source: StockBalance = { id: "a", variantId: "v", locationId: "l1", onHand: 8, reserved: 2, incoming: 0, damaged: 0, returned: 0, lost: 0, quarantined: 0 };
+const destination: StockBalance = { ...source, id: "b", locationId: "l2", onHand: 0, reserved: 0 };
+assert.equal(adjustStock(source, 2, "found").balance.onHand, 10, "adjustment creates explicit stock change");
+assert.throws(() => adjustStock(source, -10, "bad"), /negative/, "adjustment prevents negative stock");
+const transfer = transferStock(source, destination, 3); assert.equal(transfer.source.onHand, 5); assert.equal(transfer.destination.onHand, 3); assert.equal(transfer.movements.length, 2, "transfer creates paired movements");
+assert.equal(reconcileCycleCount(source, 6).movement?.quantity, -2, "cycle count records variance");
+assert.throws(() => reconcileCycleCount(source, 1), /reserved/, "cycle count protects reservations");
+assert.equal(markDamaged(source, 2, "inspection").balance.damaged, 2, "damage removes stock from usable availability");
+const quarantined = moveToQuarantine(source, 2, "inspection").balance; assert.equal(quarantined.quarantined, 2, "quarantine is excluded from usable availability");
+assert.equal(releaseFromQuarantine(quarantined, 1, "passed inspection").balance.quarantined, 1, "release restores quarantined units");
+assert.equal(markLost(source, 1, "missing").balance.onHand, 7, "loss reduces on-hand");
+assert.equal(recordFound(source, 1, "found").balance.onHand, 9, "found stock requires a recorded movement");
+console.log("✓ inventory action tests passed");

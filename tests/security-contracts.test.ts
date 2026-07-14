@@ -1,0 +1,15 @@
+import assert from "node:assert/strict";
+import { canMutateBusiness, canPerform, chooseActiveBusiness } from "../lib/business-access";
+const businesses = [{ id: "business-a", role: "owner" as const }, { id: "business-b", role: "viewer" as const }];
+assert.equal(chooseActiveBusiness("business-a", businesses)?.id, "business-a", "authorized active business remains selected");
+assert.equal(chooseActiveBusiness("forged-business", businesses)?.id, "business-a", "invalid active-business preference falls back to an authorized business");
+assert.equal(canMutateBusiness("owner"), true, "owner writes are permitted");
+assert.equal(canMutateBusiness("admin"), true, "admin writes are permitted");
+assert.equal(canMutateBusiness("viewer"), false, "viewer writes are denied");
+assert.equal(canPerform("finance", "finance"), true, "finance role can reconcile finance");
+assert.equal(canPerform("finance", "fulfillment"), false, "finance role cannot fulfill orders");
+assert.equal(canPerform("fulfillment", "fulfillment"), true, "fulfillment role can ship orders");
+assert.equal(canPerform("fulfillment", "finance"), false, "fulfillment role cannot mutate finance");
+assert.equal(canPerform("operations", "catalog"), true, "operations role can maintain catalog");
+assert.equal(canPerform("operations", "membership"), false, "operations role cannot change ownership");
+console.log("✓ tenancy security contract tests passed");

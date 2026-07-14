@@ -1,0 +1,43 @@
+import { expect, test } from "@playwright/test";
+
+test("authentication screens expose sign in, signup, and recovery", async ({ page }) => {
+  await page.goto("/sign-in"); await expect(page.getByRole("heading", { name: /sign in/i })).toBeVisible();
+  await page.getByRole("link", { name: /create account/i }).click(); await expect(page.getByRole("heading", { name: /create your workspace/i })).toBeVisible();
+  await page.getByRole("link", { name: /reset password/i }).click(); await expect(page.getByRole("heading", { name: /reset your password/i })).toBeVisible();
+});
+
+test("primary operations pages render dedicated operational views", async ({ page }) => {
+  for (const route of ["/", "/inventory", "/orders", "/purchasing", "/shipping", "/listings", "/finance", "/analytics", "/automations", "/ai-center"]) {
+    await page.goto(route); await expect(page.locator("main, body")).toBeVisible(); await expect(page.locator("h1").first()).toBeVisible();
+  }
+});
+
+test("local source-to-sale fixture can be loaded without external credentials", async ({ request, page }) => {
+  const reset = await request.post("/api/operating-system", { data: { action: "reset", mode: "development_demo" } }); expect(reset.ok()).toBeTruthy();
+  await page.goto("/orders"); await expect(page.getByText("FO-1042")).toBeVisible();
+  await page.goto("/purchasing"); await expect(page.getByText("DEMO-17TRACK-1042")).toBeVisible();
+});
+
+test("inventory exposes audited mutation controls and refreshed balances", async ({ request, page }) => {
+  const reset = await request.post("/api/operating-system", { data: { action: "reset", mode: "development_demo" } }); expect(reset.ok()).toBeTruthy();
+  await page.goto("/inventory");
+  const panel = page.getByRole("region", { name: "Inventory actions" });
+  for (const label of ["Adjust stock", "Transfer", "Cycle count", "Mark damaged", "Move to quarantine", "Release quarantine", "Mark lost", "Record found", "Assign location"]) await expect(panel.getByRole("button", { name: label, exact: true })).toBeVisible();
+  await panel.getByRole("button", { name: "Adjust stock", exact: true }).click();
+  await panel.locator('input[name="quantity"]').fill("1"); await panel.locator('input[name="reason"]').fill("Browser inventory verification"); await panel.locator('input[name="confirm"]').check();
+  await panel.getByRole("button", { name: /confirm adjust stock/i }).click();
+  await expect(panel.getByRole("status")).toContainText(/saved/i);
+  await expect(page.getByText(/movement history/i).first()).toBeVisible();
+  await panel.getByRole("button", { name: "Mark damaged", exact: true }).click();
+  await expect(panel.getByText(/remove usable units/i)).toBeVisible();
+  await panel.getByRole("button", { name: "Move to quarantine", exact: true }).click();
+  await expect(panel.getByText(/hold units out of availability/i)).toBeVisible();
+  await panel.getByRole("button", { name: "Release quarantine", exact: true }).click();
+  await expect(panel.getByText(/return inspected units/i)).toBeVisible();
+  await panel.getByRole("button", { name: "Mark lost", exact: true }).click();
+  await expect(panel.getByText(/remove missing usable units/i)).toBeVisible();
+  await panel.getByRole("button", { name: "Record found", exact: true }).click();
+  await expect(panel.getByText(/add recovered units/i)).toBeVisible();
+  await panel.getByRole("button", { name: "Assign location", exact: true }).click();
+  await expect(panel.getByText(/assign currently unlocated stock/i)).toBeVisible();
+});

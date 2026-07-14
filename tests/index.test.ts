@@ -1,0 +1,6 @@
+import "./business-calculations.test";
+import "./operational-workflows.test";
+import "./security-contracts.test";
+import "./inventory-actions.test";
+import "./inventory-contracts.test";
+import "./orders-deepening.test";

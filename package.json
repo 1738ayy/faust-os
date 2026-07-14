@@ -6,11 +6,18 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "test": "tsc -p tests/tsconfig.json && node .test-build/tests/index.test.js",
+    "test:e2e": "playwright test",
+    "test:journey": "tsc -p tests/tsconfig.json && node .test-build/tests/e2e.test.js",
+    "test:supabase": "node --env-file=.env.integration.local scripts/supabase-integration-harness.mjs",
+    "validate": "npm run lint && npm run typecheck && npm test && npm run test:e2e && npm run build"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
-    "@tabler/icons-react": "^3.44.0",
+    "@supabase/ssr": "^0.8.0",
+    "@supabase/supabase-js": "^2.110.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.24.0",
@@ -18,10 +25,13 @@
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "shadcn": "^4.13.0",
+    "sonner": "^2.0.7",
     "tailwind-merge": "^3.6.0",
-    "tw-animate-css": "^1.4.0"
+    "tw-animate-css": "^1.4.0",
+    "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

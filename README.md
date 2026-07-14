@@ -1,36 +1,48 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Faust OS
 
-## Getting Started
+Faust OS is a dark-first operating system for a resale business. It connects sourcing, products, stock, purchasing, inbound parcels, listings, orders, fulfillment, finance, tasks, and evidence-backed operating insights.
 
-First, run the development server:
+## Run locally
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open `http://localhost:3000`. Mission Control is the homepage. A fresh workspace has no invented data: use **Load development demo** to inspect a clearly labelled, internally connected sample workflow, or start from **Sourcing** with a real product.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## What works locally
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- Mission Control calculations for revenue, profit, cash, stock, fulfillment, inbound units, attention items, and activity.
+- Product/variant/stock relationship model, with available quantity and an immutable movement ledger.
+- Order shipment transition: shipping deducts physical inventory and writes an audit event; cancelling releases a reservation.
+- Purchase-order parcel receiving: receiving updates parcel state, purchase-order state, balances, and movement history.
+- Listing records with a truthful **manual publishing required** state.
+- Existing Superbuy extension import and Opportunity Analyzer. Saving an opportunity also creates a connected supplier, product, variant, stock balance, and listing draft.
+- Local JSON development adapter at `.faust/operating-system.json`. This is not production persistence.
 
-## Learn More
+## Chrome extension
 
-To learn more about Next.js, take a look at the following resources:
+1. Start Faust with `npm run dev`.
+2. In Chrome, visit `chrome://extensions`, enable Developer mode, and choose **Load unpacked**.
+3. Select the project `extension` folder.
+4. Complete any Superbuy human verification on a real product page, then use **Import Current Product**.
+5. Open **Sourcing → Opportunity Analyzer** and select **Import Superbuy**.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+The extension can import values exposed on the open product page. Shipping amounts unavailable in the page are intentionally left editable rather than guessed.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Supabase handoff
 
-## Deploy on Vercel
+1. Copy `.env.example` to `.env.local` and add the project URL and anonymous key.
+2. Run the versioned SQL files in `supabase/migrations/` in numeric order.
+3. Configure Supabase Email/Password Auth, then set `NEXT_PUBLIC_FAUST_AUTH_ENABLED=true`.
+4. Create an account and complete onboarding to create the protected business workspace.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+No marketplace is marked connected or publishable without approved API access and credentials. Shipping label purchase, marketplace order sync, automatic cross-listing, and 17TRACK polling are intentionally integration boundaries; the local workflows preserve the records and manual fallback required to connect them later.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Useful checks
+
+```bash
+npm run lint
+npm run build
+```

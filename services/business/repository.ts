@@ -1,0 +1,15 @@
+import "server-only";
+import fs from "fs/promises";
+import path from "path";
+import { cookies } from "next/headers";
+import { isProductionAuthEnabled } from "@/lib/env";
+import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { chooseActiveBusiness } from "@/lib/business-access";
+
+export type BusinessRecord = { id: string; name: string; currency: string; timezone: string; role: "owner" | "admin" | "operations" | "finance" | "fulfillment" | "viewer" };
+export interface BusinessRepository { listForUser(userId: string): Promise<BusinessRecord[]>; create(userId: string, input: Pick<BusinessRecord, "name" | "currency" | "timezone">): Promise<BusinessRecord>; }
+const localFile = path.join(process.cwd(), ".faust", "businesses.json");
+class LocalBusinessRepository implements BusinessRepository { async listForUser() { try { return JSON.parse(await fs.readFile(localFile, "utf8")) as BusinessRecord[]; } catch { return []; } } async create(_userId: string, input: Pick<BusinessRecord, "name" | "currency" | "timezone">) { const records = await this.listForUser(); const business: BusinessRecord = { id: crypto.randomUUID(), ...input, role: "owner" }; records.push(business); await fs.mkdir(path.dirname(localFile), { recursive: true }); await fs.writeFile(localFile, JSON.stringify(records, null, 2)); return business; } }
+class SupabaseBusinessRepository implements BusinessRepository { async listForUser(userId: string) { const client = await getSupabaseServerClient(); const { data, error } = await client.from("business_members").select("role,businesses!inner(id,name,currency,timezone)").eq("user_id", userId); if (error) throw error; return (data ?? []).map((entry) => { const business = Array.isArray(entry.businesses) ? entry.businesses[0] : entry.businesses; return { id: business.id, name: business.name, currency: business.currency, timezone: business.timezone, role: entry.role as BusinessRecord["role"] }; }); } async create(_userId: string, input: Pick<BusinessRecord, "name" | "currency" | "timezone">) { const client = await getSupabaseServerClient(); const { data: businessId, error } = await client.rpc("create_business_with_defaults", { p_name: input.name, p_currency: input.currency, p_timezone: input.timezone }); if (error) throw error; const { data, error: selectError } = await client.from("businesses").select("id,name,currency,timezone").eq("id", businessId).single(); if (selectError) throw selectError; return { ...data, role: "owner" as const }; } }
+export function getBusinessRepository(): BusinessRepository { return isProductionAuthEnabled() ? new SupabaseBusinessRepository() : new LocalBusinessRepository(); }
+export async function getActiveBusinessId() { const selected = (await cookies()).get("faust-active-business")?.value; if (!isProductionAuthEnabled()) return selected; const client = await getSupabaseServerClient(); const { data: { user } } = await client.auth.getUser(); if (!user) return undefined; return chooseActiveBusiness(selected, await new SupabaseBusinessRepository().listForUser(user.id))?.id; }

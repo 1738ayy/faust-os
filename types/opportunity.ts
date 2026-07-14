@@ -1,0 +1,14 @@
+import type { Costs } from "./cost";
+import type { MarketplaceListing } from "./marketplace";
+import type { Product } from "./product";
+
+export type Opportunity = {
+  id: string;
+  product: Product;
+  costs: Costs;
+  listing: MarketplaceListing;
+  salePrice: number;
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+};

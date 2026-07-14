@@ -9,6 +9,7 @@ import {
 
 import { NavMain } from "./nav-main";
 import { NavMarketplaces } from "./nav-marketplaces";
+import { SignOutButton } from "@/components/auth/sign-out-button";
 
 export function AppSidebar() {
   return (
@@ -33,6 +34,7 @@ export function AppSidebar() {
           <p className="text-xs text-muted-foreground">
             Business Owner
           </p>
+          <div className="mt-2"><SignOutButton /></div>
         </div>
       </SidebarFooter>
     </Sidebar>

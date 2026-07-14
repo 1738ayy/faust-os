@@ -1,0 +1,33 @@
+import assert from "node:assert/strict";
+import { advanceOrder, receiveParcelItems } from "../lib/operational-workflows";
+import type { Order, Parcel, PurchaseOrder, StockBalance } from "../domain/business";
+
+const balance: StockBalance = { id: "balance", variantId: "variant", onHand: 4, reserved: 0, incoming: 3, damaged: 0, returned: 0, lost: 0, quarantined: 0 };
+const secondBalance: StockBalance = { id: "balance-2", variantId: "variant-2", onHand: 2, reserved: 0, incoming: 0, damaged: 0, returned: 0, lost: 0, quarantined: 0 };
+const line = (id: string, variantId: string, quantity: number) => ({ id, variantId, title: variantId, quantity, unitSellingPrice: 40, discountAllocation: 0, taxAllocation: 0, feeAllocation: 0, unitCost: 20 });
+const order: Order = { id: "order", number: "FO-1", marketplace: "Depop", customerId: "customer", items: [line("line-1", "variant", 2)], shippingCharged: 0, shippingCost: 5, marketplaceFee: 8, paymentFee: 2, taxCollected: 0, status: "paid", orderedAt: "2026-01-01T00:00:00Z" };
+const reserved = advanceOrder(order, [balance], "inventory_reserved");
+assert.equal(reserved.balances[0].reserved, 2, "order reservation reduces available inventory");
+assert.throws(() => advanceOrder(order, [balance], "shipped"), /Cannot move/, "state machine rejects illegal status skips");
+const ready: Order = { ...reserved.order, status: "ready_to_ship" };
+const shipped = advanceOrder(ready, reserved.balances, "shipped");
+assert.equal(shipped.balances[0].onHand, 2, "shipment deducts physical inventory");
+assert.equal(shipped.balances[0].reserved, 0, "shipment clears reservation");
+const cancelled = advanceOrder(reserved.order, reserved.balances, "cancelled");
+assert.equal(cancelled.balances[0].reserved, 0, "cancellation releases reserved inventory");
+assert.throws(() => advanceOrder({ ...order, items: [line("line-too-many", "variant", 10)] }, [balance], "inventory_reserved"), /Insufficient/, "reservation rejects insufficient stock");
+const multi = advanceOrder({ ...order, id: "multi", items: [line("one", "variant", 1), line("two", "variant-2", 2)] }, [balance, secondBalance], "inventory_reserved");
+assert.equal(multi.balances[0].reserved, 1, "multi-item order reserves first line");
+assert.equal(multi.balances[1].reserved, 2, "multi-item order reserves second line");
+
+const po: PurchaseOrder = { id: "po", supplierId: "supplier", reference: "PO-1", status: "ordered", orderedAt: "2026-01-01T00:00:00Z", totalCost: 90, itemCount: 3, items: [{ id: "po-item", variantId: "variant", expectedQuantity: 3, receivedQuantity: 0, unitCost: 30 }] };
+const parcel: Parcel = { id: "parcel", trackingNumber: "TRACK", status: "in_transit", purchaseOrderId: po.id, items: [{ id: "parcel-item", variantId: "variant", purchaseOrderItemId: "po-item", expectedQuantity: 3, receivedQuantity: 0 }], events: [] };
+const partial = receiveParcelItems(parcel, po, [balance], [{ parcelItemId: "parcel-item", receivedQuantity: 1, damagedQuantity: 1, missingQuantity: 0, rejectedQuantity: 0 }]);
+assert.equal(partial.parcel.status, "warehouse", "partial receipt leaves parcel open");
+assert.equal(partial.balances[0].onHand, 5, "partial receipt updates only received inventory");
+assert.equal(partial.balances[0].damaged, 1, "damaged receipt is segregated");
+const received = receiveParcelItems(partial.parcel, partial.purchaseOrder, partial.balances, [{ parcelItemId: "parcel-item", receivedQuantity: 1, damagedQuantity: 0, missingQuantity: 0, rejectedQuantity: 0, overageQuantity: 1 }]);
+assert.equal(received.balances[0].onHand, 7, "receiving supports a recorded overage");
+assert.equal(received.purchaseOrder?.items[0].receivedQuantity, 3, "receiving updates the linked PO item");
+assert.throws(() => receiveParcelItems({ ...parcel, items: [] }, po, [balance]), /no item rows/, "parcel receiving requires explicit item rows");
+console.log("✓ operational workflow tests passed");

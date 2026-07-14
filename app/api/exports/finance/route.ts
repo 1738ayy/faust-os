@@ -1,0 +1,6 @@
+import { getOpportunities } from "@/services/opportunities/local-opportunity-store";
+import { analyzeOpportunity } from "@/lib/analyze-opportunity";
+import { ordersRepository } from "@/services/orders/repository";
+
+function escape(value: string | number) { const text = String(value); return /[",\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text; }
+export async function GET() { const [opportunities, orders] = await Promise.all([getOpportunities(), ordersRepository.all()]); const rows = [["Type", "Date", "Name", "Marketplace", "Revenue", "Cost", "Net Profit"]]; opportunities.forEach((opportunity) => { const analysis = analyzeOpportunity(opportunity); rows.push(["Opportunity", opportunity.createdAt, opportunity.product.name, opportunity.listing.marketplaceId, analysis.revenue.toFixed(2), analysis.totalCost.toFixed(2), analysis.netProfit.toFixed(2)]); }); orders.forEach((order) => rows.push(["Order", order.orderedAt, order.itemName, order.marketplace, order.salePrice.toFixed(2), order.shippingCost.toFixed(2), (order.salePrice - order.shippingCost).toFixed(2)])); const csv = rows.map((row) => row.map(escape).join(",")).join("\n"); return new Response(csv, { headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": "attachment; filename=faust-finance.csv" } }); }

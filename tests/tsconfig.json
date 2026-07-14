@@ -1,0 +1,15 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "../.test-build",
+    "rootDir": "..",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "target": "ES2022",
+    "incremental": false,
+    "isolatedModules": false,
+    "types": ["node"]
+  },
+  "include": ["*.test.ts", "../lib/business-calculations.ts", "../lib/business-access.ts", "../lib/operational-workflows.ts", "../lib/inventory-actions.ts", "../domain/business.ts"]
+}

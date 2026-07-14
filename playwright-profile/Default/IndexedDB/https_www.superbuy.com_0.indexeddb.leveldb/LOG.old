@@ -1,0 +1,25 @@
+2026/07/13-12:54:26.728 7188 Reusing MANIFEST C:\Users\Henrry\Downloads\Projects\faust-os\playwright-profile\Default\IndexedDB\https_www.superbuy.com_0.indexeddb.leveldb/MANIFEST-000001
+2026/07/13-12:54:26.729 7188 Recovering log #31
+2026/07/13-12:54:26.729 7188 Reusing old log C:\Users\Henrry\Downloads\Projects\faust-os\playwright-profile\Default\IndexedDB\https_www.superbuy.com_0.indexeddb.leveldb/000031.log 
+2026/07/13-12:54:26.729 7188 Delete type=2 #30
+2026/07/13-12:54:26.795 ddbc Level-0 table #36: started
+2026/07/13-12:54:26.810 ddbc Level-0 table #36: 2090 bytes OK
+2026/07/13-12:54:26.812 ddbc Delete type=0 #31
+2026/07/13-12:54:26.812 ddbc Manual compaction at level-0 from '\x00\x0c\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x0d\x00\x00\x00' @ 0 : 0; will stop at '\x00\x0c\x00\x00\x05' @ 498 : 1
+2026/07/13-12:54:26.813 ddbc Compacting 1@0 + 1@1 files
+2026/07/13-12:54:26.824 ddbc Generated table #37@0: 94 keys, 2240 bytes
+2026/07/13-12:54:26.824 ddbc Compacted 1@0 + 1@1 files => 2240 bytes
+2026/07/13-12:54:26.825 ddbc compacted to: files[ 0 1 1 0 0 0 0 ]
+2026/07/13-12:54:26.825 ddbc Delete type=2 #36
+2026/07/13-12:54:26.826 dbd4 Manual compaction at level-0 from '\x00\x0c\x00\x00\x05' @ 498 : 1 .. '\x00\x0d\x00\x00\x00' @ 0 : 0; will stop at (end)
+2026/07/13-12:54:28.625 ddbc Level-0 table #39: started
+2026/07/13-12:54:28.635 ddbc Level-0 table #39: 2067 bytes OK
+2026/07/13-12:54:28.637 ddbc Delete type=2 #33
+2026/07/13-12:54:28.637 ddbc Delete type=0 #35
+2026/07/13-12:54:28.638 dbd4 Manual compaction at level-0 from '\x00\x0d\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x0e\x00\x00\x00' @ 0 : 0; will stop at '\x00\x0d\x00\x00\x05' @ 541 : 1
+2026/07/13-12:54:28.638 dbd4 Compacting 1@0 + 1@1 files
+2026/07/13-12:54:28.650 dbd4 Generated table #40@0: 94 keys, 2238 bytes
+2026/07/13-12:54:28.650 dbd4 Compacted 1@0 + 1@1 files => 2238 bytes
+2026/07/13-12:54:28.651 dbd4 compacted to: files[ 0 1 1 0 0 0 0 ]
+2026/07/13-12:54:28.652 dbd4 Delete type=2 #39
+2026/07/13-12:54:28.652 dbd4 Manual compaction at level-0 from '\x00\x0d\x00\x00\x05' @ 541 : 1 .. '\x00\x0e\x00\x00\x00' @ 0 : 0; will stop at (end)

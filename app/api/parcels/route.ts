@@ -1,0 +1,5 @@
+import { NextResponse } from "next/server";
+import { parcelsRepository } from "@/services/parcels/repository";
+import type { Parcel } from "@/types/parcel";
+export async function GET() { return NextResponse.json({ parcels: await parcelsRepository.all() }); }
+export async function POST(request: Request) { const body = await request.json() as Partial<Parcel>; if (!body.trackingNumber?.trim()) return NextResponse.json({ message: "Tracking number is required." }, { status: 400 }); const now = new Date().toISOString(); const parcel: Parcel = { id: body.id ?? crypto.randomUUID(), trackingNumber: body.trackingNumber.trim(), carrier: body.carrier, status: body.status ?? "draft", weight: Number(body.weight) || undefined, dimensions: body.dimensions, destination: body.destination, estimatedArrival: body.estimatedArrival, declaredValue: Number(body.declaredValue) || undefined, notes: body.notes, createdAt: body.createdAt ?? now, updatedAt: now }; return NextResponse.json({ parcel: await parcelsRepository.upsert(parcel) }); }

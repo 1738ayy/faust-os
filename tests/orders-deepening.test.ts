@@ -1,0 +1,16 @@
+import assert from "node:assert/strict";
+import { orderProfit } from "../lib/business-calculations";
+import { advanceOrder, cancelOrderItems, createOrderRefund, receiveOrderReturn } from "../lib/operational-workflows";
+import type { Order, StockBalance } from "../domain/business";
+const balance = (id: string, variantId: string, onHand: number): StockBalance => ({ id, variantId, onHand, reserved: 0, incoming: 0, damaged: 0, returned: 0, lost: 0, quarantined: 0 });
+const order: Order = { id: "order", number: "FO-2000", marketplace: "Manual", customerId: "customer", status: "paid", orderedAt: "2026-01-01T00:00:00Z", shippingCharged: 5, shippingCost: 4, marketplaceFee: 3, paymentFee: 2, taxCollected: 0, items: [{ id: "one", productId: "p1", variantId: "v1", title: "First", quantity: 2, unitSellingPrice: 40, discountAllocation: 2, taxAllocation: 0, feeAllocation: 1, unitCost: 15, fulfillmentState: "unfulfilled", returnState: "none", refundState: "none" }, { id: "two", productId: "p2", variantId: "v2", title: "Second", quantity: 1, unitSellingPrice: 30, discountAllocation: 0, taxAllocation: 0, feeAllocation: 1, unitCost: 12, fulfillmentState: "unfulfilled", returnState: "none", refundState: "none" }] };
+const balances = [balance("b1", "v1", 4), balance("b2", "v2", 2)];
+assert.throws(() => advanceOrder(order, balances, "shipped"), /Cannot move/, "state machine rejects step skipping");
+const reserved = advanceOrder(order, balances, "reserved"); assert.equal(reserved.balances[0].reserved, 2); assert.equal(reserved.balances[1].reserved, 1, "multi-item reservation reserves every line atomically");
+assert.throws(() => advanceOrder({ ...order, items: [{ ...order.items[0], quantity: 10 }] }, balances, "reserved"), /Insufficient/, "reservation fails without partial mutation");
+const partial = cancelOrderItems(reserved.order, reserved.balances, [{ itemId: "one", quantity: 1 }], "buyer changed mind"); assert.equal(partial.balances[0].reserved, 1); assert.equal(partial.balances[1].reserved, 1, "partial cancellation releases only the requested line quantity");
+const cancelled = advanceOrder(reserved.order, reserved.balances, "cancelled"); assert.equal(cancelled.balances[0].reserved, 0); assert.equal(cancelled.balances[1].reserved, 0, "full cancellation releases all reservations");
+const refund = createOrderRefund({ ...order, status: "returned" }, { amount: 20, reason: "partial refund", itemId: "one", quantity: 1 }); assert.equal(refund.order.status, "partially_refunded"); assert.throws(() => createOrderRefund(refund.order, { amount: 999, reason: "duplicate" }), /exceeds/, "refunds cannot exceed refundable amount");
+const returnedOrder: Order = { ...order, status: "return_in_transit", returns: [{ id: "return", status: "in_transit", reason: "fit", createdAt: "2026-01-02", items: [{ orderItemId: "one", quantity: 1 }] }] }; const received = receiveOrderReturn(returnedOrder, balances, "return", [{ itemId: "one", quantity: 1, disposition: "quarantine" }]); assert.equal(received.balances[0].quarantined, 1, "return receiving sends selected units to quarantine");
+const profit = orderProfit(refund.order); assert.equal(profit.refunds, 20); assert.ok(profit.contributionProfit < profit.netSales, "profit reconciles refunds and costs");
+console.log("✓ order state, reservation, cancellation, refund, return, and profit tests passed");
