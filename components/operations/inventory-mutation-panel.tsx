@@ -26,7 +26,12 @@ export function InventoryMutationPanel({ balances, locations }: { balances: Stoc
   const selected = actions.find((entry) => entry.id === action)!;
   const requiresQuantity = action !== "location";
   async function submit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault(); setMessage(""); const form = new FormData(event.currentTarget);
+    event.preventDefault();
+    // React clears currentTarget after the synchronous event handler. Keep the
+    // actual form node before awaiting the mutation so a successful response
+    // cannot be turned into a false client-side failure during reset.
+    const formElement = event.currentTarget;
+    setMessage(""); const form = new FormData(formElement);
     if (form.get("confirm") !== "on") { setMessage("Confirm this inventory mutation before saving."); return; }
     const quantity = Number(form.get("quantity")); const reason = String(form.get("reason") || ""); const notes = String(form.get("notes") || ""); const relatedEntityId = String(form.get("relatedEntityId") || "") || undefined;
     const idempotencyKey = crypto.randomUUID();
@@ -37,7 +42,7 @@ export function InventoryMutationPanel({ balances, locations }: { balances: Stoc
       : action === "location" ? { balanceId: form.get("balanceId"), locationId: form.get("locationId"), reason, notes, idempotencyKey }
       : { balanceId: form.get("balanceId"), quantity, action, reason, notes, relatedEntityId, idempotencyKey };
     setSubmitting(true);
-    try { const response = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); const result = await response.json(); if (!response.ok) { setMessage(result.message || "Mutation failed. No inventory was changed."); return; } setMessage("Saved. Balances, movement history, and activity history have refreshed."); router.refresh(); event.currentTarget.reset(); }
+    try { const response = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); const result = await response.json(); if (!response.ok) { setMessage(result.message || "Mutation failed. No inventory was changed."); return; } setMessage("Saved. Balances, movement history, and activity history have refreshed."); router.refresh(); formElement.reset(); }
     catch { setMessage("The request could not be completed. No inventory was changed."); }
     finally { setSubmitting(false); }
   }
