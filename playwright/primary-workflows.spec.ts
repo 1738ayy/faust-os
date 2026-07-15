@@ -14,7 +14,8 @@ test("authentication screens expose sign in, signup, and recovery", async ({ pag
 test("primary operations pages render their operational page titles", async ({ page }) => {
   const routes = [["/", "Mission Control"], ["/inventory", "Inventory"], ["/orders", "Orders"], ["/purchasing", "Purchasing"], ["/shipping", "Shipping"], ["/listings", "Listings"], ["/finance", "Finance"], ["/analytics", "Analytics"], ["/automations", "Automations"], ["/ai-center", "AI Center"]] as const;
   for (const [route, title] of routes) {
-    await page.goto(route); await expect(page.getByTestId("app-main")).toBeVisible(); await expect(page.getByRole("heading", { name: title, exact: true })).toBeVisible();
+    const appMain = page.getByTestId("app-main");
+    await page.goto(route); await expect(appMain).toBeVisible(); await expect(appMain.getByRole("heading", { name: title, exact: true })).toBeVisible();
   }
 });
 
