@@ -12,8 +12,9 @@ test("authentication screens expose sign in, signup, and recovery", async ({ pag
 });
 
 test("primary operations pages render dedicated operational views", async ({ page }) => {
-  for (const route of ["/", "/inventory", "/orders", "/purchasing", "/shipping", "/listings", "/finance", "/analytics", "/automations", "/ai-center"]) {
-    await page.goto(route); await expect(page.getByTestId("app-main")).toBeVisible(); await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  const routes = [["/", "Know what needs action next."], ["/inventory", "Stock, locations, and receiving"], ["/orders", "Orders"], ["/purchasing", "Purchase orders, suppliers, and inbound receiving"], ["/shipping", "Packing, labels, dispatch, and tracking"], ["/listings", "Marketplace drafts, validation, and delist coordination"], ["/finance", "Ledger, payout reconciliation, cash, and planning"], ["/analytics", "Business trends and drill-down comparisons"], ["/automations", "Rule builder, run logs, retries, and failures"], ["/ai-center", "Daily brief and evidence-backed recommendations"]] as const;
+  for (const [route, title] of routes) {
+    await page.goto(route); await expect(page.getByTestId("app-main")).toBeVisible(); await expect(page.getByRole("heading", { name: title, exact: true })).toBeVisible();
   }
 });
 
@@ -21,6 +22,12 @@ test("local source-to-sale fixture can be loaded without external credentials", 
   await resetDemo(request);
   await page.goto("/orders"); await expect(page.getByRole("heading", { name: /FO-1042 · Depop/i })).toBeVisible();
   await page.goto("/purchasing"); await expect(page.getByText("DEMO-17TRACK-1042")).toBeVisible();
+});
+
+test("inventory adjustment API updates the demo balance with an audit trail", async ({ request }) => {
+  await resetDemo(request); const before = await request.get("/api/operating-system"); expect(before.ok()).toBeTruthy(); const snapshot = await before.json(); const balance = snapshot.data.balances[0];
+  const response = await request.post("/api/inventory/adjust", { data: { balanceId: balance.id, quantity: 1, reason: "Playwright direct API verification", idempotencyKey: crypto.randomUUID() } }); const body = await response.text(); expect(response.ok(), body).toBeTruthy(); const updated = JSON.parse(body).data;
+  expect(updated.balances.find((entry: { id: string }) => entry.id === balance.id).onHand).toBe(balance.onHand + 1); expect(updated.stockMovements.some((entry: { referenceType?: string }) => entry.referenceType === "inventory_adjustment")).toBeTruthy(); expect(updated.activity.some((entry: { entityType: string }) => entry.entityType === "inventory_balance")).toBeTruthy();
 });
 
 test("inventory exposes audited mutation controls and refreshed balances", async ({ request, page }) => {

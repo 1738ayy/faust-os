@@ -6,7 +6,7 @@ import { availableUnits, money, orderProfit } from "@/lib/business-calculations"
 const Panel = ({ title, children }: { title: string; children: React.ReactNode }) => <section className="border border-border bg-card"><h2 className="border-b border-border px-5 py-4 font-semibold">{title}</h2>{children}</section>;
 const Status = ({ value }: { value: string }) => <span className="text-xs capitalize text-emerald-300">{value.replaceAll("_", " ")}</span>;
 const Row = ({ label, value }: { label: string; value: React.ReactNode }) => <div className="flex justify-between gap-4 border-b border-border px-5 py-3 text-sm last:border-0"><span className="text-muted-foreground">{label}</span><span className="text-right">{value}</span></div>;
-const Header = ({ eyebrow, title, description }: { eyebrow: string; title: string; description: string }) => <header><p className="text-xs uppercase tracking-[0.2em] text-emerald-400">{eyebrow}</p><h1 className="mt-2 text-3xl font-semibold">{title}</h1><p className="mt-2 text-sm text-muted-foreground">{description}</p></header>;
+const Header = ({ eyebrow, title, description }: { eyebrow: string; title: string; description: string }) => <header><p className="text-xs uppercase tracking-[0.2em] text-emerald-400">{eyebrow}</p><h1 data-testid="page-title" className="mt-2 text-3xl font-semibold">{title}</h1><p className="mt-2 text-sm text-muted-foreground">{description}</p></header>;
 const Metric = ({ label, value }: { label: string; value: string }) => <article className="border border-border bg-card p-5"><p className="text-xs uppercase text-muted-foreground">{label}</p><p className="mt-3 font-mono text-2xl">{value}</p></article>;
 
 export function InventoryWorkspace({ snapshot }: { snapshot: ReturnTypeSnapshot }) {
