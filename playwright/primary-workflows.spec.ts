@@ -12,7 +12,18 @@ test("authentication screens expose sign in, signup, and recovery", async ({ pag
 });
 
 test("primary operations pages render their operational page titles", async ({ page }) => {
-  const routes = [["/", "Set up Mission Control"], ["/inventory", "Inventory"], ["/orders", "Orders"], ["/purchasing", "Purchasing"], ["/shipping", "Shipping"], ["/listings", "Listings"], ["/finance", "Finance"], ["/analytics", "Analytics"], ["/automations", "Automations"], ["/ai-center", "AI Center"]] as const;
+  const routes = [
+    ["/", "Set up Mission Control"],
+    ["/inventory", "Stock, locations, and receiving"],
+    ["/orders", "Orders"],
+    ["/purchasing", "Purchasing & inbound"],
+    ["/shipping", "Packing, labels, dispatch, and tracking"],
+    ["/listings", "Marketplace drafts, validation, and delist coordination"],
+    ["/finance", "Ledger, payout reconciliation, cash, and planning"],
+    ["/analytics", "Business trends and drill-down comparisons"],
+    ["/automations", "Rule builder, run logs, retries, and failures"],
+    ["/ai-center", "Daily brief and evidence-backed recommendations"],
+  ] as const;
   for (const [route, title] of routes) {
     const appMain = page.getByTestId("app-main");
     await page.goto(route); await expect(appMain).toBeVisible(); await expect(appMain.getByRole("heading", { name: title, exact: true })).toBeVisible();
