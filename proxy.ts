@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const publicPaths = ["/sign-in", "/sign-up", "/forgot-password", "/update-password", "/auth/callback", "/api/auth"];
+const publicPaths = ["/sign-in", "/sign-up", "/forgot-password", "/update-password", "/auth/callback", "/api/auth", "/api/health"];
 export async function proxy(request: NextRequest) {
   const enabled = process.env.NEXT_PUBLIC_FAUST_AUTH_ENABLED === "true" && Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
   if (!enabled || publicPaths.some((path) => request.nextUrl.pathname.startsWith(path))) return NextResponse.next({ request });
