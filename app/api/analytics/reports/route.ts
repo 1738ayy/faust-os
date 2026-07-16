@@ -10,8 +10,8 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const input = analyticsActionSchema.parse(await request.json());
-    const data = await mutateAnalytics(input.action, input);
-    return Response.json({ ok: true, data, analytics: buildAnalyticsModel(data), snapshot: snapshot(data) });
+    const result = await mutateAnalytics(input.action, input);
+    return Response.json({ ok: true, data: result.data, analytics: buildAnalyticsModel(result.data), snapshot: snapshot(result.data), actionResult: result.actionResult });
   } catch (error) {
     return Response.json({ ok: false, message: error instanceof Error ? error.message : "Analytics report action failed." }, { status: 400 });
   }

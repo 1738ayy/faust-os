@@ -123,6 +123,7 @@ const analyticsReportPayload = {
   sections: z.array(z.string().trim().min(1)).optional(),
   metrics: z.array(z.string().trim().min(1)).optional(),
   filters: z.record(z.string(), z.string()).optional(),
+  drilldowns: z.array(z.enum(["sku", "supplier", "lot", "marketplace", "order", "finance", "fulfillment"])).optional(),
   scheduleFrequency: z.enum(["none", "daily", "weekly", "monthly"]).optional(),
   recipients: z.array(z.string().trim().min(1)).optional(),
   rowCount: z.coerce.number().int().nonnegative().optional(),

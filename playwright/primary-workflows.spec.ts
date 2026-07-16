@@ -224,6 +224,25 @@ test("purchasing API persists 1688 PO approvals, payments, receiving, claims, lo
 
 test("analytics decision engine supports filtering, drilldowns, and CSV export", async ({ request, page }) => {
   await resetDemo(request);
+  const apiCreate = await request.post("/api/analytics/reports", { data: { action: "create-report", name: "API saved report", sections: ["Product Analytics"], metrics: ["capitalUtilization"], filters: { marketplace: "Depop", sku: "FST-HOOD-001" }, drilldowns: ["sku", "lot"], scheduleFrequency: "weekly", recipients: ["ops@example.test"], idempotencyKey: crypto.randomUUID() } });
+  expect(apiCreate.ok(), await apiCreate.text()).toBeTruthy();
+  const createdReport = (await apiCreate.json()).actionResult;
+  const apiDuplicate = await request.post("/api/analytics/reports", { data: { action: "duplicate-report", reportId: createdReport.id } });
+  expect(apiDuplicate.ok(), await apiDuplicate.text()).toBeTruthy();
+  const duplicateReport = (await apiDuplicate.json()).actionResult;
+  expect(duplicateReport.id).not.toBe(createdReport.id);
+  expect(duplicateReport.name).toBe("API saved report copy");
+  expect(duplicateReport.filters).toEqual(createdReport.filters);
+  expect(duplicateReport.metrics).toEqual(createdReport.metrics);
+  expect(duplicateReport.drilldowns).toEqual(createdReport.drilldowns);
+  expect(duplicateReport.schedule.frequency).toBe(createdReport.schedule.frequency);
+  expect(duplicateReport.schedule.recipients).toEqual(createdReport.schedule.recipients);
+  const reloadedReports = await request.get("/api/analytics/reports");
+  expect(reloadedReports.ok(), await reloadedReports.text()).toBeTruthy();
+  const reloadedBody = await reloadedReports.json();
+  expect(reloadedBody.analytics.reports.some((report: { id: string; name: string }) => report.id === createdReport.id && report.name === "API saved report")).toBeTruthy();
+  expect(reloadedBody.analytics.reports.some((report: { id: string; name: string }) => report.id === duplicateReport.id && report.name === "API saved report copy")).toBeTruthy();
+  await resetDemo(request);
   await page.goto("/analytics");
   const analyticsMain = page.getByTestId("app-main");
   await expect(analyticsMain.getByRole("heading", { name: "Business trends and drill-down comparisons", exact: true })).toBeVisible();

@@ -315,11 +315,12 @@ export async function getPurchasingSummary() { const data = await read(); seedSu
 export async function mutateAnalytics(action: string, input: AnalyticsReportInput & { rowCount?: number }) {
  if (isProductionAuthEnabled()) return applyAnalyticsMutation(action, input as Record<string, unknown>);
  const data = await read(); ensureAnalyticsCollections(data);
- if (action === "create-report") createAnalyticsReport(data, input);
- else if (action === "update-report") updateAnalyticsReport(data, input);
- else if (action === "duplicate-report") duplicateAnalyticsReport(data, String(input.reportId));
- else if (action === "record-run") recordAnalyticsReportRun(data, String(input.reportId || "executive"), input.filters || {}, Number(input.rowCount || 0));
+ let actionResult: unknown;
+ if (action === "create-report") actionResult = createAnalyticsReport(data, input);
+ else if (action === "update-report") actionResult = updateAnalyticsReport(data, input);
+ else if (action === "duplicate-report") actionResult = duplicateAnalyticsReport(data, String(input.reportId));
+ else if (action === "record-run") actionResult = recordAnalyticsReportRun(data, String(input.reportId || "11111111-1111-4111-8111-111111111111"), input.filters || {}, Number(input.rowCount || 0));
  else throw new Error("Unsupported analytics action.");
- return write(data);
+ return { data: await write(data), actionResult };
 }
 export function snapshot(data: OperatingData) { const completed = data.orders.filter((order) => !["draft", "cancelled", "refunded"].includes(order.status)); const profits = completed.map((order) => orderProfit(order, data.variants)); const revenue = profits.reduce((total, value) => total + value.revenue, 0); const grossProfit = profits.reduce((total, value) => total + value.grossProfit, 0); const netProfit = profits.reduce((total, value) => total + value.netProfit, 0); const units = completed.reduce((total, order) => total + order.items.reduce((lineTotal, item) => lineTotal + item.quantity, 0), 0); const unitsOnHand = data.balances.reduce((total, balance) => total + balance.onHand, 0); const readyToShip = data.orders.filter((order) => ["paid", "confirmed", "inventory_reserved", "ready_to_pack", "packed", "label_purchased", "ready_to_ship"].includes(order.status)); return { data, metrics: { revenue, grossProfit, netProfit, margin: revenue ? netProfit / revenue * 100 : 0, orders: completed.length, units, averageOrderValue: completed.length ? revenue / completed.length : 0, cash: availableCash(data.transactions), inventoryValue: inventoryValue(data.balances, data.variants), unitsOnHand, availableUnits: data.balances.reduce((total, balance) => total + availableUnits(balance), 0), readyToShip: readyToShip.length, incoming: data.balances.reduce((total, balance) => total + balance.incoming, 0) }, attention: data.notices.filter((notice) => !notice.resolved), reorders: data.variants.map((variant) => ({ variant, quantity: reorderSuggestion(data.balances.find((balance) => balance.variantId === variant.id), variant) })).filter((entry) => entry.quantity > 0) }; }

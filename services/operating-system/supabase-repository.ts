@@ -236,26 +236,40 @@ export async function applyPurchasingMutationRpc(action: string, payload: Row, i
 export async function applyAnalyticsMutation(action: string, payload: Row) {
   const { businessId, client } = await context();
   const now = new Date().toISOString();
+  let actionResult: Row | null = null;
   if (action === "create-report") {
     const id = text(payload.idempotencyKey) || crypto.randomUUID();
-    const { error } = await client.from("analytics_saved_reports").upsert({ id, business_id: businessId, name: text(payload.name) || "Custom analytics report", description: text(payload.description), sections: payload.sections || ["Executive Dashboard"], metrics: payload.metrics || ["revenue"], filters: payload.filters || {}, drilldowns: ["sku","supplier","lot","marketplace","order","finance","fulfillment"], schedule: { frequency: text(payload.scheduleFrequency) || "none", recipients: Array.isArray(payload.recipients) ? payload.recipients : [] }, export_format: "csv", created_at: now, updated_at: now });
+    const { data, error } = await client.from("analytics_saved_reports").upsert({ id, business_id: businessId, name: text(payload.name) || "Custom analytics report", description: text(payload.description), sections: payload.sections || ["Executive Dashboard"], metrics: payload.metrics || ["revenue"], filters: payload.filters || {}, drilldowns: payload.drilldowns || ["sku","supplier","lot","marketplace","order","finance","fulfillment"], schedule: { frequency: text(payload.scheduleFrequency) || "none", recipients: Array.isArray(payload.recipients) ? payload.recipients : [] }, export_format: "csv", created_at: now, updated_at: now }).select("*").single();
     if (error) throw new Error(`Analytics create report failed: ${error.message}`);
+    actionResult = data as Row;
+    const { error: presetError } = await client.from("analytics_filter_presets").insert({ business_id: businessId, name: `${text(payload.name) || "Custom analytics report"} filters`, filters: payload.filters || {}, created_at: now, updated_at: now });
+    if (presetError) throw new Error(`Analytics create filter preset failed: ${presetError.message}`);
   } else if (action === "update-report") {
-    const { error } = await client.from("analytics_saved_reports").update({ name: text(payload.name), description: text(payload.description), sections: payload.sections, metrics: payload.metrics, filters: payload.filters || {}, schedule: { frequency: text(payload.scheduleFrequency) || "none", recipients: Array.isArray(payload.recipients) ? payload.recipients : [] }, updated_at: now }).eq("business_id", businessId).eq("id", String(payload.reportId));
+    const { data, error } = await client.from("analytics_saved_reports").update({ name: text(payload.name), description: text(payload.description), sections: payload.sections, metrics: payload.metrics, filters: payload.filters || {}, drilldowns: payload.drilldowns, schedule: { frequency: text(payload.scheduleFrequency) || "none", recipients: Array.isArray(payload.recipients) ? payload.recipients : [] }, updated_at: now }).eq("business_id", businessId).eq("id", String(payload.reportId)).select("*").single();
     if (error) throw new Error(`Analytics update report failed: ${error.message}`);
+    actionResult = data as Row;
   } else if (action === "duplicate-report") {
     const original = await client.from("analytics_saved_reports").select("*").eq("business_id", businessId).eq("id", String(payload.reportId)).single();
     if (original.error) throw new Error(original.error.message);
     const row = original.data as Row;
-    const { error } = await client.from("analytics_saved_reports").insert({ business_id: businessId, name: `${row.name as string} copy`, description: row.description, sections: row.sections, metrics: row.metrics, filters: row.filters, drilldowns: row.drilldowns, schedule: row.schedule, export_format: row.export_format || "csv", created_at: now, updated_at: now });
+    const existing = await rows(client.from("analytics_saved_reports").select("name").eq("business_id", businessId));
+    const names = new Set(existing.map((entry) => String(entry.name)));
+    const base = `${row.name as string} copy`;
+    let name = base;
+    for (let index = 2; names.has(name); index += 1) name = `${base} ${index}`;
+    const { data, error } = await client.from("analytics_saved_reports").insert({ business_id: businessId, name, description: row.description, sections: row.sections, metrics: row.metrics, filters: row.filters, drilldowns: row.drilldowns, schedule: row.schedule, export_format: row.export_format || "csv", created_at: now, updated_at: now }).select("*").single();
     if (error) throw new Error(`Analytics duplicate report failed: ${error.message}`);
+    actionResult = data as Row;
+    const { error: presetError } = await client.from("analytics_filter_presets").insert({ business_id: businessId, name: `${name} filters`, filters: row.filters || {}, created_at: now, updated_at: now });
+    if (presetError) throw new Error(`Analytics duplicate filter preset failed: ${presetError.message}`);
   } else if (action === "record-run") {
-    const { error } = await client.from("analytics_report_runs").insert({ business_id: businessId, report_id: String(payload.reportId), status: "completed", filters: payload.filters || {}, exported_row_count: number(payload.rowCount), created_at: now, completed_at: now });
+    const { data, error } = await client.from("analytics_report_runs").insert({ business_id: businessId, report_id: String(payload.reportId), status: "completed", filters: payload.filters || {}, exported_row_count: number(payload.rowCount), created_at: now, completed_at: now }).select("*").single();
     if (error) throw new Error(`Analytics report run failed: ${error.message}`);
+    actionResult = data as Row;
   } else {
     throw new Error("Unsupported analytics action.");
   }
-  return readNormalizedOperatingData();
+  return { data: await readNormalizedOperatingData(), actionResult };
 }
 export async function confirmOrderImportBatchRpc(batchId: string, idempotencyKey = crypto.randomUUID()) { const { businessId, client } = await context(); const { data: auth, error: authError } = await client.auth.getUser(); if (authError || !auth.user) throw new Error("Authentication required for import confirmation."); const { data, error } = await client.rpc("confirm_order_import_batch_transactional", { p_business_id: businessId, p_batch_id: batchId, p_actor_id: auth.user.id, p_idempotency_key: idempotencyKey }); if (error) throw new Error(`Import confirmation failed: ${error.message}`); return data as Row; }
 export async function getOrderImportBatchResultRpc(batchId: string) { const { businessId, client } = await context(); const [batch, rowsResult] = await Promise.all([client.from("order_import_batches").select("*").eq("business_id",businessId).eq("id",batchId).single(), client.from("order_import_rows").select("*").eq("business_id",businessId).eq("batch_id",batchId).order("row_number")]); if (batch.error) throw new Error(batch.error.message); if (rowsResult.error) throw new Error(rowsResult.error.message); return { batch: batch.data, rows: rowsResult.data || [] }; }

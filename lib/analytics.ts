@@ -11,7 +11,7 @@ const marketplaces: Exclude<Marketplace, "Manual">[] = ["Depop", "eBay", "Etsy",
 export type AnalyticsFilters = { from?: string; to?: string; marketplace?: string; supplierId?: string; sku?: string };
 export type AnalyticsModel = ReturnType<typeof buildAnalyticsModel>;
 type AnalyticsScheduleFrequency = NonNullable<AnalyticsSavedReport["schedule"]>["frequency"];
-export type AnalyticsReportInput = { name?: string; description?: string; sections?: string[]; metrics?: string[]; filters?: Record<string, string>; scheduleFrequency?: AnalyticsScheduleFrequency; recipients?: string[]; reportId?: string; idempotencyKey?: string };
+export type AnalyticsReportInput = { name?: string; description?: string; sections?: string[]; metrics?: string[]; filters?: Record<string, string>; drilldowns?: AnalyticsSavedReport["drilldowns"]; scheduleFrequency?: AnalyticsScheduleFrequency; recipients?: string[]; reportId?: string; idempotencyKey?: string };
 
 function inDateRange(date: string | undefined, filters: AnalyticsFilters) {
   if (!date) return true;
@@ -297,8 +297,8 @@ export function createAnalyticsReport(data: OperatingData, input: AnalyticsRepor
     sections: input.sections?.length ? input.sections : ["Executive Dashboard", "Product Analytics", "Finance Analytics"],
     metrics: input.metrics?.length ? input.metrics : ["revenue", "profit", "inventoryValue"],
     filters: input.filters || {},
-    drilldowns: ["sku", "supplier", "lot", "marketplace", "order", "finance", "fulfillment"],
-    schedule: { frequency: input.scheduleFrequency || "none", recipients: input.recipients || [] },
+    drilldowns: input.drilldowns?.length ? input.drilldowns : ["sku", "supplier", "lot", "marketplace", "order", "finance", "fulfillment"],
+    schedule: { frequency: input.scheduleFrequency || "none", recipients: input.recipients || [], nextRunAt: nextScheduleRun(input.scheduleFrequency || "none") },
     exportFormat: "csv",
     createdAt,
     updatedAt: createdAt,
@@ -326,7 +326,18 @@ export function duplicateAnalyticsReport(data: OperatingData, reportId: string) 
   ensureAnalyticsCollections(data);
   const source = data.analyticsSavedReports!.find((entry) => entry.id === reportId);
   if (!source) throw new Error("Analytics report not found.");
-  return createAnalyticsReport(data, { name: `${source.name} copy`, description: source.description, sections: source.sections, metrics: source.metrics, filters: source.filters, scheduleFrequency: source.schedule?.frequency, recipients: source.schedule?.recipients });
+  return createAnalyticsReport(data, { name: nextAnalyticsReportCopyName(data, source.name), description: source.description, sections: source.sections, metrics: source.metrics, filters: source.filters, drilldowns: source.drilldowns, scheduleFrequency: source.schedule?.frequency, recipients: source.schedule?.recipients });
+}
+
+export function nextAnalyticsReportCopyName(data: OperatingData, sourceName: string) {
+  ensureAnalyticsCollections(data);
+  const names = new Set(data.analyticsSavedReports!.map((report) => report.name));
+  const base = `${sourceName} copy`;
+  if (!names.has(base)) return base;
+  for (let index = 2; ; index += 1) {
+    const candidate = `${base} ${index}`;
+    if (!names.has(candidate)) return candidate;
+  }
 }
 
 export function recordAnalyticsReportRun(data: OperatingData, reportId: string, filters: Record<string, string>, rowCount: number) {

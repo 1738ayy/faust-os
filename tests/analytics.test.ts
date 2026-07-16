@@ -83,7 +83,16 @@ test("analytics saved reports persist filters, schedules, duplicates, and run hi
   updateAnalyticsReport(data, { reportId: report.id, filters: { marketplace: "Depop" }, scheduleFrequency: "daily", recipients: ["founder@example.test"] });
   assert.equal(data.analyticsSavedReports?.[0].schedule?.frequency, "daily");
   const copy = duplicateAnalyticsReport(data, report.id);
-  assert.match(copy.name, /copy/);
+  assert.equal(copy.name, "Supplier vs SKU decision report copy");
+  assert.notEqual(copy.id, report.id);
+  assert.deepEqual(copy.filters, report.filters);
+  assert.deepEqual(copy.metrics, report.metrics);
+  assert.deepEqual(copy.drilldowns, report.drilldowns);
+  assert.equal(copy.schedule?.frequency, report.schedule?.frequency);
+  assert.deepEqual(copy.schedule?.recipients, report.schedule?.recipients);
+  assert.equal(data.analyticsFilterPresets?.[0].name, "Supplier vs SKU decision report copy filters");
+  const secondCopy = duplicateAnalyticsReport(data, report.id);
+  assert.equal(secondCopy.name, "Supplier vs SKU decision report copy 2");
   const run = recordAnalyticsReportRun(data, report.id, { marketplace: "Depop" }, 12);
   assert.equal(run.status, "completed");
   assert.equal(data.analyticsReportRuns?.[0].exportedRowCount, 12);
