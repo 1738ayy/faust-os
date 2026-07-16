@@ -14,3 +14,4 @@ import "./automations.test";
 import "./ai-center.test";
 import "./browser-extension.test";
 import "./production-connection.test";
+import "./easypost-adapter.test";

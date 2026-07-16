@@ -98,7 +98,9 @@ export function providerReadiness(env: ProductionEnv = readProductionEnv()) {
     shipping: {
       selected: env.SHIPPING_PROVIDER,
       configured: env.SHIPPING_PROVIDER === "local_mock" || Boolean(env.SHIPPING_PROVIDER === "easypost" ? env.EASYPOST_API_KEY : env.SHIPPO_API_KEY),
-      mode: env.SHIPPING_PROVIDER === "local_mock" ? "mock" : "sandbox_required",
+      reachability: env.SHIPPING_PROVIDER === "local_mock" ? "mock" : "not_checked",
+      mockFallback: env.SHIPPING_PROVIDER === "local_mock",
+      mode: env.SHIPPING_PROVIDER === "local_mock" ? "mock" : env.SHIPPING_PROVIDER === "easypost" ? "easypost_sandbox" : "sandbox_required",
     },
     marketplaces: {
       selected: "extension-assisted single test channel only",
