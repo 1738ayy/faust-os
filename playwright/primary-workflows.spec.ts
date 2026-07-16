@@ -181,7 +181,7 @@ test("production health API reports migration, storage, worker, extension, and p
   expect(health.checks.storage.ready).toBeTruthy();
   expect(health.checks.worker.gracefulShutdown).toBeTruthy();
   expect(health.checks.extension).toBeTruthy();
-  expect(health.checks.providers.marketplaceCredentials).toBe("not_connected_by_design");
+  expect(health.checks.providers.marketplaces.allFiveLiveCredentials).toBe("not_connected_by_design");
 });
 
 test("fulfillment API persists pick, pack, label, dispatch, tracking, exception, finance, order, and inventory state", async ({ request }) => {

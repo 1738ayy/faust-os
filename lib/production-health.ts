@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { extensionConnectionSummary } from "./browser-extension";
-import { validateProductionReadiness, readProductionEnv } from "./production-config";
+import { providerReadiness, validateProductionReadiness, readProductionEnv } from "./production-config";
 import { storageReadiness } from "./production-storage";
 import type { OperatingData } from "../domain/business";
 
@@ -43,7 +43,7 @@ export function productionHealth(data?: OperatingData) {
     storage: { status: statusFrom(storage.ready, storage.duplicateBuckets), ...storage },
     worker: { status: statusFrom(worker.ready, worker.deadLetters ? [worker.deadLetters] : []), ...worker },
     extension: { status: "ok" as const, registeredDevices: extension?.devices?.length || 0, activeDevices: extension?.devices?.filter((device) => device.status === "active").length || 0, artifacts: extension?.artifacts?.length || 0 },
-    providers: { status: "warning" as const, marketplaceCredentials: "not_connected_by_design", carrierCredentials: "not_connected_by_design", bankCredentials: "not_connected_by_design" },
+    providers: { status: providerReadiness(env).shipping.configured && providerReadiness(env).ai.configured ? "warning" as const : "blocked" as const, ...providerReadiness(env), bankCredentials: "not_connected_by_design" },
   };
   const overall: HealthStatus = Object.values(checks).some((check) => check.status === "blocked") ? "blocked" : Object.values(checks).some((check) => check.status === "warning") ? "warning" : "ok";
   return { ok: overall !== "blocked", status: overall, checkedAt: new Date().toISOString(), checks };
