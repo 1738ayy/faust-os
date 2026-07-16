@@ -146,3 +146,17 @@ test("inventory exposes audited mutation controls and refreshed balances", async
   await panel.getByRole("button", { name: "Assign location", exact: true }).click();
   await expect(panel.getByText(/assign currently unlocated stock/i)).toBeVisible();
 });
+
+test("finance workspace exposes ledger, reconciliation, payout, cash, budget, tax, and forecast workflows", async ({ request, page }) => {
+  await resetDemo(request);
+  await page.goto("/finance");
+  const financeMain = page.getByTestId("app-main");
+  await expect(financeMain.getByRole("heading", { name: "Ledger, payout reconciliation, cash, and planning", exact: true })).toBeVisible();
+  for (const section of ["Finance Overview", "Deployable Cash Formula", "Cash Flow", "Transaction Ledger", "Revenue", "Order Reconciliation", "Expenses", "COGS", "Fees", "Payouts", "Payout Reconciliation", "Inventory Value", "Tax Reserve", "Reinvestment", "Budgets", "Forecasts"]) {
+    await expect(financeMain.getByRole("heading", { name: section, exact: true })).toBeVisible();
+  }
+  const revenueSection = financeMain.locator("section").filter({ has: page.getByRole("heading", { name: "Revenue", exact: true }) });
+  await expect(revenueSection.getByText("FO-1042", { exact: true })).toBeVisible();
+  await expect(financeMain.getByText(/Deployable cash/i)).toBeVisible();
+  await expect(financeMain.getByText(/Assumptions:/i)).toBeVisible();
+});
