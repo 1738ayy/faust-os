@@ -91,7 +91,8 @@ test("fulfillment center browser flow drives real API actions", async ({ request
   const labelWorkflow = shippingMain.locator("section").filter({ has: page.getByRole("heading", { name: "Rate shopping & labels", exact: true }) });
   await labelWorkflow.getByRole("button", { name: "Dispatch", exact: true }).click();
   await expect(page.getByRole("status")).toContainText("Shipment dispatched.");
-  await expect(page.getByText(/Carrier accepted package/i)).toBeVisible();
+  const trackingCenter = shippingMain.locator("section").filter({ has: page.getByRole("heading", { name: "Tracking center", exact: true }) });
+  await expect(trackingCenter.locator(".border-l").getByText(/Carrier accepted package/i)).toBeVisible();
   await page.getByRole("button", { name: "Refresh tracking" }).click();
   await expect(page.getByRole("status")).toContainText("Tracking refreshed.");
   const operating = await (await request.get("/api/operating-system")).json();
