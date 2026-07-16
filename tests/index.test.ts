@@ -9,3 +9,4 @@ import "./finance.test";
 import "./wholesale-core.test";
 import "./listings-core.test";
 import "./purchasing-core.test";
+import "./analytics.test";

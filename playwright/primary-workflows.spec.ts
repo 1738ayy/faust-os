@@ -222,6 +222,25 @@ test("purchasing API persists 1688 PO approvals, payments, receiving, claims, lo
   await expect(purchasingMain.getByRole("heading", { name: "Parcel-to-lot receiving", level: 2, exact: true })).toBeVisible();
 });
 
+test("analytics decision engine supports filtering, drilldowns, and CSV export", async ({ request, page }) => {
+  await resetDemo(request);
+  await page.goto("/analytics");
+  const analyticsMain = page.getByTestId("app-main");
+  await expect(analyticsMain.getByRole("heading", { name: "Business trends and drill-down comparisons", exact: true })).toBeVisible();
+  for (const section of ["Reporting controls", "Product Analytics", "Channel Analytics", "Supplier Analytics", "Purchasing Analytics", "Inventory Analytics", "Fulfillment Analytics", "Finance Analytics", "Customer Analytics", "Geographic Analytics", "Saved Reports"]) {
+    await expect(analyticsMain.getByRole("heading", { name: section, level: 2, exact: true })).toBeVisible();
+  }
+  await page.locator('select[name="marketplace"]').selectOption("Depop");
+  await page.locator('select[name="sku"]').selectOption("FST-HOOD-001");
+  await page.getByRole("button", { name: "Apply filters", exact: true }).click();
+  await expect(page).toHaveURL(/marketplace=Depop/);
+  await expect(analyticsMain.getByText("FST-HOOD-001", { exact: true })).toBeVisible();
+  await expect(analyticsMain.getByRole("link", { name: "Inventory value", exact: true })).toBeVisible();
+  const csv = await request.get("/api/exports/analytics?marketplace=Depop");
+  expect(csv.ok(), await csv.text()).toBeTruthy();
+  expect(await csv.text()).toContain("executive");
+});
+
 test("inventory exposes audited mutation controls and refreshed balances", async ({ request, page }) => {
   await resetDemo(request);
   await page.goto("/inventory");
