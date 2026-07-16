@@ -133,6 +133,30 @@ test("finance API persists expense, payout, budget, tax, allocation, and forecas
   const forecast = await request.post("/api/finance/actions", { data: { action: "configure-forecast", scenario: "expected", revenueMultiplier: 1.08, expenseMultiplier: 1.02, assumption: "API scenario" } }); expect(forecast.ok(), await forecast.text()).toBeTruthy(); state = (await forecast.json()).data; expect(state.forecasts.some((entry: { scenarios?: unknown[] }) => entry.scenarios?.length)).toBeTruthy();
 });
 
+test("wholesale core API persists lots, FIFO allocations, journals, jobs, and channel risk locks", async ({ request }) => {
+  await resetDemo(request);
+  let state = (await (await request.get("/api/operating-system")).json()).data;
+  const variant = state.variants[0];
+  const order = state.orders.find((entry: { number: string }) => entry.number === "FO-1042");
+  const orderItem = order.items[0];
+  const listing = state.listings[0];
+  const batch = await request.post("/api/wholesale-core", { data: { action: "receive-batch", reference: "PW-WHOLESALE-001", supplierId: state.suppliers[0].id, purchaseOrderId: state.purchaseOrders[0].id, currency: "RMB", rmbUsdRate: 0.14, items: [{ variantId: variant.id, quantity: 4, unitCost: 100, physicalSku: "PW-HOOD-L", locationId: state.locations[0].id }], landedCosts: [{ type: "international_freight", description: "Playwright freight", amount: 40, currency: "RMB", allocationMethod: "by_quantity" }], idempotencyKey: crypto.randomUUID() } });
+  expect(batch.ok(), await batch.text()).toBeTruthy(); state = (await batch.json()).data;
+  expect(state.purchaseBatches.length).toBe(1); expect(state.inventoryLots.length).toBe(1); expect(state.journalEntries.length).toBeGreaterThan(0);
+  const fifo = await request.post("/api/wholesale-core", { data: { action: "allocate-fifo", orderId: order.id, orderItemId: orderItem.id, idempotencyKey: crypto.randomUUID() } });
+  expect(fifo.ok(), await fifo.text()).toBeTruthy(); state = (await fifo.json()).data;
+  expect(state.orderItemCostAllocations.length).toBe(1); expect(state.inventoryLots[0].quantityRemaining).toBe(3);
+  const returned = await request.post("/api/wholesale-core", { data: { action: "receive-return", orderId: order.id, orderItemId: orderItem.id, quantity: 1, returnId: crypto.randomUUID(), mode: "returned_goods_lot", idempotencyKey: crypto.randomUUID() } });
+  expect(returned.ok(), await returned.text()).toBeTruthy(); state = (await returned.json()).data;
+  expect(state.inventoryLots.some((lot: { condition: string }) => lot.condition === "returned_goods")).toBeTruthy();
+  const sync = await request.post("/api/wholesale-core", { data: { action: "sync-channel-risk", variantId: variant.id, listingId: listing.id, desiredQuantity: 20, physicalSku: "PW-HOOD-L", idempotencyKey: crypto.randomUUID() } });
+  expect(sync.ok(), await sync.text()).toBeTruthy(); state = (await sync.json()).data;
+  expect(state.physicalSkuMappings.some((mapping: { physicalSku: string }) => mapping.physicalSku === "PW-HOOD-L")).toBeTruthy(); expect(state.inventoryRiskLocks.some((lock: { status: string }) => lock.status === "active")).toBeTruthy();
+  const outbox = await request.post("/api/wholesale-core", { data: { action: "process-outbox", maxAttempts: 1 } });
+  expect(outbox.ok(), await outbox.text()).toBeTruthy(); state = (await outbox.json()).data;
+  expect(state.deadLetters.length).toBeGreaterThan(0);
+});
+
 test("inventory exposes audited mutation controls and refreshed balances", async ({ request, page }) => {
   await resetDemo(request);
   await page.goto("/inventory");

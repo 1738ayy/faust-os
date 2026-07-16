@@ -6,3 +6,4 @@ import "./inventory-contracts.test";
 import "./orders-deepening.test";
 import "./fulfillment-workflows.test";
 import "./finance.test";
+import "./wholesale-core.test";
