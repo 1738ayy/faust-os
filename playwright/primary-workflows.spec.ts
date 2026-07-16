@@ -218,8 +218,8 @@ test("purchasing API persists 1688 PO approvals, payments, receiving, claims, lo
   const purchasingMain = page.getByTestId("app-main");
   await expect(purchasingMain.getByRole("heading", { name: "Purchasing & inbound", exact: true })).toBeVisible();
   await expect(page.getByRole("region", { name: "Purchasing workflows" })).toBeVisible();
-  await expect(purchasingMain.getByText("1688 purchase orders", { exact: true })).toBeVisible();
-  await expect(purchasingMain.getByText("Parcel-to-lot receiving", { exact: true })).toBeVisible();
+  await expect(purchasingMain.getByRole("heading", { name: "1688 purchase orders", level: 2, exact: true })).toBeVisible();
+  await expect(purchasingMain.getByRole("heading", { name: "Parcel-to-lot receiving", level: 2, exact: true })).toBeVisible();
 });
 
 test("inventory exposes audited mutation controls and refreshed balances", async ({ request, page }) => {
