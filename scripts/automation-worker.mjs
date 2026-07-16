@@ -3,6 +3,7 @@ const workerId = process.env.AUTOMATION_WORKER_ID || `automation-worker-${proces
 const concurrency = Number(process.env.AUTOMATION_WORKER_CONCURRENCY || 4);
 const pollingIntervalMs = Number(process.env.AUTOMATION_WORKER_POLL_MS || 5000);
 const leaseTimeoutMs = Number(process.env.AUTOMATION_WORKER_LEASE_MS || 30000);
+const browserJobsEnabled = process.env.BROWSER_EXTENSION_WORKER_ENABLED === "true";
 
 let stopping = false;
 process.on("SIGINT", () => { stopping = true; });
@@ -13,18 +14,19 @@ function log(level, message, detail = {}) {
 }
 
 async function tick() {
+  const startedAt = Date.now();
   const response = await fetch(endpoint, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ action: "worker-tick", workerId, concurrency, pollingIntervalMs, leaseTimeoutMs }),
+    headers: { "Content-Type": "application/json", "X-Faust-Worker-Id": workerId },
+    body: JSON.stringify({ action: "worker-tick", workerId, concurrency, pollingIntervalMs, leaseTimeoutMs, browserJobsEnabled }),
   });
   const body = await response.text();
   if (!response.ok) throw new Error(`Automation worker tick failed: ${response.status} ${body}`);
   const parsed = body ? JSON.parse(body) : {};
-  log("info", "Automation worker tick complete", { dueCount: parsed.actionResult?.dueCount || 0, runCount: parsed.actionResult?.runs?.length || 0 });
+  log("info", "Automation worker tick complete", { durationMs: Date.now() - startedAt, dueCount: parsed.actionResult?.dueCount || 0, runCount: parsed.actionResult?.runs?.length || 0, browserJobsEnabled });
 }
 
-log("info", "Automation worker starting", { endpoint, concurrency, pollingIntervalMs, leaseTimeoutMs });
+log("info", "Automation worker starting", { endpoint, concurrency, pollingIntervalMs, leaseTimeoutMs, browserJobsEnabled, gracefulShutdown: true });
 while (!stopping) {
   try {
     await tick();
@@ -33,4 +35,4 @@ while (!stopping) {
   }
   await new Promise((resolve) => setTimeout(resolve, pollingIntervalMs));
 }
-log("info", "Automation worker stopped");
+log("info", "Automation worker stopped", { gracefulShutdown: true });

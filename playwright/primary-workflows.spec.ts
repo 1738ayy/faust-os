@@ -172,6 +172,18 @@ test("browser extension API scans, analyzes, imports, confirms, syncs, and repor
   expect(state.data.extensionActionAudits.some((entry: { action: string }) => entry.action === "report-error")).toBeTruthy();
 });
 
+test("production health API reports migration, storage, worker, extension, and provider readiness", async ({ request }) => {
+  await resetDemo(request);
+  const response = await request.get("/api/health");
+  expect(response.ok(), await response.text()).toBeTruthy();
+  const health = await response.json();
+  expect(health.checks.migrations.ready).toBeTruthy();
+  expect(health.checks.storage.ready).toBeTruthy();
+  expect(health.checks.worker.gracefulShutdown).toBeTruthy();
+  expect(health.checks.extension).toBeTruthy();
+  expect(health.checks.providers.marketplaceCredentials).toBe("not_connected_by_design");
+});
+
 test("fulfillment API persists pick, pack, label, dispatch, tracking, exception, finance, order, and inventory state", async ({ request }) => {
   await resetDemo(request);
   const beforeResponse = await request.get("/api/operating-system"); expect(beforeResponse.ok()).toBeTruthy(); const before = await beforeResponse.json();

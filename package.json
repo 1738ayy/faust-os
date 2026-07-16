@@ -15,6 +15,8 @@
     "test:e2e": "playwright test",
     "test:journey": "tsc -p tests/tsconfig.json && node .test-build/tests/e2e.test.js",
     "test:supabase": "node --env-file=.env.integration.local scripts/supabase-integration-harness.mjs",
+    "production:migrations": "node scripts/validate-migrations.mjs",
+    "production:bootstrap-plan": "node scripts/production-bootstrap-plan.mjs",
     "worker:automations": "node scripts/automation-worker.mjs",
     "worker:automations:dev": "node scripts/automation-worker.mjs",
     "validate": "npm run lint && npm run typecheck && npm test && npm run test:e2e && npm run build"
