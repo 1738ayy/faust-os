@@ -62,6 +62,7 @@ test("fulfillment center browser flow drives real API actions", async ({ request
   await resetDemo(request);
   await page.goto("/shipping");
   const shippingMain = page.getByTestId("app-main");
+  const labelWorkflow = shippingMain.locator("section").filter({ has: page.getByRole("heading", { name: "Rate shopping & labels", exact: true }) });
   await expect(shippingMain.getByRole("heading", { name: "Warehouse fulfillment center", exact: true })).toBeVisible();
   await expect(shippingMain.getByRole("cell", { name: "FO-1042", exact: true })).toBeVisible();
   const startPickResponse = page.waitForResponse((response) => response.url().includes("/api/fulfillment/actions") && response.request().method() === "POST");
@@ -78,8 +79,10 @@ test("fulfillment center browser flow drives real API actions", async ({ request
   await expect(page.getByRole("status")).toContainText("Address validated.");
   await page.getByRole("button", { name: "Get rates" }).click();
   await expect(page.getByRole("status")).toContainText("Rates loaded.");
+  await expect(labelWorkflow.getByText("USPS Mock Ground Advantage", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Select best rate" }).click();
   await expect(page.getByRole("status")).toContainText("Rate selected.");
+  await expect(labelWorkflow.getByText(/USPS Mock - Ground Advantage - postage/i)).toBeVisible();
   await page.getByRole("button", { name: "Generate mock label" }).click();
   await expect(page.getByRole("status")).toContainText("Label generated.");
   await page.getByRole("button", { name: "Print/reprint" }).click();
@@ -88,7 +91,6 @@ test("fulfillment center browser flow drives real API actions", async ({ request
   await expect(page.getByRole("status")).toContainText("Label voided.");
   await page.getByRole("button", { name: "Regenerate label" }).click();
   await expect(page.getByRole("status")).toContainText("Label regenerated.");
-  const labelWorkflow = shippingMain.locator("section").filter({ has: page.getByRole("heading", { name: "Rate shopping & labels", exact: true }) });
   await labelWorkflow.getByRole("button", { name: "Dispatch", exact: true }).click();
   await expect(page.getByRole("status")).toContainText("Shipment dispatched.");
   const trackingCenter = shippingMain.locator("section").filter({ has: page.getByRole("heading", { name: "Tracking center", exact: true }) });
@@ -162,7 +164,7 @@ test("finance workspace exposes ledger, reconciliation, payout, cash, budget, ta
   const financeMain = page.getByTestId("app-main");
   await expect(financeMain.getByRole("heading", { name: "Ledger, payout reconciliation, cash, and planning", exact: true })).toBeVisible();
   for (const section of ["Finance Overview", "Deployable Cash Formula", "Cash Flow", "Transaction Ledger", "Revenue", "Order Reconciliation", "Expenses", "COGS", "Fees", "Payouts", "Payout Reconciliation", "Inventory Value", "Tax Reserve", "Reinvestment", "Budgets", "Forecasts"]) {
-    await expect(financeMain.getByRole("heading", { name: section, exact: true })).toBeVisible();
+    await expect(financeMain.getByRole("heading", { name: section, level: 2, exact: true })).toBeVisible();
   }
   const revenueSection = financeMain.locator("section").filter({ has: page.getByRole("heading", { name: "Revenue", exact: true }) });
   await expect(revenueSection.getByText("FO-1042", { exact: true })).toBeVisible();
