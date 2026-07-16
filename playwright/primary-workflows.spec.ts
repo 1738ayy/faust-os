@@ -157,6 +157,9 @@ test("finance workspace exposes ledger, reconciliation, payout, cash, budget, ta
   }
   const revenueSection = financeMain.locator("section").filter({ has: page.getByRole("heading", { name: "Revenue", exact: true }) });
   await expect(revenueSection.getByText("FO-1042", { exact: true })).toBeVisible();
-  await expect(financeMain.getByText(/Deployable cash/i)).toBeVisible();
-  await expect(financeMain.getByText(/Assumptions:/i)).toBeVisible();
+  const deployableCashSection = financeMain.locator("section").filter({ has: page.getByRole("heading", { name: "Deployable Cash Formula", exact: true }) });
+  await expect(deployableCashSection).toBeVisible();
+  await expect(deployableCashSection.getByText("Deployable cash", { exact: true })).toBeVisible();
+  const forecastsSection = financeMain.locator("section").filter({ has: page.getByRole("heading", { name: "Forecasts", exact: true }) });
+  await expect(forecastsSection.getByText(/Assumptions:/i)).toBeVisible();
 });
