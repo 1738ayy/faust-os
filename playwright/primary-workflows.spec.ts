@@ -183,6 +183,45 @@ test("listings API creates five channel drafts and coordinates publish, sync, ma
   expect(state.channelListingDrafts.filter((entry: { status: string }) => entry.status === "delisted").length).toBeGreaterThanOrEqual(4);
 });
 
+test("purchasing API persists 1688 PO approvals, payments, receiving, claims, lots, and reorders", async ({ request, page }) => {
+  await resetDemo(request);
+  let state = (await (await request.get("/api/operating-system")).json()).data;
+  const supplier = state.suppliers[0];
+  const variant = state.variants[0];
+  const create = await request.post("/api/purchasing/actions", { data: { action: "create-1688-po", supplierId: supplier.id, reference: "PW-1688-001", currency: "RMB", exchangeRate: 0.14, items: [{ variantId: variant.id, expectedQuantity: 6, unitCost: 118 }], domesticFreight: 48, internationalFreight: 32, duties: 8, customs: 4, idempotencyKey: crypto.randomUUID() } });
+  expect(create.ok(), await create.text()).toBeTruthy(); state = (await create.json()).data;
+  const po = state.purchaseOrders.find((entry: { reference: string }) => entry.reference === "PW-1688-001");
+  expect(po.status).toBe("draft");
+  expect(state.purchaseApprovals.some((entry: { purchaseOrderId: string; status: string }) => entry.purchaseOrderId === po.id && entry.status === "requested")).toBeTruthy();
+  expect(state.transactions.some((entry: { purchaseOrderId: string; category: string }) => entry.purchaseOrderId === po.id && entry.category === "Purchase commitment")).toBeTruthy();
+
+  const approved = await request.post("/api/purchasing/actions", { data: { action: "approve-po", purchaseOrderId: po.id, approved: true, reason: "Playwright replenishment approval" } });
+  expect(approved.ok(), await approved.text()).toBeTruthy(); state = (await approved.json()).data;
+  expect(state.purchaseOrders.find((entry: { id: string }) => entry.id === po.id).status).toBe("ordered");
+
+  const deposit = await request.post("/api/purchasing/actions", { data: { action: "record-payment", purchaseOrderId: po.id, type: "deposit", currency: "RMB", amountOriginal: 300, exchangeRate: 0.14, idempotencyKey: crypto.randomUUID() } });
+  expect(deposit.ok(), await deposit.text()).toBeTruthy(); state = (await deposit.json()).data;
+  expect(state.purchasePayments.some((entry: { purchaseOrderId: string; type: string }) => entry.purchaseOrderId === po.id && entry.type === "deposit")).toBeTruthy();
+
+  const refreshedPo = state.purchaseOrders.find((entry: { id: string }) => entry.id === po.id);
+  const received = await request.post("/api/purchasing/actions", { data: { action: "receive-parcel-to-lots", purchaseOrderId: refreshedPo.id, rows: [{ purchaseOrderItemId: refreshedPo.items[0].id, receivedQuantity: 5, damagedQuantity: 1, notes: "Playwright damaged unit" }], idempotencyKey: crypto.randomUUID() } });
+  expect(received.ok(), await received.text()).toBeTruthy(); state = (await received.json()).data;
+  expect(state.receivingSessions.some((entry: { purchaseOrderId: string; status: string }) => entry.purchaseOrderId === po.id && entry.status === "issue")).toBeTruthy();
+  expect(state.supplierClaims.some((entry: { purchaseOrderId: string; type: string }) => entry.purchaseOrderId === po.id && entry.type === "damaged")).toBeTruthy();
+  expect(state.inventoryLots.some((entry: { variantId: string; quantityReceived: number }) => entry.variantId === variant.id && entry.quantityReceived === 5)).toBeTruthy();
+
+  const reorders = await request.post("/api/purchasing/actions", { data: { action: "generate-reorders" } });
+  expect(reorders.ok(), await reorders.text()).toBeTruthy(); state = (await reorders.json()).data;
+  expect(state.reorderRecommendations.length).toBeGreaterThanOrEqual(0);
+
+  await page.goto("/purchasing");
+  const purchasingMain = page.getByTestId("app-main");
+  await expect(purchasingMain.getByRole("heading", { name: "Purchasing & inbound", exact: true })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Purchasing workflows" })).toBeVisible();
+  await expect(purchasingMain.getByText("1688 purchase orders", { exact: true })).toBeVisible();
+  await expect(purchasingMain.getByText("Parcel-to-lot receiving", { exact: true })).toBeVisible();
+});
+
 test("inventory exposes audited mutation controls and refreshed balances", async ({ request, page }) => {
   await resetDemo(request);
   await page.goto("/inventory");

@@ -105,3 +105,13 @@ export const listingsActionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("coordinate-sold"), draftId: z.string().uuid(), idempotencyKey: z.string().uuid().optional() }),
   z.object({ action: z.literal("retry-sync"), draftId: z.string().uuid(), idempotencyKey: z.string().uuid().optional() }),
 ]);
+const purchaseItemSchema = z.object({ variantId: z.string().uuid(), expectedQuantity: z.coerce.number().int().positive(), unitCost: z.coerce.number().nonnegative() });
+const receiveRowSchema = z.object({ purchaseOrderItemId: z.string().uuid(), receivedQuantity: z.coerce.number().int().nonnegative(), damagedQuantity: z.coerce.number().int().nonnegative().optional(), overageQuantity: z.coerce.number().int().nonnegative().optional(), notes: z.string().trim().max(500).optional() });
+export const purchasingActionSchema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("seed-supplier-ops") }),
+  z.object({ action: z.literal("create-1688-po"), supplierId: z.string().uuid(), reference: z.string().trim().min(1).max(120), currency: z.enum(["RMB", "USD"]), exchangeRate: z.coerce.number().positive(), items: z.array(purchaseItemSchema).min(1), domesticFreight: z.coerce.number().nonnegative().optional(), internationalFreight: z.coerce.number().nonnegative().optional(), duties: z.coerce.number().nonnegative().optional(), customs: z.coerce.number().nonnegative().optional(), idempotencyKey: z.string().uuid().optional() }),
+  z.object({ action: z.literal("approve-po"), purchaseOrderId: z.string().uuid(), approved: z.boolean().default(true), reason: z.string().trim().max(500).optional() }),
+  z.object({ action: z.literal("record-payment"), purchaseOrderId: z.string().uuid(), type: z.enum(["deposit", "final", "freight", "duty", "customs", "refund"]), currency: z.enum(["RMB", "USD"]), amountOriginal: z.coerce.number().positive(), exchangeRate: z.coerce.number().positive(), idempotencyKey: z.string().uuid().optional() }),
+  z.object({ action: z.literal("receive-parcel-to-lots"), purchaseOrderId: z.string().uuid(), parcelId: z.string().uuid().optional(), rows: z.array(receiveRowSchema).min(1), idempotencyKey: z.string().uuid().optional() }),
+  z.object({ action: z.literal("generate-reorders") }),
+]);
