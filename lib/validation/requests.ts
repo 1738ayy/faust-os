@@ -135,3 +135,10 @@ export const analyticsActionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("duplicate-report"), reportId: z.string().min(1) }),
   z.object({ action: z.literal("record-run"), reportId: z.string().min(1), filters: z.record(z.string(), z.string()).optional(), rowCount: z.coerce.number().int().nonnegative().optional() }),
 ]);
+
+export const automationActionSchema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("create-rule"), name: z.string().trim().min(1).max(140).optional(), templateId: z.string().optional(), triggerType: z.string().optional(), dryRun: z.boolean().optional(), enabled: z.boolean().optional(), priority: z.coerce.number().int().min(0).max(999).optional(), conditionMode: z.enum(["AND", "OR"]).optional(), samplePayload: z.record(z.string(), z.unknown()).optional(), idempotencyKey: z.string().uuid().optional() }),
+  z.object({ action: z.enum(["duplicate-rule", "enable-rule", "disable-rule", "archive-rule", "test-rule"]), ruleId: z.string().uuid() }),
+  z.object({ action: z.literal("trigger-run"), ruleId: z.string().uuid(), samplePayload: z.record(z.string(), z.unknown()).optional(), idempotencyKey: z.string().uuid().optional() }),
+  z.object({ action: z.enum(["approve-action", "reject-action", "retry-run", "cancel-run"]), runId: z.string().uuid() }),
+]);

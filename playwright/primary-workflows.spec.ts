@@ -31,6 +31,44 @@ test("primary operations pages render their operational page titles", async ({ r
   }
 });
 
+test("automations create, test, enable, run, approve, retry, duplicate, archive, and audit rules", async ({ request, page }) => {
+  await resetDemo(request);
+  const create = await request.post("/api/automations/actions", { data: { action: "create-rule", name: "Browser low stock automation", templateId: "auto-template-low-stock", enabled: false, dryRun: true, idempotencyKey: crypto.randomUUID() } });
+  expect(create.ok(), await create.text()).toBeTruthy();
+  let state = (await create.json()).data;
+  const rule = state.automationRules.find((entry: { name: string }) => entry.name === "Browser low stock automation");
+  expect(rule.conditions.length).toBeGreaterThan(0);
+  const testRun = await request.post("/api/automations/actions", { data: { action: "test-rule", ruleId: rule.id } });
+  expect(testRun.ok(), await testRun.text()).toBeTruthy();
+  state = (await testRun.json()).data;
+  expect(state.automationRuns.some((entry: { status: string }) => entry.status === "dry_run")).toBeTruthy();
+  const enable = await request.post("/api/automations/actions", { data: { action: "enable-rule", ruleId: rule.id } });
+  expect(enable.ok(), await enable.text()).toBeTruthy();
+  const trigger = await request.post("/api/automations/actions", { data: { action: "trigger-run", ruleId: rule.id, samplePayload: { available: 1, sku: "FST-HOOD-001" }, idempotencyKey: crypto.randomUUID() } });
+  expect(trigger.ok(), await trigger.text()).toBeTruthy();
+  state = (await trigger.json()).data;
+  expect(state.automationSteps.length).toBeGreaterThan(0);
+  expect(state.activity.some((entry: { entityType: string }) => entry.entityType === "automation_run")).toBeTruthy();
+  const duplicate = await request.post("/api/automations/actions", { data: { action: "duplicate-rule", ruleId: rule.id } });
+  expect(duplicate.ok(), await duplicate.text()).toBeTruthy();
+  state = (await duplicate.json()).data;
+  expect(state.automationRules.some((entry: { name: string }) => entry.name === "Browser low stock automation copy")).toBeTruthy();
+  const archive = await request.post("/api/automations/actions", { data: { action: "archive-rule", ruleId: rule.id } });
+  expect(archive.ok(), await archive.text()).toBeTruthy();
+
+  await page.goto("/automations");
+  const automationMain = page.getByTestId("app-main");
+  await expect(automationMain.getByRole("heading", { name: "Rule builder, run logs, retries, and failures", exact: true })).toBeVisible();
+  const builder = page.getByRole("region", { name: "Automation builder" });
+  await expect(builder).toBeVisible();
+  for (const label of ["Create rule", "Test rule", "Enable rule", "Trigger run", "Duplicate rule", "Archive rule"]) await expect(builder.getByRole("button", { name: label, exact: true })).toBeVisible();
+  await expect(automationMain.getByRole("heading", { name: "Rules", level: 2, exact: true })).toBeVisible();
+  await expect(automationMain.getByRole("heading", { name: "Active Runs", level: 2, exact: true })).toBeVisible();
+  await expect(automationMain.getByRole("heading", { name: "Run steps", level: 2, exact: true })).toBeVisible();
+  await expect(automationMain.getByRole("heading", { name: "Waiting Approval", level: 2, exact: true })).toBeVisible();
+  await expect(automationMain.getByRole("heading", { name: "Failed & Dead Letter", level: 2, exact: true })).toBeVisible();
+});
+
 test("fulfillment API persists pick, pack, label, dispatch, tracking, exception, finance, order, and inventory state", async ({ request }) => {
   await resetDemo(request);
   const beforeResponse = await request.get("/api/operating-system"); expect(beforeResponse.ok()).toBeTruthy(); const before = await beforeResponse.json();
