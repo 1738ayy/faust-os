@@ -1,4 +1,4 @@
-const DEFAULTS = { faustBaseUrl: "http://localhost:3000", environment: "local", extensionVersion: "1.0.0" };
+const DEFAULTS = { faustBaseUrl: "http://localhost:3000", environment: "local", extensionVersion: "1.1.0-phase2", deviceName: "Faust Chrome Extension" };
 
 async function settings() {
   const stored = await chrome.storage.sync.get(DEFAULTS);
@@ -7,9 +7,11 @@ async function settings() {
 
 async function callFaust(path, body) {
   const config = await settings();
+  const session = await chrome.storage.local.get(["deviceId", "extensionToken", "tokenExpiresAt"]);
+  const nonce = crypto.randomUUID();
   const response = await fetch(`${config.faustBaseUrl}${path}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", "X-Faust-Extension-Version": config.extensionVersion },
+    headers: { "Content-Type": "application/json", "X-Faust-Extension-Version": config.extensionVersion, ...(session.deviceId ? { "X-Faust-Device-Id": session.deviceId } : {}), ...(session.extensionToken ? { "X-Faust-Extension-Token": session.extensionToken } : {}), "X-Faust-Nonce": nonce },
     body: JSON.stringify(body),
   });
   const data = await response.json().catch(() => ({}));
@@ -17,8 +19,22 @@ async function callFaust(path, body) {
   return data;
 }
 
+async function registerDevice() {
+  const config = await settings();
+  const response = await fetch(`${config.faustBaseUrl}/api/extension/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Faust-Extension-Version": config.extensionVersion },
+    body: JSON.stringify({ deviceName: config.deviceName, browser: navigator.userAgent, environment: config.environment, version: config.extensionVersion, permissions: chrome.runtime.getManifest().permissions || [], idempotencyKey: crypto.randomUUID() }),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data.actionResult?.token) throw new Error(data.message || "Could not register Faust extension device.");
+  await chrome.storage.local.set({ deviceId: data.actionResult.deviceId, extensionToken: data.actionResult.token, tokenExpiresAt: data.actionResult.expiresAt });
+  return data;
+}
+
 chrome.runtime.onInstalled.addListener(async () => {
   await chrome.storage.sync.set(await settings());
+  await registerDevice().catch(() => undefined);
   if (chrome.sidePanel?.setPanelBehavior) await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
 });
 
@@ -26,8 +42,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   (async () => {
     if (message.type === "FAUST_STATUS") {
       const config = await settings();
+      const local = await chrome.storage.local.get(["deviceId", "tokenExpiresAt"]);
       const response = await fetch(`${config.faustBaseUrl}/api/extension/actions`).then((item) => item.json());
-      sendResponse({ ok: true, config, response });
+      sendResponse({ ok: true, config, local, response });
+      return;
+    }
+    if (message.type === "FAUST_REGISTER_DEVICE") {
+      const response = await registerDevice();
+      sendResponse({ ok: true, response });
       return;
     }
     if (message.type === "FAUST_SCAN_PRODUCT") {
@@ -50,6 +72,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
     if (message.type === "FAUST_CONFIRM_PUBLISH") {
       const result = await callFaust("/api/extension/confirm", message.payload);
+      sendResponse({ ok: true, result });
+      return;
+    }
+    if (message.type === "FAUST_GUIDED_PUBLISH") {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!tab?.id) throw new Error("Open a marketplace listing tab first.");
+      const status = await chrome.tabs.sendMessage(tab.id, { type: "FAUST_MARKETPLACE_STATUS" });
+      const preview = await chrome.tabs.sendMessage(tab.id, { type: "FAUST_FILL_MARKETPLACE_FORM", mapping: message.mapping, dryRun: message.dryRun !== false });
+      sendResponse({ ok: true, status, preview });
+      return;
+    }
+    if (message.type === "FAUST_SYNC_DRAFT") {
+      const path = message.mode === "pause" ? "/api/extension/pause" : message.mode === "delist" ? "/api/extension/delist" : "/api/extension/sync";
+      const result = await callFaust(path, message.payload);
       sendResponse({ ok: true, result });
       return;
     }

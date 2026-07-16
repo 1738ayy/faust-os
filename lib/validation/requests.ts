@@ -171,13 +171,27 @@ const extensionAssumptionsSchema = z.object({
   quantity: z.coerce.number().int().positive().optional(),
 }).passthrough();
 
+const extensionArtifactSchema = z.object({
+  type: z.enum(["screenshot", "dom_snapshot", "log", "failed_field", "publish_confirmation"]).optional(),
+  url: z.string().url().optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+  failedSelector: z.string().trim().max(500).optional(),
+  pageVersion: z.string().trim().max(120).optional(),
+  currentUrl: z.string().url().optional(),
+  domSnapshotHash: z.string().trim().max(200).optional(),
+  log: z.string().trim().max(5000).optional(),
+  marketplace: z.enum(["Depop", "eBay", "Etsy", "Mercari", "Poshmark", "Manual"]).optional(),
+});
+
 export const extensionActionSchema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("register-device"), deviceName: z.string().trim().min(1).max(120), browser: z.string().trim().min(1).max(120), environment: z.enum(["local", "staging", "production"]), version: z.string().trim().min(1).max(40), permissions: z.array(z.string().trim().min(1).max(120)).max(50), deviceId: z.string().uuid().optional(), idempotencyKey: z.string().uuid().optional() }),
+  z.object({ action: z.literal("revoke-device"), deviceId: z.string().uuid(), reason: z.string().trim().max(500).optional(), idempotencyKey: z.string().uuid().optional() }),
   z.object({ action: z.literal("scan-intake"), payload: z.record(z.string(), z.unknown()), idempotencyKey: z.string().uuid().optional() }),
   z.object({ action: z.literal("analyze"), product: z.record(z.string(), z.unknown()), assumptions: extensionAssumptionsSchema.optional(), idempotencyKey: z.string().uuid().optional() }),
   z.object({ action: z.literal("import-product"), product: z.record(z.string(), z.unknown()), assumptions: extensionAssumptionsSchema.optional(), approved: z.boolean(), idempotencyKey: z.string().uuid().optional() }),
   z.object({ action: z.literal("create-publish-job"), draftId: z.string().uuid(), idempotencyKey: z.string().uuid().optional() }),
-  z.object({ action: z.literal("confirm-publish"), draftId: z.string().uuid(), externalListingId: z.string().trim().min(1).max(200), externalUrl: z.string().url(), finalTitle: z.string().trim().max(120).optional(), finalPrice: z.coerce.number().positive().optional(), idempotencyKey: z.string().uuid().optional() }),
-  z.object({ action: z.literal("report-error"), draftId: z.string().uuid().optional(), marketplace: z.enum(["Depop", "eBay", "Etsy", "Mercari", "Poshmark", "Manual"]).optional(), reason: z.string().trim().min(2).max(1000), screenshotUrl: z.string().url().optional(), artifact: z.record(z.string(), z.unknown()).optional(), idempotencyKey: z.string().uuid().optional() }),
+  z.object({ action: z.literal("confirm-publish"), draftId: z.string().uuid(), externalListingId: z.string().trim().min(1).max(200), externalUrl: z.string().url(), finalTitle: z.string().trim().max(120).optional(), finalPrice: z.coerce.number().positive().optional(), evidence: extensionArtifactSchema.optional(), idempotencyKey: z.string().uuid().optional() }),
+  z.object({ action: z.literal("report-error"), draftId: z.string().uuid().optional(), marketplace: z.enum(["Depop", "eBay", "Etsy", "Mercari", "Poshmark", "Manual"]).optional(), reason: z.string().trim().min(2).max(1000), classification: z.enum(["retryable", "permanent"]).optional(), screenshotUrl: z.string().url().optional(), artifact: extensionArtifactSchema.optional(), idempotencyKey: z.string().uuid().optional() }),
   z.object({ action: z.literal("sync-quantity"), draftId: z.string().uuid(), quantity: z.coerce.number().int().nonnegative().optional(), idempotencyKey: z.string().uuid().optional() }),
   z.object({ action: z.enum(["pause-draft", "delist-draft"]), draftId: z.string().uuid(), reason: z.string().trim().max(500).optional(), idempotencyKey: z.string().uuid().optional() }),
 ]);

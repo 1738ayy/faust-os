@@ -332,10 +332,22 @@ export async function mutateAiCenter(input: AiCenterActionInput) {
  const actionResult = await mutateAiCenterData(data, input);
  return { data: await write(data), actionResult };
 }
-export async function mutateBrowserExtension(input: ExtensionAction) {
- const data = await read();
- const actionResult = applyExtensionAction(data, input);
- return { data: await write(data), actionResult };
+export async function mutateBrowserExtension(input: ExtensionAction, context?: { deviceId?: string; nonce?: string }) {
+  const data = await read();
+  if (context?.deviceId) {
+    data.extensionDevices ||= [];
+    data.extensionSessions ||= [];
+    const device = data.extensionDevices.find((entry) => entry.id === context.deviceId);
+    if (device) device.lastSeenAt = new Date().toISOString();
+    const session = data.extensionSessions.find((entry) => entry.deviceId === context.deviceId && !entry.revokedAt);
+    if (session && context.nonce) {
+      session.usedNonces.push(context.nonce);
+      session.lastNonce = context.nonce;
+      if (session.usedNonces.length > 100) session.usedNonces.splice(0, session.usedNonces.length - 100);
+    }
+  }
+  const actionResult = applyExtensionAction(data, input);
+  return { data: await write(data), actionResult };
 }
 export function snapshot(data: OperatingData) { const completed = data.orders.filter((order) => !["draft", "cancelled", "refunded"].includes(order.status)); const profits = completed.map((order) => orderProfit(order, data.variants)); const revenue = profits.reduce((total, value) => total + value.revenue, 0); const grossProfit = profits.reduce((total, value) => total + value.grossProfit, 0); const netProfit = profits.reduce((total, value) => total + value.netProfit, 0); const units = completed.reduce((total, order) => total + order.items.reduce((lineTotal, item) => lineTotal + item.quantity, 0), 0); const unitsOnHand = data.balances.reduce((total, balance) => total + balance.onHand, 0); const readyToShip = data.orders.filter((order) => ["paid", "confirmed", "inventory_reserved", "ready_to_pack", "packed", "label_purchased", "ready_to_ship"].includes(order.status)); return { data, metrics: { revenue, grossProfit, netProfit, margin: revenue ? netProfit / revenue * 100 : 0, orders: completed.length, units, averageOrderValue: completed.length ? revenue / completed.length : 0, cash: availableCash(data.transactions), inventoryValue: inventoryValue(data.balances, data.variants), unitsOnHand, availableUnits: data.balances.reduce((total, balance) => total + availableUnits(balance), 0), readyToShip: readyToShip.length, incoming: data.balances.reduce((total, balance) => total + balance.incoming, 0) }, attention: data.notices.filter((notice) => !notice.resolved), reorders: data.variants.map((variant) => ({ variant, quantity: reorderSuggestion(data.balances.find((balance) => balance.variantId === variant.id), variant) })).filter((entry) => entry.quantity > 0) }; }
 
