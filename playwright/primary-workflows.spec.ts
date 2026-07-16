@@ -234,8 +234,11 @@ test("analytics decision engine supports filtering, drilldowns, and CSV export",
   await page.locator('select[name="sku"]').selectOption("FST-HOOD-001");
   await page.getByRole("button", { name: "Apply filters", exact: true }).click();
   await expect(page).toHaveURL(/marketplace=Depop/);
-  await expect(analyticsMain.getByText("FST-HOOD-001", { exact: true })).toBeVisible();
-  await expect(analyticsMain.getByRole("link", { name: "Inventory value", exact: true })).toBeVisible();
+  const productAnalytics = analyticsMain.locator("section").filter({ has: page.getByRole("heading", { name: "Product Analytics", level: 2, exact: true }) });
+  await expect(productAnalytics.getByRole("link", { name: "FST-HOOD-001", exact: true })).toBeVisible();
+  const inventoryValueCard = analyticsMain.locator("article").filter({ has: page.getByText("Inventory value", { exact: true }) });
+  await expect(inventoryValueCard).toBeVisible();
+  await expect(inventoryValueCard.getByRole("link", { name: /drill through/i })).toBeVisible();
   const csv = await request.get("/api/exports/analytics?marketplace=Depop");
   expect(csv.ok(), await csv.text()).toBeTruthy();
   expect(await csv.text()).toContain("executive");
