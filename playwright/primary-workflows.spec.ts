@@ -239,6 +239,18 @@ test("analytics decision engine supports filtering, drilldowns, and CSV export",
   const inventoryValueCard = analyticsMain.locator("article").filter({ has: page.getByText("Inventory value", { exact: true }) });
   await expect(inventoryValueCard).toBeVisible();
   await expect(inventoryValueCard.getByRole("link", { name: /drill through/i })).toBeVisible();
+  const reportBuilder = page.getByRole("region", { name: "Analytics report builder" });
+  await expect(reportBuilder).toBeVisible();
+  for (const label of ["Create saved report", "Save active filters", "Duplicate report", "Record export run"]) {
+    const responsePromise = page.waitForResponse((response) => response.url().includes("/api/analytics/reports") && response.request().method() === "POST");
+    await reportBuilder.getByRole("button", { name: label, exact: true }).click();
+    const response = await responsePromise; expect(response.ok(), await response.text()).toBeTruthy();
+    await expect(reportBuilder.getByRole("status")).toContainText(/saved/i);
+  }
+  await page.reload();
+  await expect(analyticsMain.getByText(/SKU capital utilization review/i)).toBeVisible();
+  await expect(analyticsMain.getByText(/Filter preset:/i)).toBeVisible();
+  await expect(analyticsMain.getByText(/completed .* rows/i)).toBeVisible();
   const csv = await request.get("/api/exports/analytics?marketplace=Depop");
   expect(csv.ok(), await csv.text()).toBeTruthy();
   expect(await csv.text()).toContain("executive");

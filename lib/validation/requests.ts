@@ -115,3 +115,22 @@ export const purchasingActionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("receive-parcel-to-lots"), purchaseOrderId: z.string().uuid(), parcelId: z.string().uuid().optional(), rows: z.array(receiveRowSchema).min(1), idempotencyKey: z.string().uuid().optional() }),
   z.object({ action: z.literal("generate-reorders") }),
 ]);
+
+const analyticsReportPayload = {
+  reportId: z.string().optional(),
+  name: z.string().trim().min(1).max(120).optional(),
+  description: z.string().trim().max(500).optional(),
+  sections: z.array(z.string().trim().min(1)).optional(),
+  metrics: z.array(z.string().trim().min(1)).optional(),
+  filters: z.record(z.string(), z.string()).optional(),
+  scheduleFrequency: z.enum(["none", "daily", "weekly", "monthly"]).optional(),
+  recipients: z.array(z.string().trim().min(1)).optional(),
+  rowCount: z.coerce.number().int().nonnegative().optional(),
+  idempotencyKey: z.string().uuid().optional(),
+};
+export const analyticsActionSchema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("create-report"), ...analyticsReportPayload }),
+  z.object({ action: z.literal("update-report"), ...analyticsReportPayload, reportId: z.string().min(1) }),
+  z.object({ action: z.literal("duplicate-report"), reportId: z.string().min(1) }),
+  z.object({ action: z.literal("record-run"), reportId: z.string().min(1), filters: z.record(z.string(), z.string()).optional(), rowCount: z.coerce.number().int().nonnegative().optional() }),
+]);

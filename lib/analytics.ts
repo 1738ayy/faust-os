@@ -1,4 +1,4 @@
-import type { Marketplace, OperatingData, Order } from "@/domain/business";
+import type { AnalyticsReportRun, AnalyticsSavedReport, Marketplace, OperatingData, Order } from "@/domain/business";
 import { availableUnits, inventoryValue, orderProfit, reorderSuggestion } from "./business-calculations";
 import { buildFinanceModel } from "./finance";
 
@@ -10,6 +10,8 @@ const marketplaces: Exclude<Marketplace, "Manual">[] = ["Depop", "eBay", "Etsy",
 
 export type AnalyticsFilters = { from?: string; to?: string; marketplace?: string; supplierId?: string; sku?: string };
 export type AnalyticsModel = ReturnType<typeof buildAnalyticsModel>;
+type AnalyticsScheduleFrequency = NonNullable<AnalyticsSavedReport["schedule"]>["frequency"];
+export type AnalyticsReportInput = { name?: string; description?: string; sections?: string[]; metrics?: string[]; filters?: Record<string, string>; scheduleFrequency?: AnalyticsScheduleFrequency; recipients?: string[]; reportId?: string; idempotencyKey?: string };
 
 function inDateRange(date: string | undefined, filters: AnalyticsFilters) {
   if (!date) return true;
@@ -51,6 +53,7 @@ function fulfillmentHours(order: Order, status: string) {
 }
 
 export function buildAnalyticsModel(data: OperatingData, filters: AnalyticsFilters = {}) {
+  ensureAnalyticsCollections(data);
   const scoped = filteredData(data, filters);
   const scopedData = { ...data, orders: scoped.orders };
   const finance = buildFinanceModel(scopedData);
@@ -99,12 +102,13 @@ export function buildAnalyticsModel(data: OperatingData, filters: AnalyticsFilte
       daysToSell: daysBetween(firstReceipt, firstSale),
       inventoryTurnover: balance?.onHand ? round(soldUnits / Math.max(1, balance.onHand)) : soldUnits,
       fifoCostHistory: lots.map((lot) => ({ lotId: lot.id, receivedAt: lot.receivedAt, unitCostUsd: lot.unitLandedCostUsd, quantityRemaining: lot.quantityRemaining })),
-      lotProfitability: lots.map((lot) => ({ lotId: lot.id, unitLandedCostUsd: lot.unitLandedCostUsd, realizedRevenue: revenue, remainingValue: round(lot.quantityRemaining * lot.unitLandedCostUsd) })),
+      lotProfitability: lots.map((lot) => ({ lotId: lot.id, sourceHref: `/inventory?lot=${lot.id}`, ageDays: daysBetween(lot.receivedAt, new Date().toISOString()), unitLandedCostUsd: lot.unitLandedCostUsd, realizedRevenue: revenue, remainingValue: round(lot.quantityRemaining * lot.unitLandedCostUsd), capitalUtilization: lot.quantityReceived ? round((lot.quantityReceived - lot.quantityRemaining) / lot.quantityReceived * 100) : 0 })),
       deadStock: soldUnits === 0 && available > 0,
       overstock: available > variant.reorderQuantity * 2,
       stockoutRisk: available + (balance?.incoming || 0) <= variant.reorderPoint,
       reorderQuantity: reorderSuggestion(balance, variant),
       sourceHref: `/inventory?sku=${encodeURIComponent(variant.sku)}`,
+      lotHref: lots[0] ? `/inventory?lot=${lots[0].id}` : `/inventory?sku=${encodeURIComponent(variant.sku)}`,
     };
   });
 
@@ -132,6 +136,7 @@ export function buildAnalyticsModel(data: OperatingData, filters: AnalyticsFilte
       fulfillmentHours: average(fulfillment),
       syncReliability: drafts.length ? round((drafts.length - failedJobs) / drafts.length * 100) : 100,
       sourceHref: `/marketplace/${marketplace.toLowerCase()}`,
+      comparisonHref: `/analytics?marketplace=${encodeURIComponent(marketplace)}`,
     };
   });
 
@@ -158,6 +163,7 @@ export function buildAnalyticsModel(data: OperatingData, filters: AnalyticsFilte
       supplierScore: scorecard ? Math.round((scorecard.qualityScore + scorecard.leadTimeScore + scorecard.communicationScore + scorecard.priceScore) / 4) : 0,
       marginContribution,
       sourceHref: `/suppliers?supplier=${supplier.id}`,
+      comparisonHref: `/analytics?supplierId=${supplier.id}`,
     };
   });
 
@@ -176,7 +182,7 @@ export function buildAnalyticsModel(data: OperatingData, filters: AnalyticsFilte
     lowStock: productAnalytics.filter((item) => item.stockoutRisk).length,
     deadStock: productAnalytics.filter((item) => item.deadStock).length,
     incomingInventory: sum(data.balances, (balance) => balance.incoming || 0),
-    lotAging: (data.inventoryLots || []).map((lot) => ({ lotId: lot.id, sku: lot.sku, ageDays: daysBetween(lot.receivedAt, new Date().toISOString()), remainingValue: round(lot.quantityRemaining * lot.unitLandedCostUsd) })),
+    lotAging: (data.inventoryLots || []).map((lot) => ({ lotId: lot.id, sku: lot.sku, ageDays: daysBetween(lot.receivedAt, new Date().toISOString()), remainingValue: round(lot.quantityRemaining * lot.unitLandedCostUsd), capitalUtilization: lot.quantityReceived ? round((lot.quantityReceived - lot.quantityRemaining) / lot.quantityReceived * 100) : 0, sourceHref: `/inventory?lot=${lot.id}` })),
     capitalTiedUp: sum(data.inventoryLots || [], (lot) => lot.quantityRemaining * lot.unitLandedCostUsd) || inventoryValue(data.balances, data.variants),
     safetyStock: sum(data.variants, (variant) => Math.ceil((variant.reorderQuantity || 1) / 2)),
     reorderPointUnits: sum(data.variants, (variant) => variant.reorderPoint),
@@ -186,7 +192,8 @@ export function buildAnalyticsModel(data: OperatingData, filters: AnalyticsFilte
   const financeAnalytics = buildFinanceAnalytics(finance, data);
   const customerAnalytics = buildCustomerAnalytics(data, scoped.orders);
   const geographicAnalytics = buildGeographicAnalytics(data, scoped.orders);
-  const reports = savedReports();
+  const reports = data.analyticsSavedReports!.length ? data.analyticsSavedReports! : defaultAnalyticsReports();
+  const filterPresets = data.analyticsFilterPresets!;
   const csvRows = [
     ["family", "metric", "value", "source"],
     ["executive", "revenue", executive.revenue, "finance.reconciliations"],
@@ -196,7 +203,7 @@ export function buildAnalyticsModel(data: OperatingData, filters: AnalyticsFilte
     ...supplierAnalytics.map((item) => ["supplier", `${item.name} score`, item.supplierScore, item.sourceHref]),
   ];
 
-  return { filters, executive, products: productAnalytics, channels: channelAnalytics, suppliers: supplierAnalytics, purchasing: purchasingAnalytics, inventory: inventoryAnalytics, fulfillment: fulfillmentAnalytics, finance: financeAnalytics, customers: customerAnalytics, geography: geographicAnalytics, reports, csvRows };
+  return { filters, executive, products: productAnalytics, channels: channelAnalytics, suppliers: supplierAnalytics, purchasing: purchasingAnalytics, inventory: inventoryAnalytics, fulfillment: fulfillmentAnalytics, finance: financeAnalytics, customers: customerAnalytics, geography: geographicAnalytics, reports, filterPresets, reportRuns: data.analyticsReportRuns!, csvRows };
 }
 
 function sellThroughForOrders(orders: Order[], data: OperatingData) {
@@ -264,14 +271,79 @@ function buildGeographicAnalytics(_data: OperatingData, orders: Order[]) {
   });
 }
 
-function savedReports() {
+export function defaultAnalyticsReports(createdAt = new Date().toISOString()): AnalyticsSavedReport[] {
   return [
-    { id: "executive", name: "Executive decision brief", sections: ["Executive Dashboard", "Finance Analytics", "Purchasing Analytics"] },
-    { id: "sku-profitability", name: "SKU profitability and lot performance", sections: ["Product Analytics", "Inventory Analytics"] },
-    { id: "channel-health", name: "Marketplace channel health", sections: ["Channel Analytics", "Fulfillment Analytics"] },
-    { id: "supplier-scorecard", name: "Supplier purchasing scorecard", sections: ["Supplier Analytics", "Purchasing Analytics"] },
-    { id: "cash-risk", name: "Cash, inventory, and reorder risk", sections: ["Finance Analytics", "Inventory Analytics", "Product Analytics"] },
+    { id: "11111111-1111-4111-8111-111111111111", name: "Executive decision brief", sections: ["Executive Dashboard", "Finance Analytics", "Purchasing Analytics"], metrics: ["revenue", "deployableCash", "purchaseCommitments"], filters: {}, drilldowns: ["finance", "order", "supplier"], schedule: { frequency: "weekly", recipients: [] }, exportFormat: "csv", isDefault: true, createdAt },
+    { id: "22222222-2222-4222-8222-222222222222", name: "SKU profitability and lot performance", sections: ["Product Analytics", "Inventory Analytics"], metrics: ["profitBySku", "lotProfitability", "capitalUtilization"], filters: {}, drilldowns: ["sku", "lot"], schedule: { frequency: "none", recipients: [] }, exportFormat: "csv", createdAt },
+    { id: "33333333-3333-4333-8333-333333333333", name: "Marketplace channel health", sections: ["Channel Analytics", "Fulfillment Analytics"], metrics: ["channelRevenue", "syncReliability", "fulfillmentHours"], filters: {}, drilldowns: ["marketplace", "fulfillment"], schedule: { frequency: "weekly", recipients: [] }, exportFormat: "csv", createdAt },
+    { id: "44444444-4444-4444-8444-444444444444", name: "Supplier purchasing scorecard", sections: ["Supplier Analytics", "Purchasing Analytics"], metrics: ["supplierScore", "leadTime", "claimRate"], filters: {}, drilldowns: ["supplier"], schedule: { frequency: "monthly", recipients: [] }, exportFormat: "csv", createdAt },
+    { id: "55555555-5555-4555-8555-555555555555", name: "Cash, inventory, and reorder risk", sections: ["Finance Analytics", "Inventory Analytics", "Product Analytics"], metrics: ["deployableCash", "deadStock", "stockoutRisk"], filters: {}, drilldowns: ["finance", "sku", "lot"], schedule: { frequency: "daily", recipients: [] }, exportFormat: "csv", createdAt },
   ];
+}
+
+export function ensureAnalyticsCollections(data: OperatingData) {
+  data.analyticsSavedReports ||= defaultAnalyticsReports();
+  data.analyticsFilterPresets ||= [{ id: "66666666-6666-4666-8666-666666666666", name: "Default analytics filters", filters: {}, isDefault: true, createdAt: new Date().toISOString() }];
+  data.analyticsReportRuns ||= [];
+}
+
+export function createAnalyticsReport(data: OperatingData, input: AnalyticsReportInput = {}) {
+  ensureAnalyticsCollections(data);
+  const createdAt = new Date().toISOString();
+  const report: AnalyticsSavedReport = {
+    id: input.idempotencyKey || crypto.randomUUID(),
+    name: input.name || "Custom analytics report",
+    description: input.description || "Custom report built from Faust operating records.",
+    sections: input.sections?.length ? input.sections : ["Executive Dashboard", "Product Analytics", "Finance Analytics"],
+    metrics: input.metrics?.length ? input.metrics : ["revenue", "profit", "inventoryValue"],
+    filters: input.filters || {},
+    drilldowns: ["sku", "supplier", "lot", "marketplace", "order", "finance", "fulfillment"],
+    schedule: { frequency: input.scheduleFrequency || "none", recipients: input.recipients || [] },
+    exportFormat: "csv",
+    createdAt,
+    updatedAt: createdAt,
+  };
+  data.analyticsSavedReports!.unshift(report);
+  data.analyticsFilterPresets!.unshift({ id: crypto.randomUUID(), name: `${report.name} filters`, filters: report.filters, createdAt, updatedAt: createdAt });
+  return report;
+}
+
+export function updateAnalyticsReport(data: OperatingData, input: AnalyticsReportInput) {
+  ensureAnalyticsCollections(data);
+  const report = data.analyticsSavedReports!.find((entry) => entry.id === input.reportId);
+  if (!report) throw new Error("Analytics report not found.");
+  report.name = input.name || report.name;
+  report.description = input.description ?? report.description;
+  report.sections = input.sections?.length ? input.sections : report.sections;
+  report.metrics = input.metrics?.length ? input.metrics : report.metrics;
+  report.filters = input.filters || report.filters;
+  report.schedule = { frequency: input.scheduleFrequency || report.schedule?.frequency || "none", recipients: input.recipients || report.schedule?.recipients || [], nextRunAt: nextScheduleRun(input.scheduleFrequency || report.schedule?.frequency || "none") };
+  report.updatedAt = new Date().toISOString();
+  return report;
+}
+
+export function duplicateAnalyticsReport(data: OperatingData, reportId: string) {
+  ensureAnalyticsCollections(data);
+  const source = data.analyticsSavedReports!.find((entry) => entry.id === reportId);
+  if (!source) throw new Error("Analytics report not found.");
+  return createAnalyticsReport(data, { name: `${source.name} copy`, description: source.description, sections: source.sections, metrics: source.metrics, filters: source.filters, scheduleFrequency: source.schedule?.frequency, recipients: source.schedule?.recipients });
+}
+
+export function recordAnalyticsReportRun(data: OperatingData, reportId: string, filters: Record<string, string>, rowCount: number) {
+  ensureAnalyticsCollections(data);
+  const now = new Date().toISOString();
+  const run: AnalyticsReportRun = { id: crypto.randomUUID(), reportId, status: "completed", filters, exportedRowCount: rowCount, createdAt: now, completedAt: now };
+  data.analyticsReportRuns!.unshift(run);
+  const report = data.analyticsSavedReports!.find((entry) => entry.id === reportId);
+  if (report) report.lastRunAt = now;
+  return run;
+}
+
+function nextScheduleRun(frequency: AnalyticsScheduleFrequency) {
+  if (frequency === "none") return undefined;
+  const date = new Date();
+  date.setDate(date.getDate() + (frequency === "daily" ? 1 : frequency === "weekly" ? 7 : 30));
+  return date.toISOString();
 }
 
 export function analyticsCsv(model: AnalyticsModel) {

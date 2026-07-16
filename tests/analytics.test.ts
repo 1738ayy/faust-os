@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { OperatingData } from "../domain/business";
-import { buildAnalyticsModel, analyticsCsv } from "../lib/analytics";
+import { analyticsCsv, buildAnalyticsModel, createAnalyticsReport, duplicateAnalyticsReport, ensureAnalyticsCollections, recordAnalyticsReportRun, updateAnalyticsReport } from "../lib/analytics";
 import { buildFinanceModel } from "../lib/finance";
 
 const fixture = (): OperatingData => {
@@ -58,7 +58,9 @@ test("analytics decision engine derives every metric family from operating sourc
   assert.equal(analytics.finance.payoutDiscrepancies, 0);
   assert.equal(analytics.customers.customers[0].marketplaceOrigin, "Depop");
   assert.equal(analytics.geography[0].state, "NY");
-  assert.ok(analytics.reports.some((report) => report.id === "sku-profitability"));
+  assert.ok(analytics.reports.some((report) => report.name === "SKU profitability and lot performance"));
+  assert.ok(analytics.products[0].lotProfitability[0].capitalUtilization > 0);
+  assert.ok(analytics.inventory.lotAging[0].sourceHref.includes("lot="));
   assert.match(analyticsCsv(analytics), /sku-profitability|AN-HOOD-L|Depop/);
 });
 
@@ -69,4 +71,21 @@ test("analytics filters by marketplace and SKU without changing source records",
   assert.equal(depop.executive.orders, 1);
   assert.equal(etsy.executive.orders, 0);
   assert.equal(data.orders.length, 1);
+});
+
+test("analytics saved reports persist filters, schedules, duplicates, and run history", () => {
+  const data = fixture();
+  ensureAnalyticsCollections(data);
+  const report = createAnalyticsReport(data, { name: "Supplier vs SKU decision report", sections: ["Supplier Analytics", "Product Analytics"], metrics: ["supplierScore", "capitalUtilization"], filters: { marketplace: "Depop", sku: "AN-HOOD-L" }, scheduleFrequency: "weekly", recipients: ["ops@example.test"], idempotencyKey: crypto.randomUUID() });
+  assert.equal(report.schedule?.frequency, "weekly");
+  assert.equal(data.analyticsSavedReports?.[0].name, "Supplier vs SKU decision report");
+  assert.equal(data.analyticsFilterPresets?.[0].filters.sku, "AN-HOOD-L");
+  updateAnalyticsReport(data, { reportId: report.id, filters: { marketplace: "Depop" }, scheduleFrequency: "daily", recipients: ["founder@example.test"] });
+  assert.equal(data.analyticsSavedReports?.[0].schedule?.frequency, "daily");
+  const copy = duplicateAnalyticsReport(data, report.id);
+  assert.match(copy.name, /copy/);
+  const run = recordAnalyticsReportRun(data, report.id, { marketplace: "Depop" }, 12);
+  assert.equal(run.status, "completed");
+  assert.equal(data.analyticsReportRuns?.[0].exportedRowCount, 12);
+  assert.equal(buildAnalyticsModel(data).reportRuns.length, 1);
 });
