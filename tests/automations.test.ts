@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { OperatingData } from "../domain/business";
-import { approveAutomation, archiveAutomationRule, createAutomationRule, duplicateAutomationRule, ensureAutomationCollections, retryAutomation, runAutomationRule, setAutomationEnabled, testAutomationRule } from "../lib/automations";
+import { approveAutomation, archiveAutomationRule, createAutomationRule, defaultAutomationTemplates, dueScheduledRules, duplicateAutomationRule, ensureAutomationCollections, expireApprovals, ingestAutomationEvent, nextBackoff, processAutomationWorkerTick, recoverStaleRuns, replayDeadLetter, retryAutomation, runAutomationRule, setAutomationEnabled, setSchedulePaused, testAutomationRule } from "../lib/automations";
 
 const fixture = (): OperatingData => {
   const now = "2026-07-01T00:00:00.000Z";
@@ -54,4 +54,70 @@ test("automations support dry run, approval gates, retry records, duplicate, arc
   assert.equal(data.automationRules?.find((entry) => entry.id === copy.id)?.enabled, false);
   archiveAutomationRule(data, copy.id);
   assert.ok(data.automationRules?.find((entry) => entry.id === copy.id)?.archivedAt);
+});
+
+test("automations expose production Faust templates and editable schedule controls", () => {
+  const data = fixture();
+  ensureAutomationCollections(data);
+  const templates = defaultAutomationTemplates("2026-07-01T00:00:00.000Z");
+  assert.equal(templates.length, 10);
+  assert.ok(templates.some((template) => template.triggerType === "listing.quantity_sync_failed"));
+  assert.ok(templates.every((template) => template.version === 2));
+  const rule = createAutomationRule(data, { templateId: "auto-template-low-stock", enabled: true, dryRun: true, threshold: 4 });
+  assert.equal(rule.templateVersion, 2);
+  assert.deepEqual(rule.localOverrides, ["threshold"]);
+  setSchedulePaused(data, rule.id, true);
+  assert.equal(dueScheduledRules(data, new Date(Date.now() + 2 * 86400000).toISOString()).length, 0);
+  setSchedulePaused(data, rule.id, false);
+  rule.schedule!.nextRunAt = "2026-07-01T00:00:00.000Z";
+  assert.equal(dueScheduledRules(data, "2026-07-01T00:00:01.000Z").length, 1);
+});
+
+test("automations ingest real Faust events once and create linked runs", () => {
+  const data = fixture();
+  ensureAutomationCollections(data);
+  const rule = createAutomationRule(data, { templateId: "auto-template-low-stock", enabled: true, dryRun: false });
+  const receipt = ingestAutomationEvent(data, "inventory.below_reorder_point", { id: "evt-1", aggregateType: "variant", aggregateId: data.variants[0].id, available: 1, reorderPoint: 2 }, "evt-key-1");
+  assert.equal(receipt.status, "processed");
+  assert.equal(receipt.runIds.length, 1);
+  const duplicate = ingestAutomationEvent(data, "inventory.below_reorder_point", { id: "evt-1", available: 1 }, "evt-key-1");
+  assert.equal(duplicate.id, receipt.id);
+  assert.equal(data.automationRuns?.filter((run) => run.ruleId === rule.id).length, 1);
+  assert.ok(data.automationExecutionTraces?.some((trace) => trace.message === "Automation run started"));
+});
+
+test("automation worker ticks lease schedules, heartbeat, and recover stale runs", () => {
+  const data = fixture();
+  ensureAutomationCollections(data);
+  const rule = createAutomationRule(data, { enabled: true, dryRun: false });
+  rule.schedule!.nextRunAt = "2026-07-01T00:00:00.000Z";
+  const result = processAutomationWorkerTick(data, { workerId: "unit-worker", now: "2026-07-01T00:00:01.000Z", concurrency: 1, leaseTimeoutMs: 1000 });
+  assert.equal(result.dueCount, 1);
+  assert.equal(result.heartbeat.workerId, "unit-worker");
+  assert.ok(data.automationWorkerLeases?.some((lease) => lease.resourceType === "schedule" && lease.resourceId === rule.id));
+  const running = runAutomationRule(data, rule.id, { available: 1, reorderPoint: 2 }, "stale-run", "unit-worker");
+  running.status = "running";
+  running.startedAt = "2026-06-30T00:00:00.000Z";
+  const recovered = recoverStaleRuns(data, "2026-07-01T00:00:00.000Z", 1000);
+  assert.equal(recovered.length, 1);
+  assert.equal(data.automationDeadLetters?.[0].status, "open");
+});
+
+test("automation retry, dead-letter replay, approval expiration, and backoff are durable", () => {
+  const data = fixture();
+  ensureAutomationCollections(data);
+  const rule = createAutomationRule(data, { templateId: "auto-template-cash-threshold", enabled: true, dryRun: false });
+  const run = runAutomationRule(data, rule.id, { deployableCash: 1000 }, "approval-expire");
+  assert.equal(run.status, "waiting_approval");
+  data.automationApprovals![0].expiresAt = "2026-07-01T00:00:00.000Z";
+  const expired = expireApprovals(data, "2026-07-02T00:00:00.000Z");
+  assert.equal(expired[0].status, "expired");
+  run.status = "failed";
+  run.error = "forced failure";
+  data.automationDeadLetters!.unshift({ id: crypto.randomUUID(), runId: run.id, ruleId: rule.id, reason: "forced failure", payload: run.eventPayload, status: "open", createdAt: "2026-07-02T00:00:00.000Z" });
+  const retry = retryAutomation(data, run.id);
+  assert.ok(retry.id);
+  const replay = replayDeadLetter(data, data.automationDeadLetters![0].id);
+  assert.ok(replay.id);
+  assert.ok(new Date(nextBackoff(2)).getTime() > Date.now());
 });

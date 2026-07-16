@@ -44,11 +44,23 @@ test("automations create, test, enable, run, approve, retry, duplicate, archive,
   expect(state.automationRuns.some((entry: { status: string }) => entry.status === "dry_run")).toBeTruthy();
   const enable = await request.post("/api/automations/actions", { data: { action: "enable-rule", ruleId: rule.id } });
   expect(enable.ok(), await enable.text()).toBeTruthy();
+  const pause = await request.post("/api/automations/actions", { data: { action: "pause-schedule", ruleId: rule.id } });
+  expect(pause.ok(), await pause.text()).toBeTruthy();
+  const resume = await request.post("/api/automations/actions", { data: { action: "resume-schedule", ruleId: rule.id } });
+  expect(resume.ok(), await resume.text()).toBeTruthy();
   const trigger = await request.post("/api/automations/actions", { data: { action: "trigger-run", ruleId: rule.id, samplePayload: { available: 1, sku: "FST-HOOD-001" }, idempotencyKey: crypto.randomUUID() } });
   expect(trigger.ok(), await trigger.text()).toBeTruthy();
   state = (await trigger.json()).data;
   expect(state.automationSteps.length).toBeGreaterThan(0);
   expect(state.activity.some((entry: { entityType: string }) => entry.entityType === "automation_run")).toBeTruthy();
+  const event = await request.post("/api/automations/actions", { data: { action: "trigger-event", triggerType: "inventory.below_reorder_point", samplePayload: { id: crypto.randomUUID(), available: 1, reorderPoint: 2, sku: "FST-HOOD-001" }, idempotencyKey: crypto.randomUUID() } });
+  expect(event.ok(), await event.text()).toBeTruthy();
+  state = (await event.json()).data;
+  expect(state.automationEventReceipts.some((entry: { status: string }) => entry.status === "processed")).toBeTruthy();
+  const worker = await request.post("/api/automations/actions", { data: { action: "worker-tick", workerId: "playwright-worker", concurrency: 2 } });
+  expect(worker.ok(), await worker.text()).toBeTruthy();
+  state = (await worker.json()).data;
+  expect(state.automationWorkerHeartbeats.some((entry: { workerId: string }) => entry.workerId === "playwright-worker")).toBeTruthy();
   const duplicate = await request.post("/api/automations/actions", { data: { action: "duplicate-rule", ruleId: rule.id } });
   expect(duplicate.ok(), await duplicate.text()).toBeTruthy();
   state = (await duplicate.json()).data;
@@ -61,12 +73,15 @@ test("automations create, test, enable, run, approve, retry, duplicate, archive,
   await expect(automationMain.getByRole("heading", { name: "Rule builder, run logs, retries, and failures", exact: true })).toBeVisible();
   const builder = page.getByRole("region", { name: "Automation builder" });
   await expect(builder).toBeVisible();
-  for (const label of ["Create rule", "Test rule", "Enable rule", "Trigger run", "Duplicate rule", "Archive rule"]) await expect(builder.getByRole("button", { name: label, exact: true })).toBeVisible();
+  for (const label of ["Create rule", "Install template", "Test rule", "Enable rule", "Trigger run", "Trigger real event", "Worker tick", "Pause schedule", "Resume schedule", "Duplicate rule", "Archive rule"]) await expect(builder.getByRole("button", { name: label, exact: true })).toBeVisible();
   await expect(automationMain.getByRole("heading", { name: "Rules", level: 2, exact: true })).toBeVisible();
   await expect(automationMain.getByRole("heading", { name: "Active Runs", level: 2, exact: true })).toBeVisible();
   await expect(automationMain.getByRole("heading", { name: "Run steps", level: 2, exact: true })).toBeVisible();
   await expect(automationMain.getByRole("heading", { name: "Waiting Approval", level: 2, exact: true })).toBeVisible();
   await expect(automationMain.getByRole("heading", { name: "Failed & Dead Letter", level: 2, exact: true })).toBeVisible();
+  await expect(automationMain.getByRole("heading", { name: "Event receipts", level: 2, exact: true })).toBeVisible();
+  await expect(automationMain.getByRole("heading", { name: "Worker health", level: 2, exact: true })).toBeVisible();
+  await expect(automationMain.getByRole("heading", { name: "Execution traces", level: 2, exact: true })).toBeVisible();
 });
 
 test("fulfillment API persists pick, pack, label, dispatch, tracking, exception, finance, order, and inventory state", async ({ request }) => {

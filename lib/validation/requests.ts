@@ -138,7 +138,13 @@ export const analyticsActionSchema = z.discriminatedUnion("action", [
 
 export const automationActionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("create-rule"), name: z.string().trim().min(1).max(140).optional(), templateId: z.string().optional(), triggerType: z.string().optional(), dryRun: z.boolean().optional(), enabled: z.boolean().optional(), priority: z.coerce.number().int().min(0).max(999).optional(), conditionMode: z.enum(["AND", "OR"]).optional(), samplePayload: z.record(z.string(), z.unknown()).optional(), idempotencyKey: z.string().uuid().optional() }),
+  z.object({ action: z.literal("install-template"), templateId: z.string().min(1), name: z.string().trim().min(1).max(140).optional(), threshold: z.coerce.number().optional(), enabled: z.boolean().optional(), dryRun: z.boolean().optional(), idempotencyKey: z.string().uuid().optional() }),
   z.object({ action: z.enum(["duplicate-rule", "enable-rule", "disable-rule", "archive-rule", "test-rule"]), ruleId: z.string().uuid() }),
+  z.object({ action: z.enum(["pause-schedule", "resume-schedule"]), ruleId: z.string().uuid() }),
   z.object({ action: z.literal("trigger-run"), ruleId: z.string().uuid(), samplePayload: z.record(z.string(), z.unknown()).optional(), idempotencyKey: z.string().uuid().optional() }),
+  z.object({ action: z.literal("trigger-event"), triggerType: z.string().min(1), samplePayload: z.record(z.string(), z.unknown()).optional(), idempotencyKey: z.string().uuid().optional() }),
+  z.object({ action: z.literal("replay-dead-letter"), deadLetterId: z.string().uuid() }),
+  z.object({ action: z.literal("worker-tick"), workerId: z.string().trim().max(120).optional(), concurrency: z.coerce.number().int().min(1).max(25).optional(), leaseTimeoutMs: z.coerce.number().int().min(1000).max(300000).optional(), pollingIntervalMs: z.coerce.number().int().min(250).max(60000).optional() }),
+  z.object({ action: z.literal("expire-approvals") }),
   z.object({ action: z.enum(["approve-action", "reject-action", "retry-run", "cancel-run"]), runId: z.string().uuid() }),
 ]);
