@@ -95,3 +95,13 @@ export const wholesaleCoreActionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("sync-channel-risk"), variantId: z.string().uuid(), listingId: z.string().uuid(), desiredQuantity: z.coerce.number().int().nonnegative(), physicalSku: z.string().trim().min(1).max(120), idempotencyKey: z.string().uuid().optional() }),
   z.object({ action: z.literal("process-outbox"), failEventId: z.string().uuid().optional(), maxAttempts: z.coerce.number().int().min(1).max(10).optional() }),
 ]);
+export const listingsActionSchema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("create-five-drafts"), variantId: z.string().uuid(), physicalSku: z.string().trim().min(1).max(120).optional(), basePrice: z.coerce.number().positive().optional(), imageUrls: z.array(z.string().trim().min(1).max(1000)).optional(), idempotencyKey: z.string().uuid().optional() }),
+  z.object({ action: z.literal("publish-draft"), draftId: z.string().uuid(), idempotencyKey: z.string().uuid().optional() }),
+  z.object({ action: z.literal("confirm-external"), draftId: z.string().uuid(), externalListingId: z.string().trim().min(1).max(200), externalUrl: z.string().url(), idempotencyKey: z.string().uuid().optional() }),
+  z.object({ action: z.literal("sync-quantity"), draftId: z.string().uuid(), quantity: z.coerce.number().int().nonnegative().optional(), idempotencyKey: z.string().uuid().optional() }),
+  z.object({ action: z.literal("pause-draft"), draftId: z.string().uuid(), reason: z.string().trim().max(500).optional(), idempotencyKey: z.string().uuid().optional() }),
+  z.object({ action: z.literal("delist-draft"), draftId: z.string().uuid(), reason: z.string().trim().max(500).optional(), idempotencyKey: z.string().uuid().optional() }),
+  z.object({ action: z.literal("coordinate-sold"), draftId: z.string().uuid(), idempotencyKey: z.string().uuid().optional() }),
+  z.object({ action: z.literal("retry-sync"), draftId: z.string().uuid(), idempotencyKey: z.string().uuid().optional() }),
+]);

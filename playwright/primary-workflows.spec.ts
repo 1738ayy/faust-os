@@ -157,6 +157,32 @@ test("wholesale core API persists lots, FIFO allocations, journals, jobs, and ch
   expect(state.deadLetters.length).toBeGreaterThan(0);
 });
 
+test("listings API creates five channel drafts and coordinates publish, sync, manual fallback, and sold delists", async ({ request }) => {
+  await resetDemo(request);
+  let state = (await (await request.get("/api/operating-system")).json()).data;
+  const variant = state.variants[0];
+  const create = await request.post("/api/listings/actions", { data: { action: "create-five-drafts", variantId: variant.id, physicalSku: "PW-HOOD-L", basePrice: 90, imageUrls: ["/hoodie.png"], idempotencyKey: crypto.randomUUID() } });
+  expect(create.ok(), await create.text()).toBeTruthy(); state = (await create.json()).data;
+  expect(state.channelListingDrafts.length).toBe(5); expect(state.physicalSkuMappings.filter((entry: { physicalSku: string }) => entry.physicalSku === "PW-HOOD-L").length).toBe(5);
+  const depop = state.channelListingDrafts.find((entry: { marketplace: string }) => entry.marketplace === "Depop");
+  const etsy = state.channelListingDrafts.find((entry: { marketplace: string }) => entry.marketplace === "Etsy");
+  const published = await request.post("/api/listings/actions", { data: { action: "publish-draft", draftId: depop.id, idempotencyKey: crypto.randomUUID() } });
+  expect(published.ok(), await published.text()).toBeTruthy(); state = (await published.json()).data;
+  expect(state.channelListingDrafts.find((entry: { id: string }) => entry.id === depop.id).externalListingId).toBeTruthy();
+  const manual = await request.post("/api/listings/actions", { data: { action: "publish-draft", draftId: etsy.id, idempotencyKey: crypto.randomUUID() } });
+  expect(manual.ok(), await manual.text()).toBeTruthy(); state = (await manual.json()).data;
+  expect(state.channelListingDrafts.find((entry: { id: string }) => entry.id === etsy.id).status).toBe("manual_required");
+  const confirmed = await request.post("/api/listings/actions", { data: { action: "confirm-external", draftId: etsy.id, externalListingId: "ETSY-MANUAL-1", externalUrl: "https://example.test/etsy/manual-1", idempotencyKey: crypto.randomUUID() } });
+  expect(confirmed.ok(), await confirmed.text()).toBeTruthy(); state = (await confirmed.json()).data;
+  expect(state.channelListingDrafts.find((entry: { id: string }) => entry.id === etsy.id).externalUrl).toContain("etsy");
+  const risk = await request.post("/api/listings/actions", { data: { action: "sync-quantity", draftId: depop.id, quantity: 99, idempotencyKey: crypto.randomUUID() } });
+  expect(risk.ok(), await risk.text()).toBeTruthy(); state = (await risk.json()).data;
+  expect(state.inventoryRiskLocks.some((entry: { reason: string }) => entry.reason === "oversell_risk")).toBeTruthy();
+  const sold = await request.post("/api/listings/actions", { data: { action: "coordinate-sold", draftId: depop.id, idempotencyKey: crypto.randomUUID() } });
+  expect(sold.ok(), await sold.text()).toBeTruthy(); state = (await sold.json()).data;
+  expect(state.channelListingDrafts.filter((entry: { status: string }) => entry.status === "delisted").length).toBeGreaterThanOrEqual(4);
+});
+
 test("inventory exposes audited mutation controls and refreshed balances", async ({ request, page }) => {
   await resetDemo(request);
   await page.goto("/inventory");

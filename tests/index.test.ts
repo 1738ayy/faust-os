@@ -7,3 +7,4 @@ import "./orders-deepening.test";
 import "./fulfillment-workflows.test";
 import "./finance.test";
 import "./wholesale-core.test";
+import "./listings-core.test";
