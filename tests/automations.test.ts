@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { OperatingData } from "../domain/business";
 import { approveAutomation, archiveAutomationRule, createAutomationRule, defaultAutomationTemplates, dueScheduledRules, duplicateAutomationRule, ensureAutomationCollections, expireApprovals, ingestAutomationEvent, nextBackoff, processAutomationWorkerTick, recoverStaleRuns, replayDeadLetter, retryAutomation, runAutomationRule, setAutomationEnabled, setSchedulePaused, testAutomationRule } from "../lib/automations";
+import { createAnalyticsReport } from "../lib/analytics";
+import { createFiveChannelDrafts } from "../lib/listings-core";
 
 const fixture = (): OperatingData => {
   const now = "2026-07-01T00:00:00.000Z";
@@ -12,7 +14,7 @@ const fixture = (): OperatingData => {
     products: [{ id: productId, title: "Automation hoodie", category: "Streetwear", tags: [], status: "active", createdAt: now, updatedAt: now }],
     variants: [{ id: variantId, productId, sku: "AUTO-HOOD", title: "Automation Hoodie", condition: "New", landedUnitCost: 20, defaultSalePrice: 80, reorderPoint: 2, reorderQuantity: 6, active: true }],
     locations: [], balances: [{ id: crypto.randomUUID(), variantId, onHand: 2, reserved: 1, incoming: 0, damaged: 0, returned: 0, lost: 0, quarantined: 0 }], stockMovements: [],
-    suppliers: [], purchaseOrders: [], parcels: [], listings: [], customers: [], orders: [], transactions: [], tasks: [], notices: [], insights: [], activity: [],
+    suppliers: [{ id: crypto.randomUUID(), name: "Automation supplier", sourcePlatform: "Manual", status: "active" }], purchaseOrders: [], parcels: [], listings: [], customers: [], orders: [], transactions: [], tasks: [], notices: [], insights: [], activity: [],
   };
 };
 
@@ -120,4 +122,61 @@ test("automation retry, dead-letter replay, approval expiration, and backoff are
   const replay = replayDeadLetter(data, data.automationDeadLetters![0].id);
   assert.ok(replay.id);
   assert.ok(new Date(nextBackoff(2)).getTime() > Date.now());
+});
+
+test("automation actions call real cross-module services and persist linked records", () => {
+  const data = fixture();
+  ensureAutomationCollections(data);
+  createFiveChannelDrafts(data, { variantId: data.variants[0].id, physicalSku: "AUTO-HOOD" });
+  createAnalyticsReport(data, { name: "Automation report", sections: ["inventory"], metrics: ["dead_stock"], filters: { sku: "AUTO-HOOD" }, drilldowns: ["sku"] });
+  const orderId = crypto.randomUUID();
+  data.customers.push({ id: crypto.randomUUID(), name: "Automation buyer", orderCount: 0, lifetimeValue: 0, issueCount: 0 });
+  data.orders.push({ id: orderId, number: "AUTO-ORDER", marketplace: "Depop", customerId: data.customers[0].id, items: [{ id: crypto.randomUUID(), variantId: data.variants[0].id, title: "Automation Hoodie", quantity: 1, unitSellingPrice: 80, discountAllocation: 0, taxAllocation: 0, feeAllocation: 0, unitCost: 20 }], shippingCharged: 0, shippingCost: 0, marketplaceFee: 0, paymentFee: 0, taxCollected: 0, status: "paid", orderedAt: new Date().toISOString() });
+  const rule = createAutomationRule(data, { enabled: true, dryRun: false, triggerType: "order.imported" });
+  rule.actions = [
+    { id: crypto.randomUUID(), type: "reserve_inventory", config: {} },
+    { id: crypto.randomUUID(), type: "queue_sibling_delist", config: {} },
+    { id: crypto.randomUUID(), type: "create_fulfillment_exception", config: {} },
+    { id: crypto.randomUUID(), type: "create_reorder_recommendation", config: {} },
+    { id: crypto.randomUUID(), type: "run_saved_report", config: {} },
+    { id: crypto.randomUUID(), type: "trigger_forecast_refresh", config: {} },
+  ];
+  const run = runAutomationRule(data, rule.id, { orderId, draftId: data.channelListingDrafts![0].id, sku: "AUTO-HOOD", marketplace: "Depop", available: 1 }, "cross-module-actions");
+  assert.equal(run.status, "succeeded");
+  assert.equal(data.orders.find((order) => order.id === orderId)?.status, "reserved");
+  assert.ok(data.stockMovements.some((movement) => movement.referenceId === orderId));
+  assert.ok(data.listingSyncJobs?.some((job) => job.action === "sold_coordination"));
+  assert.ok(data.fulfillmentExceptions?.length);
+  assert.ok(data.reorderRecommendations?.length);
+  assert.ok(data.analyticsReportRuns?.length);
+  assert.ok(data.automationSteps?.every((step) => step.linkedRecords.length > 0));
+});
+
+test("approval-gated automation actions block, then execute the approved module operation", () => {
+  const data = fixture();
+  ensureAutomationCollections(data);
+  const rule = createAutomationRule(data, { enabled: true, dryRun: false, triggerType: "inventory.below_reorder_point" });
+  rule.actions = [{ id: crypto.randomUUID(), type: "draft_purchase_order", config: {}, approvalRequired: true }];
+  const run = runAutomationRule(data, rule.id, { sku: "AUTO-HOOD", available: 1, reorderPoint: 2 }, "approval-real-action");
+  assert.equal(run.status, "waiting_approval");
+  assert.equal(data.purchaseOrders.length, 0);
+  const approval = data.automationApprovals![0];
+  assert.equal(approval.proposedAction, "draft_purchase_order");
+  approveAutomation(data, approval.id, true, { note: "Approved by unit test" });
+  assert.equal(data.purchaseOrders.length, 1);
+  assert.equal(data.purchaseApprovals?.[0].status, "requested");
+  assert.equal(data.automationRuns?.find((entry) => entry.id === run.id)?.status, "succeeded");
+});
+
+test("automation action failure rolls back partial module writes and creates a dead letter", () => {
+  const data = fixture();
+  ensureAutomationCollections(data);
+  const rule = createAutomationRule(data, { enabled: true, dryRun: false, triggerType: "order.imported" });
+  rule.actions = [{ id: crypto.randomUUID(), type: "reserve_inventory", config: {} }];
+  const beforeMovements = data.stockMovements.length;
+  const run = runAutomationRule(data, rule.id, { daysWithoutSale: 90 }, "rollback-action");
+  assert.equal(run.status, "failed");
+  assert.equal(data.stockMovements.length, beforeMovements);
+  assert.equal(data.automationDeadLetters?.[0].status, "open");
+  assert.ok(data.notices.some((notice) => notice.title === "Automation failed"));
 });

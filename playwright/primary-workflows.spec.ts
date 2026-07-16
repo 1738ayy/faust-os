@@ -82,6 +82,9 @@ test("automations create, test, enable, run, approve, retry, duplicate, archive,
   await expect(automationMain.getByRole("heading", { name: "Event receipts", level: 2, exact: true })).toBeVisible();
   await expect(automationMain.getByRole("heading", { name: "Worker health", level: 2, exact: true })).toBeVisible();
   await expect(automationMain.getByRole("heading", { name: "Execution traces", level: 2, exact: true })).toBeVisible();
+  await expect(automationMain.getByRole("heading", { name: "Queue observability", level: 2, exact: true })).toBeVisible();
+  await expect(automationMain.getByRole("heading", { name: "Active leases", level: 2, exact: true })).toBeVisible();
+  await expect(automationMain.getByText("Queue depth", { exact: true })).toBeVisible();
 });
 
 test("fulfillment API persists pick, pack, label, dispatch, tracking, exception, finance, order, and inventory state", async ({ request }) => {
