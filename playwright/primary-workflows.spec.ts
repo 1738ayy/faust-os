@@ -121,6 +121,15 @@ test("inventory adjustment API updates the demo balance with an audit trail", as
   expect(updated.balances.find((entry: { id: string }) => entry.id === balance.id).onHand).toBe(balance.onHand + 1); expect(updated.stockMovements.some((entry: { referenceType?: string }) => entry.referenceType === "inventory_adjustment")).toBeTruthy(); expect(updated.activity.some((entry: { entityType: string }) => entry.entityType === "inventory_balance")).toBeTruthy();
 });
 
+test("finance API persists expense, payout, budget, tax, allocation, and forecast workflows", async ({ request }) => {
+  await resetDemo(request);
+  const expense = await request.post("/api/finance/actions", { data: { action: "create-expense", vendor: "API Vendor", category: "Software", amount: 42, recurring: "monthly", receiptStatus: "pending_attachment" } }); expect(expense.ok(), await expense.text()).toBeTruthy(); let state = (await expense.json()).data; expect(state.expenses.some((entry: { vendor: string }) => entry.vendor === "API Vendor")).toBeTruthy();
+  const payout = await request.post("/api/finance/actions", { data: { action: "reconcile-payout", marketplace: "Depop", expectedAmount: 81.18, actualAmount: 80, externalPayoutId: "API-PAYOUT" } }); expect(payout.ok(), await payout.text()).toBeTruthy(); state = (await payout.json()).data; expect(state.payouts.some((entry: { externalPayoutId: string }) => entry.externalPayoutId === "API-PAYOUT")).toBeTruthy(); expect(state.payoutReconciliations.some((entry: { status: string }) => entry.status === "discrepancy")).toBeTruthy();
+  const budget = await request.post("/api/finance/actions", { data: { action: "create-budget", month: "2026-07", category: "Advertising", amount: 250 } }); expect(budget.ok(), await budget.text()).toBeTruthy(); state = (await budget.json()).data; expect(state.budgets.some((entry: { category: string }) => entry.category === "Advertising")).toBeTruthy();
+  const tax = await request.post("/api/finance/actions", { data: { action: "reserve-tax", amount: 25, basisAmount: 140, rate: 0.18, notes: "API reserve" } }); expect(tax.ok(), await tax.text()).toBeTruthy(); state = (await tax.json()).data; expect(state.taxReserveMovements.some((entry: { notes: string }) => entry.notes === "API reserve")).toBeTruthy();
+  const forecast = await request.post("/api/finance/actions", { data: { action: "configure-forecast", scenario: "expected", revenueMultiplier: 1.08, expenseMultiplier: 1.02, assumption: "API scenario" } }); expect(forecast.ok(), await forecast.text()).toBeTruthy(); state = (await forecast.json()).data; expect(state.forecasts.some((entry: { scenarios?: unknown[] }) => entry.scenarios?.length)).toBeTruthy();
+});
+
 test("inventory exposes audited mutation controls and refreshed balances", async ({ request, page }) => {
   await resetDemo(request);
   await page.goto("/inventory");
@@ -162,4 +171,17 @@ test("finance workspace exposes ledger, reconciliation, payout, cash, budget, ta
   await expect(deployableCashSection.getByText("Deployable cash", { exact: true })).toBeVisible();
   const forecastsSection = financeMain.locator("section").filter({ has: page.getByRole("heading", { name: "Forecasts", exact: true }) });
   await expect(forecastsSection.getByText(/Assumptions:/i)).toBeVisible();
+  const workflows = page.getByRole("region", { name: "Finance workflows" });
+  await expect(workflows).toBeVisible();
+  for (const label of ["Create expense", "Edit expense", "Reconcile payout", "Create budget", "Reserve movement", "Configure forecast"]) {
+    const responsePromise = page.waitForResponse((response) => response.url().includes("/api/finance/actions") && response.request().method() === "POST");
+    await workflows.getByRole("button", { name: label, exact: true }).click();
+    const response = await responsePromise; expect(response.ok(), await response.text()).toBeTruthy();
+    await expect(workflows.getByRole("status")).toContainText(/saved/i);
+  }
+  await workflows.getByRole("button", { name: "Simulate allocation", exact: true }).click();
+  await expect(workflows.getByRole("status")).toContainText(/saved/i);
+  await page.reload();
+  await expect(page.getByTestId("app-main").getByRole("heading", { name: "Transaction Ledger", exact: true })).toBeVisible();
+  await expect(page.getByText("Edited vendor")).toBeVisible();
 });
