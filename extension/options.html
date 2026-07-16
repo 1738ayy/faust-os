@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="en">
+  <head><meta charset="utf-8" /><style>body{max-width:560px;margin:0 auto;padding:24px;background:#111113;color:#f7f7f8;font:14px system-ui,sans-serif}label{display:block;margin:12px 0}input,select{width:100%;padding:10px;background:#18181b;color:#fff;border:1px solid #334155}button{padding:10px 14px;background:#7c3aed;color:#fff;border:0}</style></head>
+  <body>
+    <h1>Faust Bridge settings</h1>
+    <label>Faust API URL <input id="faustBaseUrl" /></label>
+    <label>Environment <select id="environment"><option value="local">local</option><option value="staging">staging</option><option value="production">production</option></select></label>
+    <p>No marketplace passwords are stored. Faust uses your active browser sessions only.</p>
+    <button id="save">Save</button>
+    <p id="status"></p>
+    <script src="options.js"></script>
+  </body>
+</html>

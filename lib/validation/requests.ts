@@ -157,3 +157,27 @@ export const aiCenterActionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("request-approval"), recommendationId: z.string().uuid(), reason: z.string().trim().max(500).optional() }),
   z.object({ action: z.literal("feedback"), messageId: z.string().uuid().optional(), recommendationId: z.string().uuid().optional(), rating: z.enum(["useful", "not_useful", "unsafe", "wrong"]), comment: z.string().trim().max(1000).optional() }),
 ]);
+
+const extensionAssumptionsSchema = z.object({
+  rmbUsdRate: z.coerce.number().positive().optional(),
+  internationalFreightPerKgUsd: z.coerce.number().nonnegative().optional(),
+  dutyRate: z.coerce.number().min(0).max(1).optional(),
+  customsFlatUsd: z.coerce.number().nonnegative().optional(),
+  expectedShippingUsd: z.coerce.number().nonnegative().optional(),
+  packagingUsd: z.coerce.number().nonnegative().optional(),
+  paymentFeeRate: z.coerce.number().min(0).max(1).optional(),
+  paymentFeeFlatUsd: z.coerce.number().nonnegative().optional(),
+  targetSalePriceUsd: z.coerce.number().positive().optional(),
+  quantity: z.coerce.number().int().positive().optional(),
+}).passthrough();
+
+export const extensionActionSchema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("scan-intake"), payload: z.record(z.string(), z.unknown()), idempotencyKey: z.string().uuid().optional() }),
+  z.object({ action: z.literal("analyze"), product: z.record(z.string(), z.unknown()), assumptions: extensionAssumptionsSchema.optional(), idempotencyKey: z.string().uuid().optional() }),
+  z.object({ action: z.literal("import-product"), product: z.record(z.string(), z.unknown()), assumptions: extensionAssumptionsSchema.optional(), approved: z.boolean(), idempotencyKey: z.string().uuid().optional() }),
+  z.object({ action: z.literal("create-publish-job"), draftId: z.string().uuid(), idempotencyKey: z.string().uuid().optional() }),
+  z.object({ action: z.literal("confirm-publish"), draftId: z.string().uuid(), externalListingId: z.string().trim().min(1).max(200), externalUrl: z.string().url(), finalTitle: z.string().trim().max(120).optional(), finalPrice: z.coerce.number().positive().optional(), idempotencyKey: z.string().uuid().optional() }),
+  z.object({ action: z.literal("report-error"), draftId: z.string().uuid().optional(), marketplace: z.enum(["Depop", "eBay", "Etsy", "Mercari", "Poshmark", "Manual"]).optional(), reason: z.string().trim().min(2).max(1000), screenshotUrl: z.string().url().optional(), artifact: z.record(z.string(), z.unknown()).optional(), idempotencyKey: z.string().uuid().optional() }),
+  z.object({ action: z.literal("sync-quantity"), draftId: z.string().uuid(), quantity: z.coerce.number().int().nonnegative().optional(), idempotencyKey: z.string().uuid().optional() }),
+  z.object({ action: z.enum(["pause-draft", "delist-draft"]), draftId: z.string().uuid(), reason: z.string().trim().max(500).optional(), idempotencyKey: z.string().uuid().optional() }),
+]);

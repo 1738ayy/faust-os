@@ -1,6 +1,6 @@
 /** Facts captured from a Superbuy product page. Financial assumptions do not belong here. */
 export type SuperbuyProduct = {
-  source: "superbuy";
+  source: "superbuy" | "1688";
   importedAt: string;
   title: string;
   superbuyUrl: string;
@@ -23,6 +23,12 @@ export type SuperbuyProduct = {
   price?: number;
   domesticShipping?: number;
   internationalShipping?: number;
+  dimensionsParsed?: { lengthCm?: number; widthCm?: number; heightCm?: number };
+  sellerRating?: number;
+  salesCount?: number;
+  orderCount?: number;
+  notes?: string;
+  pageTimestamp?: string;
   priceRange?: { min: number; max: number };
   images: string[];
   variants: SuperbuyVariant[];

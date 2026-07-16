@@ -1,25 +1,39 @@
 {
   "manifest_version": 3,
-  "name": "Faust Companion",
-  "version": "0.2.0",
-  "description": "Import Superbuy products into Faust OS.",
-  "permissions": ["activeTab", "scripting"],
+  "name": "Faust Commerce Bridge",
+  "version": "1.0.0",
+  "description": "Scan source products, analyze profitability, import to Faust, and assist marketplace publishing.",
+  "permissions": ["activeTab", "scripting", "storage", "sidePanel", "tabs"],
   "host_permissions": [
     "https://*.superbuy.com/*",
-    "http://localhost:3000/*"
+    "https://*.1688.com/*",
+    "https://*.depop.com/*",
+    "https://*.ebay.com/*",
+    "https://*.etsy.com/*",
+    "https://*.mercari.com/*",
+    "https://*.poshmark.com/*",
+    "http://localhost:3000/*",
+    "https://*.faust.local/*"
   ],
+  "background": { "service_worker": "background.js", "type": "module" },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Import into Faust"
+    "default_title": "Faust Commerce Bridge"
   },
+  "side_panel": { "default_path": "sidepanel.html" },
+  "options_page": "options.html",
   "content_scripts": [
     {
-      "matches": ["https://*.superbuy.com/*"],
+      "matches": ["https://*.superbuy.com/*", "https://*.1688.com/*"],
       "js": [
         "extractors/product.js",
         "utils/send.js",
         "content.js"
       ]
+    },
+    {
+      "matches": ["https://*.depop.com/*", "https://*.ebay.com/*", "https://*.etsy.com/*", "https://*.mercari.com/*", "https://*.poshmark.com/*"],
+      "js": ["marketplace-content.js"]
     }
   ]
 }

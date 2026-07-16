@@ -40,15 +40,15 @@ export function parseSuperbuyProduct(value: unknown): SuperbuyProduct {
   const superbuyUrl = asText(input.superbuyUrl);
 
   if (!title) throw new Error("A Superbuy product title is required.");
-  if (!superbuyUrl || !/^https:\/\/([\w-]+\.)?superbuy\.com\//.test(superbuyUrl)) {
-    throw new Error("A valid Superbuy product URL is required.");
+  if (!superbuyUrl || !/^https:\/\/(([\w-]+\.)?superbuy\.com|([\w-]+\.)?1688\.com)\//.test(superbuyUrl)) {
+    throw new Error("A valid Superbuy or 1688 product URL is required.");
   }
 
   const min = asNumber((input.priceRange as Record<string, unknown> | undefined)?.min);
   const max = asNumber((input.priceRange as Record<string, unknown> | undefined)?.max);
 
   return {
-    source: "superbuy",
+    source: /1688\.com/.test(superbuyUrl) ? "1688" : "superbuy",
     importedAt: asText(input.importedAt) ?? new Date().toISOString(),
     title,
     superbuyUrl,
@@ -71,6 +71,12 @@ export function parseSuperbuyProduct(value: unknown): SuperbuyProduct {
     price: asNumber(input.price),
     domesticShipping: asNumber(input.domesticShipping),
     internationalShipping: asNumber(input.internationalShipping),
+    dimensionsParsed: typeof input.dimensionsParsed === "object" && input.dimensionsParsed ? input.dimensionsParsed as SuperbuyProduct["dimensionsParsed"] : undefined,
+    sellerRating: asNumber(input.sellerRating),
+    salesCount: asNumber(input.salesCount),
+    orderCount: asNumber(input.orderCount),
+    notes: asText(input.notes),
+    pageTimestamp: asText(input.pageTimestamp),
     priceRange: min !== undefined && max !== undefined ? { min, max } : undefined,
     images: asImages(input.images),
     variants: asVariants(input.variants),

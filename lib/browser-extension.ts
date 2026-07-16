@@ -1,0 +1,161 @@
+import type { ChannelListingDraft, Marketplace, OperatingData, Product, Supplier, Variant } from "../domain/business";
+import type { SuperbuyProduct } from "../types/superbuy-product";
+import { parseSuperbuyProduct } from "./validation/superbuy-product";
+import { createFiveChannelDrafts, seedMarketplaceAccountsAndTemplates, syncDraftQuantity, pauseOrDelistDraft, confirmExternalListing } from "./listings-core";
+import { money } from "./business-calculations";
+
+const now = () => new Date().toISOString();
+const id = () => crypto.randomUUID();
+export const extensionVersion = "1.0.0-phase1";
+
+export type ExtensionAction =
+  | { action: "scan-intake"; payload: unknown; idempotencyKey?: string }
+  | { action: "analyze"; product: unknown; assumptions?: Partial<ProfitabilityAssumptions>; idempotencyKey?: string }
+  | { action: "import-product"; product: unknown; assumptions?: Partial<ProfitabilityAssumptions>; approved?: boolean; idempotencyKey?: string }
+  | { action: "create-publish-job"; draftId: string; idempotencyKey?: string }
+  | { action: "confirm-publish"; draftId: string; externalListingId: string; externalUrl: string; finalTitle?: string; finalPrice?: number; idempotencyKey?: string }
+  | { action: "report-error"; draftId?: string; marketplace?: Marketplace; reason: string; screenshotUrl?: string; artifact?: Record<string, unknown>; idempotencyKey?: string }
+  | { action: "sync-quantity"; draftId: string; quantity?: number; idempotencyKey?: string }
+  | { action: "pause-draft" | "delist-draft"; draftId: string; reason?: string; idempotencyKey?: string };
+
+export type ProfitabilityAssumptions = {
+  rmbUsdRate: number;
+  internationalFreightPerKgUsd: number;
+  dutyRate: number;
+  customsFlatUsd: number;
+  expectedShippingUsd: number;
+  packagingUsd: number;
+  paymentFeeRate: number;
+  paymentFeeFlatUsd: number;
+  marketplaceFeeRates: Record<Exclude<Marketplace, "Manual">, number>;
+  targetSalePriceUsd?: number;
+  quantity?: number;
+};
+
+export function defaultProfitabilityAssumptions(): ProfitabilityAssumptions {
+  return { rmbUsdRate: 0.14, internationalFreightPerKgUsd: 8, dutyRate: 0.08, customsFlatUsd: 0, expectedShippingUsd: 7.5, packagingUsd: 1.2, paymentFeeRate: 0.029, paymentFeeFlatUsd: 0.3, marketplaceFeeRates: { Depop: 0.1, eBay: 0.1325, Etsy: 0.095, Mercari: 0.1, Poshmark: 0.2 }, quantity: 1 };
+}
+
+function audit(data: OperatingData, action: string, entityType: string, entityId: string, detail: string) {
+  data.activity.unshift({ id: id(), action, entityType, entityId, detail, createdAt: now() });
+}
+
+function weightKg(product: SuperbuyProduct) {
+  const raw = product.shippingWeight || product.weight || "";
+  const match = raw.replace(",", "").match(/([\d.]+)\s*(kg|g|lb|oz)?/i);
+  if (!match) return 0.5;
+  const value = Number(match[1]);
+  const unit = (match[2] || "g").toLowerCase();
+  if (unit === "kg") return value;
+  if (unit === "lb") return value * 0.453592;
+  if (unit === "oz") return value * 0.0283495;
+  return value / 1000;
+}
+
+export function analyzeExtensionProduct(input: unknown, overrides: Partial<ProfitabilityAssumptions> = {}) {
+  const product = parseSuperbuyProduct(input);
+  const assumptions = { ...defaultProfitabilityAssumptions(), ...overrides, marketplaceFeeRates: { ...defaultProfitabilityAssumptions().marketplaceFeeRates, ...overrides.marketplaceFeeRates } };
+  const rmbPrice = product.priceRange?.min ?? product.price ?? 0;
+  const quantity = Math.max(1, assumptions.quantity || product.minimumOrderQuantity || 1);
+  const purchaseCostUsd = Math.round(rmbPrice * assumptions.rmbUsdRate * 100) / 100;
+  const domesticFreightUsd = Math.round((product.domesticShipping || 0) * assumptions.rmbUsdRate * 100) / 100;
+  const internationalFreightUsd = Math.round(weightKg(product) * assumptions.internationalFreightPerKgUsd * 100) / 100;
+  const dutyCustomsUsd = Math.round((purchaseCostUsd * assumptions.dutyRate + assumptions.customsFlatUsd) * 100) / 100;
+  const landedUnitCost = Math.round((purchaseCostUsd + domesticFreightUsd + internationalFreightUsd + dutyCustomsUsd) * 100) / 100;
+  const targetSalePrice = assumptions.targetSalePriceUsd || Math.max(landedUnitCost * 2.7, landedUnitCost + 25);
+  const byMarketplace = Object.entries(assumptions.marketplaceFeeRates).map(([marketplace, feeRate]) => {
+    const platformFee = targetSalePrice * feeRate;
+    const paymentFee = targetSalePrice * assumptions.paymentFeeRate + assumptions.paymentFeeFlatUsd;
+    const expectedProfit = targetSalePrice - landedUnitCost - platformFee - paymentFee - assumptions.expectedShippingUsd - assumptions.packagingUsd;
+    return { marketplace: marketplace as Exclude<Marketplace, "Manual">, targetSalePrice, platformFee, paymentFee, expectedShippingCost: assumptions.expectedShippingUsd, landedUnitCost, expectedProfit, contributionMargin: targetSalePrice ? expectedProfit / targetSalePrice * 100 : 0, roi: landedUnitCost ? expectedProfit / landedUnitCost * 100 : 0, breakEvenPrice: landedUnitCost + platformFee + paymentFee + assumptions.expectedShippingUsd + assumptions.packagingUsd };
+  });
+  return { product, assumptions, purchaseCostUsd, domesticFreightUsd, internationalFreightUsd, dutyCustomsUsd, landedUnitCost, cashCommitment: landedUnitCost * quantity, quantity, byMarketplace };
+}
+
+function supplierName(product: SuperbuyProduct) {
+  return product.storeName || product.factoryName || product.supplier || "Extension supplier";
+}
+
+function physicalSku(product: SuperbuyProduct) {
+  return `FST-${supplierName(product).slice(0, 3).replace(/[^a-z0-9]/gi, "").toUpperCase() || "SRC"}-${Math.abs([...product.superbuyUrl].reduce((sum, char) => sum + char.charCodeAt(0), 0)).toString(36).toUpperCase()}`;
+}
+
+export function importExtensionProduct(data: OperatingData, input: unknown, assumptions: Partial<ProfitabilityAssumptions> = {}, idempotencyKey?: string) {
+  const analysis = analyzeExtensionProduct(input, assumptions);
+  const product = analysis.product;
+  const existing = data.products.find((entry) => entry.sourceUrl === product.superbuyUrl);
+  if (existing) {
+    const variant = data.variants.find((entry) => entry.productId === existing.id);
+    return { analysis, productId: existing.id, variantId: variant?.id, idempotent: true, drafts: data.channelListingDrafts?.filter((draft) => draft.variantId === variant?.id) || [] };
+  }
+  const createdAt = now();
+  let supplier: Supplier | undefined = data.suppliers.find((entry) => entry.name.toLowerCase() === supplierName(product).toLowerCase());
+  if (!supplier) { supplier = { id: id(), name: supplierName(product), contact: product.supplier, sourcePlatform: product.source, leadDays: 12, rating: product.sellerRating, status: "active", notes: `Created by Faust extension from ${product.superbuyUrl}` }; data.suppliers.push(supplier); }
+  const catalogProduct: Product = { id: id(), title: product.title, category: product.category || "Imported source product", tags: ["extension-import", product.source], supplierId: supplier.id, sourceUrl: product.superbuyUrl, image: product.images[0], status: "draft", createdAt, updatedAt: createdAt };
+  data.products.push(catalogProduct);
+  const sku = physicalSku(product);
+  const variant: Variant = { id: id(), productId: catalogProduct.id, sku, title: product.variants[0]?.name || "Default variant", condition: "New with tags", landedUnitCost: analysis.landedUnitCost, defaultSalePrice: analysis.byMarketplace[0]?.targetSalePrice || analysis.landedUnitCost * 3, weightOz: Math.round(weightKg(product) * 35.274 * 10) / 10, reorderPoint: Math.max(1, Math.min(5, product.minimumOrderQuantity || 2)), reorderQuantity: Math.max(product.minimumOrderQuantity || 1, analysis.quantity), active: true };
+  data.variants.push(variant);
+  data.balances.push({ id: id(), variantId: variant.id, onHand: 0, reserved: 0, incoming: analysis.quantity, damaged: 0, returned: 0, lost: 0, quarantined: 0 });
+  data.purchaseBatches ||= [];
+  data.landedCostComponents ||= [];
+  const batchId = id();
+  data.purchaseBatches.push({ id: batchId, supplierId: supplier.id, reference: `EXT-DRAFT-${sku}`, currency: product.source === "1688" ? "RMB" : "USD", status: "draft", itemCount: analysis.quantity, subtotalOriginal: product.price || 0, subtotalUsd: analysis.purchaseCostUsd * analysis.quantity, landedCostUsd: (analysis.domesticFreightUsd + analysis.internationalFreightUsd + analysis.dutyCustomsUsd) * analysis.quantity, totalCostUsd: analysis.cashCommitment, receivedAt: createdAt, idempotencyKey, createdAt });
+  data.landedCostComponents.push({ id: id(), batchId, type: "product", description: "Extension source product estimate", amountOriginal: product.price || 0, currency: product.source === "1688" ? "RMB" : "USD", amountUsd: analysis.purchaseCostUsd, allocationMethod: "by_quantity", linkedObjectType: "manual", linkedObjectId: catalogProduct.id, createdAt });
+  seedMarketplaceAccountsAndTemplates(data);
+  createFiveChannelDrafts(data, { variantId: variant.id, physicalSku: sku, basePrice: variant.defaultSalePrice, imageUrls: product.images, idempotencyKey });
+  const drafts = data.channelListingDrafts?.filter((draft) => draft.variantId === variant.id) || [];
+  audit(data, "Extension product imported", "product", catalogProduct.id, `${product.title} imported with ${drafts.length} channel drafts. Cash commitment ${money(analysis.cashCommitment)}.`);
+  data.notices.unshift({ id: id(), severity: "info", title: "Extension import ready", detail: `${product.title} created ${drafts.length} marketplace drafts.`, actionLabel: "Open listings", href: "/listings", createdAt, category: "system", entityType: "product", entityId: catalogProduct.id, read: false });
+  return { analysis, productId: catalogProduct.id, variantId: variant.id, idempotent: false, drafts };
+}
+
+export function createExtensionPublishJob(data: OperatingData, draftId: string, idempotencyKey?: string) {
+  seedMarketplaceAccountsAndTemplates(data);
+  const draft = data.channelListingDrafts?.find((entry) => entry.id === draftId);
+  if (!draft) throw new Error("Listing draft not found.");
+  data.listingSyncJobs ||= [];
+  const existing = idempotencyKey ? data.listingSyncJobs.find((job) => job.idempotencyKey === idempotencyKey) : undefined;
+  if (existing) return { draft, job: existing };
+  const job = { id: id(), channelDraftId: draft.id, marketplace: draft.marketplace, action: "publish" as const, status: draft.publishMode === "adapter" ? "queued" as const : "manual_required" as const, attempts: 0, maxAttempts: 3, idempotencyKey, runAfter: now(), createdAt: now() };
+  data.listingSyncJobs.push(job);
+  draft.status = draft.publishMode === "adapter" ? "queued" : "manual_required";
+  draft.syncState = draft.publishMode === "adapter" ? "pending" : "manual";
+  audit(data, "Extension publish job created", "channel_listing_draft", draft.id, `${draft.marketplace} publish job queued.`);
+  return { draft, job };
+}
+
+export function confirmExtensionPublish(data: OperatingData, input: Extract<ExtensionAction, { action: "confirm-publish" }>) {
+  confirmExternalListing(data, { draftId: input.draftId, externalListingId: input.externalListingId, externalUrl: input.externalUrl, idempotencyKey: input.idempotencyKey });
+  const draft = data.channelListingDrafts!.find((entry) => entry.id === input.draftId)!;
+  if (input.finalTitle) draft.title = input.finalTitle;
+  if (input.finalPrice) draft.price = input.finalPrice;
+  audit(data, "Extension publish confirmed", "channel_listing_draft", draft.id, `${draft.marketplace} confirmed ${input.externalListingId}.`);
+  return draft;
+}
+
+export function reportExtensionFailure(data: OperatingData, input: Extract<ExtensionAction, { action: "report-error" }>) {
+  data.listingReviewItems ||= [];
+  const review = { id: id(), channelDraftId: input.draftId, marketplace: (input.marketplace || "Depop") as Exclude<Marketplace, "Manual">, severity: "warning" as const, reason: "sync_failed" as const, status: "open" as const, detail: input.reason, actionLabel: "Retry or finish manually", createdAt: now() };
+  data.listingReviewItems.unshift(review);
+  data.notices.unshift({ id: id(), severity: "warning", title: "Extension publish blocked", detail: input.reason, actionLabel: "Review listing", href: "/listings", createdAt: now(), category: "system", entityType: "listing_review_item", entityId: review.id, read: false });
+  audit(data, "Extension failure reported", "listing_review_item", review.id, input.reason);
+  return review;
+}
+
+export function applyExtensionAction(data: OperatingData, input: ExtensionAction) {
+  if (input.action === "scan-intake") return { product: parseSuperbuyProduct(input.payload), extensionVersion };
+  if (input.action === "analyze") return analyzeExtensionProduct(input.product, input.assumptions);
+  if (input.action === "import-product") { if (!input.approved) throw new Error("Import must be approved from the extension review screen."); return importExtensionProduct(data, input.product, input.assumptions, input.idempotencyKey); }
+  if (input.action === "create-publish-job") return createExtensionPublishJob(data, input.draftId, input.idempotencyKey);
+  if (input.action === "confirm-publish") return confirmExtensionPublish(data, input);
+  if (input.action === "report-error") return reportExtensionFailure(data, input);
+  if (input.action === "sync-quantity") return syncDraftQuantity(data, { draftId: input.draftId, quantity: input.quantity, idempotencyKey: input.idempotencyKey });
+  if (input.action === "pause-draft") return pauseOrDelistDraft(data, { draftId: input.draftId, mode: "pause", reason: input.reason, idempotencyKey: input.idempotencyKey });
+  if (input.action === "delist-draft") return pauseOrDelistDraft(data, { draftId: input.draftId, mode: "delist", reason: input.reason, idempotencyKey: input.idempotencyKey });
+  throw new Error("Unsupported extension action.");
+}
+
+export function marketplaceFormMapping(draft: ChannelListingDraft) {
+  return { title: draft.title, description: draft.description, category: draft.category, price: draft.price, condition: draft.attributes.condition || "New with tags", quantity: draft.quantity, sku: draft.physicalSku, images: draft.imageUrls, attributes: draft.attributes, shipping: "Standard seller-paid shipping" };
+}

@@ -62,7 +62,7 @@
     const title = normalize(structured?.name) || normalize(document.querySelector("h1")?.textContent) || normalize(document.title.replace(/\s*[-|]\s*Superbuy.*$/i, ""));
 
     return {
-      source: "superbuy",
+      source: /1688\.com/i.test(location.hostname) ? "1688" : "superbuy",
       importedAt: new Date().toISOString(),
       title,
       superbuyUrl: location.href,
@@ -83,6 +83,11 @@
       price,
       domesticShipping: numberFrom(firstMatch(/(?:Domestic|China)\s*(?:shipping|freight)\s*:?\s*(?:US\s*\$)?\s*([\d,.]+)/i)),
       internationalShipping: numberFrom(firstMatch(/(?:International|Overseas)\s*(?:shipping|freight)\s*:?\s*(?:US\s*\$)?\s*([\d,.]+)/i)),
+      sellerRating: numberFrom(firstMatch(/(?:rating|score)\s*:?\s*([\d.]+)/i)),
+      salesCount: numberFrom(firstMatch(/(?:sold|sales)\s*:?\s*([\d,]+)/i)),
+      orderCount: numberFrom(firstMatch(/orders?\s*:?\s*([\d,]+)/i)),
+      notes: "Captured by Faust Commerce Bridge. Review selector results before import.",
+      pageTimestamp: new Date().toISOString(),
       priceRange: range ? { min: numberFrom(range[1]), max: numberFrom(range[2]) } : undefined,
       images: unique([...(structured?.image ? (Array.isArray(structured.image) ? structured.image : [structured.image]) : []), ...productImages()]),
       variants: extractVariants(),

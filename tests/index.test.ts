@@ -12,3 +12,4 @@ import "./purchasing-core.test";
 import "./analytics.test";
 import "./automations.test";
 import "./ai-center.test";
+import "./browser-extension.test";

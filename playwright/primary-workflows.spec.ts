@@ -126,6 +126,39 @@ test("AI Center answers with evidence, generates briefs, scenarios, approvals, a
   await expect(page.getByRole("status")).toContainText("Grounded answer saved.");
 });
 
+test("browser extension API scans, analyzes, imports, confirms, syncs, and reports failures", async ({ request }) => {
+  await resetDemo(request);
+  const product = { source: "1688", importedAt: new Date().toISOString(), title: "Playwright 1688 Hoodie", superbuyUrl: "https://detail.1688.com/offer/999.html", supplier: "PW Factory", storeName: "PW Factory Store", images: ["https://img.example.test/pw.jpg"], variants: [{ id: "pw-l", name: "Black / L", options: ["Black", "L"], price: 118 }], price: 118, domesticShipping: 12, minimumOrderQuantity: 3, weight: "650g", sellerRating: 4.7, salesCount: 1200, pageTimestamp: new Date().toISOString() };
+  const scan = await request.post("/api/extension/scan", { data: { payload: product } });
+  expect(scan.ok(), await scan.text()).toBeTruthy();
+  const analyze = await request.post("/api/extension/analyze", { data: { product, assumptions: { rmbUsdRate: 0.14, targetSalePriceUsd: 65, quantity: 3 } } });
+  expect(analyze.ok(), await analyze.text()).toBeTruthy();
+  let state = await analyze.json();
+  expect(state.actionResult.byMarketplace.length).toBe(5);
+  const imported = await request.post("/api/extension/import", { data: { product, assumptions: { rmbUsdRate: 0.14, targetSalePriceUsd: 65, quantity: 3 }, approved: true, idempotencyKey: crypto.randomUUID() } });
+  expect(imported.ok(), await imported.text()).toBeTruthy();
+  state = await imported.json();
+  const draft = state.data.channelListingDrafts.find((entry: { marketplace: string; title: string }) => entry.marketplace === "Depop" && entry.title.includes("Playwright"));
+  expect(draft).toBeTruthy();
+  expect(state.data.channelListingDrafts.filter((entry: { variantId: string }) => entry.variantId === draft.variantId).length).toBe(5);
+  const second = await request.post("/api/extension/import", { data: { product, assumptions: { rmbUsdRate: 0.14, targetSalePriceUsd: 65, quantity: 3 }, approved: true, idempotencyKey: crypto.randomUUID() } });
+  expect(second.ok(), await second.text()).toBeTruthy();
+  state = await second.json();
+  expect(state.actionResult.idempotent).toBeTruthy();
+  const job = await request.post("/api/extension/publish-job", { data: { draftId: draft.id, idempotencyKey: crypto.randomUUID() } });
+  expect(job.ok(), await job.text()).toBeTruthy();
+  const confirm = await request.post("/api/extension/confirm", { data: { draftId: draft.id, externalListingId: "PW-DEPOP-1", externalUrl: "https://www.depop.com/products/pw-depop-1", finalTitle: "Playwright final title", finalPrice: 66 } });
+  expect(confirm.ok(), await confirm.text()).toBeTruthy();
+  state = await confirm.json();
+  expect(state.data.channelListingDrafts.find((entry: { id: string }) => entry.id === draft.id).externalListingId).toBe("PW-DEPOP-1");
+  const sync = await request.post("/api/extension/sync", { data: { draftId: draft.id, quantity: 2 } });
+  expect(sync.ok(), await sync.text()).toBeTruthy();
+  const failure = await request.post("/api/extension/error", { data: { draftId: draft.id, marketplace: "Depop", reason: "Selector changed in controlled test" } });
+  expect(failure.ok(), await failure.text()).toBeTruthy();
+  state = await failure.json();
+  expect(state.data.listingReviewItems.some((entry: { detail: string }) => entry.detail === "Selector changed in controlled test")).toBeTruthy();
+});
+
 test("fulfillment API persists pick, pack, label, dispatch, tracking, exception, finance, order, and inventory state", async ({ request }) => {
   await resetDemo(request);
   const beforeResponse = await request.get("/api/operating-system"); expect(beforeResponse.ok()).toBeTruthy(); const before = await beforeResponse.json();
