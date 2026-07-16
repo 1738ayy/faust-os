@@ -248,9 +248,12 @@ test("analytics decision engine supports filtering, drilldowns, and CSV export",
     await expect(reportBuilder.getByRole("status")).toContainText(/saved/i);
   }
   await page.reload();
-  await expect(analyticsMain.getByText(/SKU capital utilization review/i)).toBeVisible();
-  await expect(analyticsMain.getByText(/Filter preset:/i)).toBeVisible();
-  await expect(analyticsMain.getByText(/completed .* rows/i)).toBeVisible();
+  const savedReports = analyticsMain.locator("section").filter({ has: page.getByRole("heading", { name: "Saved Reports", level: 2, exact: true }) });
+  await expect(savedReports.getByRole("link", { name: "SKU capital utilization review", exact: true })).toBeVisible();
+  await expect(savedReports.getByRole("link", { name: "SKU capital utilization review copy", exact: true })).toBeVisible();
+  await expect(savedReports.getByText("Filter preset: SKU capital utilization review filters", { exact: true })).toBeVisible();
+  await expect(savedReports.getByText("Filter preset: SKU capital utilization review copy filters", { exact: true })).toBeVisible();
+  await expect(savedReports.getByText(/completed .* rows/i)).toBeVisible();
   const csv = await request.get("/api/exports/analytics?marketplace=Depop");
   expect(csv.ok(), await csv.text()).toBeTruthy();
   expect(await csv.text()).toContain("executive");
