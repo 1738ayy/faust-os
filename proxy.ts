@@ -4,6 +4,10 @@ import { NextResponse, type NextRequest } from "next/server";
 const publicPaths = ["/sign-in", "/sign-up", "/forgot-password", "/update-password", "/auth/callback", "/api/auth", "/api/health"];
 export async function proxy(request: NextRequest) {
   const enabled = process.env.NEXT_PUBLIC_FAUST_AUTH_ENABLED === "true" && Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+  const isConfiguredWorker = request.nextUrl.pathname === "/api/automations/actions"
+    && Boolean(process.env.AUTOMATION_WORKER_ID)
+    && request.headers.get("X-Faust-Worker-Id") === process.env.AUTOMATION_WORKER_ID;
+  if (isConfiguredWorker) return NextResponse.next({ request });
   if (!enabled || publicPaths.some((path) => request.nextUrl.pathname.startsWith(path))) return NextResponse.next({ request });
   let response = NextResponse.next({ request });
   const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, { cookies: { getAll() { return request.cookies.getAll(); }, setAll(cookiesToSet) { cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value)); response = NextResponse.next({ request }); cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options)); } } });
