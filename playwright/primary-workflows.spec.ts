@@ -11,9 +11,10 @@ test("authentication screens expose sign in, signup, and recovery", async ({ pag
   await page.getByRole("link", { name: /reset password/i }).click(); await expect(page.getByRole("heading", { name: /reset your password/i })).toBeVisible();
 });
 
-test("primary operations pages render their operational page titles", async ({ page }) => {
+test("primary operations pages render their operational page titles", async ({ request, page }) => {
+  await resetDemo(request);
   const routes = [
-    ["/", "Set up Mission Control"],
+    ["/", "Know what needs action next."],
     ["/inventory", "Stock, locations, and receiving"],
     ["/orders", "Orders"],
     ["/purchasing", "Purchasing & inbound"],
@@ -185,5 +186,7 @@ test("finance workspace exposes ledger, reconciliation, payout, cash, budget, ta
   await expect(workflows.getByRole("status")).toContainText(/saved/i);
   await page.reload();
   await expect(page.getByTestId("app-main").getByRole("heading", { name: "Transaction Ledger", exact: true })).toBeVisible();
-  await expect(page.getByText("Edited vendor")).toBeVisible();
+  const refreshedFinanceMain = page.getByTestId("app-main");
+  const refreshedExpensesSection = refreshedFinanceMain.locator("section").filter({ has: page.getByRole("heading", { name: "Expenses", level: 2, exact: true }) });
+  await expect(refreshedExpensesSection.getByText("Edited vendor · Software", { exact: true })).toBeVisible();
 });

@@ -51,9 +51,7 @@ export const fulfillmentActionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("resolve-exception"), exceptionId: z.string().uuid(), notes: z.string().trim().min(2).max(1000) }),
   z.object({ action: z.literal("reopen-exception"), exceptionId: z.string().uuid(), notes: z.string().trim().min(2).max(1000) }),
 ]);
-export const financeActionSchema = z.object({
-  action: z.enum(["create-expense", "edit-expense", "duplicate-expense", "archive-expense", "delete-expense", "create-payout", "import-payout", "reconcile-payout", "resolve-payout", "reopen-payout", "archive-payout", "create-budget", "edit-budget", "duplicate-budget", "rollover-budget", "yearly-template", "reserve-tax", "release-tax", "adjust-tax", "edit-allocation", "simulate-allocation", "approve-allocation", "configure-forecast"]),
-  id: z.string().uuid().optional(),
+const financeActionBase = {
   vendor: z.string().trim().max(120).optional(),
   category: z.string().trim().max(120).optional(),
   amount: z.coerce.number().optional(),
@@ -84,4 +82,7 @@ export const financeActionSchema = z.object({
   assumption: z.string().trim().max(300).optional(),
   notes: z.string().trim().max(1000).optional(),
   idempotencyKey: z.string().uuid().optional(),
-});
+};
+const financeCreateShape = z.object({ ...financeActionBase, action: z.enum(["create-expense", "create-payout", "import-payout", "reconcile-payout", "create-budget", "yearly-template", "reserve-tax", "release-tax", "adjust-tax", "edit-allocation", "simulate-allocation", "approve-allocation", "configure-forecast"]) });
+const financeExistingShape = z.object({ ...financeActionBase, action: z.enum(["edit-expense", "duplicate-expense", "archive-expense", "delete-expense", "resolve-payout", "reopen-payout", "archive-payout", "edit-budget", "duplicate-budget", "rollover-budget"]), id: z.string().uuid() });
+export const financeActionSchema = z.discriminatedUnion("action", [financeCreateShape, financeExistingShape]);
