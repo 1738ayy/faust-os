@@ -61,8 +61,9 @@ test("fulfillment API persists pick, pack, label, dispatch, tracking, exception,
 test("fulfillment center browser flow drives real API actions", async ({ request, page }) => {
   await resetDemo(request);
   await page.goto("/shipping");
-  await expect(page.getByRole("heading", { name: "Warehouse fulfillment center", exact: true })).toBeVisible();
-  await expect(page.getByText("FO-1042")).toBeVisible();
+  const shippingMain = page.getByTestId("app-main");
+  await expect(shippingMain.getByRole("heading", { name: "Warehouse fulfillment center", exact: true })).toBeVisible();
+  await expect(shippingMain.getByRole("cell", { name: "FO-1042", exact: true })).toBeVisible();
   const startPickResponse = page.waitForResponse((response) => response.url().includes("/api/fulfillment/actions") && response.request().method() === "POST");
   await page.getByRole("button", { name: "Start pick" }).click();
   expect((await startPickResponse).ok()).toBeTruthy();
@@ -87,7 +88,8 @@ test("fulfillment center browser flow drives real API actions", async ({ request
   await expect(page.getByRole("status")).toContainText("Label voided.");
   await page.getByRole("button", { name: "Regenerate label" }).click();
   await expect(page.getByRole("status")).toContainText("Label regenerated.");
-  await page.getByRole("button", { name: "Dispatch" }).click();
+  const labelWorkflow = shippingMain.locator("section").filter({ has: page.getByRole("heading", { name: "Rate shopping & labels", exact: true }) });
+  await labelWorkflow.getByRole("button", { name: "Dispatch", exact: true }).click();
   await expect(page.getByRole("status")).toContainText("Shipment dispatched.");
   await expect(page.getByText(/Carrier accepted package/i)).toBeVisible();
   await page.getByRole("button", { name: "Refresh tracking" }).click();
@@ -108,7 +110,7 @@ test("fulfillment center browser flow drives real API actions", async ({ request
 
 test("local source-to-sale fixture can be loaded without external credentials", async ({ request, page }) => {
   await resetDemo(request);
-  await page.goto("/orders"); await expect(page.getByRole("heading", { name: /FO-1042 · Depop/i })).toBeVisible();
+  await page.goto("/orders"); const appMain = page.getByTestId("app-main"); await expect(appMain.getByRole("heading", { name: "FO-1042 - Depop", exact: true })).toBeVisible();
   await page.goto("/purchasing"); await expect(page.getByText("DEMO-17TRACK-1042")).toBeVisible();
 });
 
