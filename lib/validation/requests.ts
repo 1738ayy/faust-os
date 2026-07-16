@@ -148,3 +148,12 @@ export const automationActionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("expire-approvals") }),
   z.object({ action: z.enum(["approve-action", "reject-action", "retry-run", "cancel-run"]), runId: z.string().uuid() }),
 ]);
+
+export const aiCenterActionSchema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("ask-question"), question: z.string().trim().min(2).max(1000), conversationId: z.string().uuid().optional(), saveQuestion: z.boolean().optional(), provider: z.enum(["deterministic", "openai", "anthropic", "gemini"]).optional() }),
+  z.object({ action: z.literal("daily-brief"), provider: z.enum(["deterministic", "openai", "anthropic", "gemini"]).optional() }),
+  z.object({ action: z.literal("run-scenario"), name: z.string().trim().max(120).optional(), prompt: z.string().trim().min(2).max(1000), units: z.coerce.number().int().positive().max(100000).optional(), variantId: z.string().uuid().optional(), priceChangePercent: z.coerce.number().min(-80).max(200).optional(), supplierId: z.string().uuid().optional(), marketingBudgetChange: z.coerce.number().min(-100000).max(100000).optional(), reserveCash: z.coerce.number().min(0).max(1000000).optional() }),
+  z.object({ action: z.literal("save-recommendation"), recommendationId: z.string().uuid() }),
+  z.object({ action: z.literal("request-approval"), recommendationId: z.string().uuid(), reason: z.string().trim().max(500).optional() }),
+  z.object({ action: z.literal("feedback"), messageId: z.string().uuid().optional(), recommendationId: z.string().uuid().optional(), rating: z.enum(["useful", "not_useful", "unsafe", "wrong"]), comment: z.string().trim().max(1000).optional() }),
+]);

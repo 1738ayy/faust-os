@@ -87,6 +87,45 @@ test("automations create, test, enable, run, approve, retry, duplicate, archive,
   await expect(automationMain.getByText("Queue depth", { exact: true })).toBeVisible();
 });
 
+test("AI Center answers with evidence, generates briefs, scenarios, approvals, and history", async ({ request, page }) => {
+  await resetDemo(request);
+  const ask = await request.post("/api/ai-center/actions", { data: { action: "ask-question", question: "What should I reorder today?", saveQuestion: true, provider: "deterministic" } });
+  expect(ask.ok(), await ask.text()).toBeTruthy();
+  let state = (await ask.json()).data;
+  expect(state.aiMessages.some((entry: { role: string; content: string; evidenceIds: string[] }) => entry.role === "assistant" && entry.content.includes("FST-HOOD-001") && entry.evidenceIds.length > 0)).toBeTruthy();
+  expect(state.aiToolCalls.some((entry: { toolName: string }) => entry.toolName === "ai.internal_records.query")).toBeTruthy();
+  const brief = await request.post("/api/ai-center/actions", { data: { action: "daily-brief", provider: "deterministic" } });
+  expect(brief.ok(), await brief.text()).toBeTruthy();
+  state = (await brief.json()).data;
+  expect(state.aiDailyBriefs[0].sections.length).toBeGreaterThan(0);
+  const scenario = await request.post("/api/ai-center/actions", { data: { action: "run-scenario", name: "Buy 300 units", prompt: "What happens if I buy 300 units of this SKU?", units: 300, variantId: state.variants[0].id, priceChangePercent: 8, reserveCash: 150 } });
+  expect(scenario.ok(), await scenario.text()).toBeTruthy();
+  state = (await scenario.json()).data;
+  expect(state.aiScenarios.some((entry: { name: string; impacts: { purchaseCommitments: number } }) => entry.name === "Buy 300 units" && entry.impacts.purchaseCommitments > 0)).toBeTruthy();
+  const recommendation = state.aiRecommendations.find((entry: { approvalRequired: boolean }) => entry.approvalRequired);
+  const saved = await request.post("/api/ai-center/actions", { data: { action: "save-recommendation", recommendationId: recommendation.id } });
+  expect(saved.ok(), await saved.text()).toBeTruthy();
+  const approval = await request.post("/api/ai-center/actions", { data: { action: "request-approval", recommendationId: recommendation.id, reason: "Playwright owner approval" } });
+  expect(approval.ok(), await approval.text()).toBeTruthy();
+  state = (await approval.json()).data;
+  expect(state.aiApprovalProposals.some((entry: { status: string }) => entry.status === "pending")).toBeTruthy();
+  expect(state.automationApprovals.some((entry: { reason?: string }) => entry.reason === "Playwright owner approval")).toBeTruthy();
+
+  await page.goto("/ai-center");
+  const aiMain = page.getByTestId("app-main");
+  await expect(aiMain.getByRole("heading", { name: "Daily brief and evidence-backed recommendations", exact: true })).toBeVisible();
+  await expect(page.getByRole("region", { name: "AI Center actions" })).toBeVisible();
+  await expect(aiMain.getByRole("heading", { name: "Safe internal tools", level: 2, exact: true })).toBeVisible();
+  await expect(aiMain.getByRole("heading", { name: "Daily operating brief", level: 2, exact: true })).toBeVisible();
+  await expect(aiMain.getByRole("heading", { name: "Evidence-backed recommendations", level: 2, exact: true })).toBeVisible();
+  await expect(aiMain.getByRole("heading", { name: "Scenario analysis", level: 2, exact: true })).toBeVisible();
+  await expect(aiMain.getByRole("heading", { name: "Citations and drilldowns", level: 2, exact: true })).toBeVisible();
+  await expect(aiMain.getByRole("link", { name: "FST-HOOD-001", exact: true })).toBeVisible();
+  await expect(aiMain.getByText("Buy 300 units", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Ask question", exact: true }).click();
+  await expect(page.getByRole("status")).toContainText("Grounded answer saved.");
+});
+
 test("fulfillment API persists pick, pack, label, dispatch, tracking, exception, finance, order, and inventory state", async ({ request }) => {
   await resetDemo(request);
   const beforeResponse = await request.get("/api/operating-system"); expect(beforeResponse.ok()).toBeTruthy(); const before = await beforeResponse.json();
