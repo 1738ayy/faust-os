@@ -35,6 +35,34 @@ test("AI Center deterministic answers are grounded in Faust evidence", async () 
   assert.ok(data.aiSavedQuestions?.some((question) => question.question === "What should I reorder today?"));
 });
 
+test("AI Center OpenAI adapter uses grounded evidence when configured", async () => {
+  const data = fixture();
+  const originalFetch = globalThis.fetch;
+  const originalKey = process.env.OPENAI_API_KEY;
+  const originalModel = process.env.OPENAI_MODEL;
+  process.env.OPENAI_API_KEY = "sk-test-openai";
+  process.env.OPENAI_MODEL = "gpt-test";
+  let requestedBody = "";
+  globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
+    assert.equal(String(url), "https://api.openai.com/v1/responses");
+    assert.equal(init?.headers && "Authorization" in (init.headers as Record<string, string>) ? (init.headers as Record<string, string>).Authorization : "", "Bearer sk-test-openai");
+    requestedBody = String(init?.body || "");
+    return new Response(JSON.stringify({ output_text: "Model answer grounded in AI-HOOD-L evidence.", usage: { input_tokens: 42, output_tokens: 11 } }), { status: 200, headers: { "Content-Type": "application/json" } });
+  }) as typeof fetch;
+  try {
+    const result = await askAiCenter(data, { action: "ask-question", question: "What should I reorder today?", provider: "openai" });
+    assert.match(result.message.content, /Model answer grounded/);
+    assert.match(requestedBody, /AI-HOOD-L/);
+    assert.equal(result.observability.provider, "openai");
+    assert.equal(result.observability.model, "gpt-test");
+    assert.deepEqual(result.observability.tokenUsage, { input: 42, output: 11 });
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = originalKey;
+    if (originalModel === undefined) delete process.env.OPENAI_MODEL; else process.env.OPENAI_MODEL = originalModel;
+  }
+});
+
 test("AI Center creates evidence-backed recommendations and approval routes", () => {
   const data = fixture();
   ensureAiCollections(data);

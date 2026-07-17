@@ -327,6 +327,11 @@ export async function mutateAnalytics(action: string, input: AnalyticsReportInpu
  return { data: await write(data), actionResult };
 }
 export async function mutateAiCenter(input: AiCenterActionInput) {
+ if (isProductionAuthEnabled() && (input.action === "ask-question" || input.action === "daily-brief" || input.action === "run-scenario")) {
+  const data = await readNormalizedOperatingData(); ensureAiCollections(data); if (!data.aiRecommendations!.length) data.aiRecommendations!.unshift(...generateAiRecommendations(data));
+  const actionResult = await mutateAiCenterData(data, input);
+  return { data: await writeNormalizedOperatingData(data), actionResult };
+ }
  if (isProductionAuthEnabled()) return applyAiCenterMutationRpc(input.action, input as Record<string, unknown>);
  const data = await read(); ensureAiCollections(data); if (!data.aiRecommendations!.length) data.aiRecommendations!.unshift(...generateAiRecommendations(data));
  const actionResult = await mutateAiCenterData(data, input);

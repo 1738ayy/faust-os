@@ -24,9 +24,69 @@ export type AiProviderAdapter = {
   answer: (input: { question: string; deterministicAnswer: string; evidence: AiEvidenceLink[] }) => Promise<{ content: string; mode: "deterministic" | "model_generated"; model?: string; tokenUsage?: { input: number; output: number }; estimatedCostUsd?: number }>;
 };
 
+function configuredOpenAiModel() {
+  return process.env.OPENAI_MODEL || "gpt-5";
+}
+
+function readResponsesText(body: unknown) {
+  if (typeof body !== "object" || !body) return "";
+  const record = body as Record<string, unknown>;
+  if (typeof record.output_text === "string" && record.output_text.trim()) return record.output_text.trim();
+  const output = Array.isArray(record.output) ? record.output : [];
+  const chunks: string[] = [];
+  for (const item of output) {
+    if (typeof item !== "object" || !item) continue;
+    const content = Array.isArray((item as Record<string, unknown>).content) ? (item as Record<string, unknown>).content as unknown[] : [];
+    for (const part of content) {
+      if (typeof part !== "object" || !part) continue;
+      const text = (part as Record<string, unknown>).text;
+      if (typeof text === "string" && text.trim()) chunks.push(text.trim());
+    }
+  }
+  return chunks.join("\n\n").trim();
+}
+
+async function askOpenAi(input: { question: string; deterministicAnswer: string; evidence: AiEvidenceLink[] }) {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) throw new Error("OpenAI is selected, but OPENAI_API_KEY is not configured on the server.");
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000);
+  const model = configuredOpenAiModel();
+  try {
+    const evidence = input.evidence.length ? input.evidence.map((link, index) => `${index + 1}. ${link.label} (${link.sourceType}, ${link.href}): ${link.excerpt}`).join("\n") : "No Faust evidence records were found for this question.";
+    const response = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      signal: controller.signal,
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model,
+        instructions: "You are Faust AI Center. Answer only from the supplied Faust evidence and deterministic operating summary. If evidence is missing, say what Faust does and does not know. Do not claim external facts, do not execute risky actions, and keep the response concise with practical next steps.",
+        input: `User question:\n${input.question}\n\nDeterministic Faust answer:\n${input.deterministicAnswer}\n\nFaust evidence records:\n${evidence}`,
+        max_output_tokens: 700,
+      }),
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const message = typeof body === "object" && body && "error" in body && typeof (body as { error?: { message?: unknown } }).error?.message === "string" ? (body as { error: { message: string } }).error.message : `OpenAI request failed with status ${response.status}.`;
+      throw new Error(message);
+    }
+    const content = readResponsesText(body);
+    if (!content) throw new Error("OpenAI returned no answer text.");
+    const usage = typeof body === "object" && body && "usage" in body ? (body as { usage?: Record<string, unknown> }).usage : undefined;
+    const inputTokens = Number(usage?.input_tokens || usage?.prompt_tokens || 0);
+    const outputTokens = Number(usage?.output_tokens || usage?.completion_tokens || 0);
+    return { content, mode: "model_generated" as const, model, tokenUsage: inputTokens || outputTokens ? { input: inputTokens, output: outputTokens } : undefined, estimatedCostUsd: 0 };
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") throw new Error("OpenAI request timed out before Faust received an answer.");
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export const aiProviderAdapters: Record<AiProviderKey, AiProviderAdapter> = {
   deterministic: { key: "deterministic", label: "Deterministic Faust rules", configured: true, answer: async ({ deterministicAnswer }) => ({ content: deterministicAnswer, mode: "deterministic" }) },
-  openai: { key: "openai", label: "OpenAI-ready adapter", configured: false, answer: async ({ deterministicAnswer }) => ({ content: `${deterministicAnswer}\n\nProvider note: OpenAI credentials are not connected, so Faust used deterministic grounded mode.`, mode: "deterministic" }) },
+  openai: { key: "openai", label: "OpenAI adapter", configured: Boolean(process.env.OPENAI_API_KEY), answer: askOpenAi },
   anthropic: { key: "anthropic", label: "Anthropic-ready adapter", configured: false, answer: async ({ deterministicAnswer }) => ({ content: `${deterministicAnswer}\n\nProvider note: Anthropic credentials are not connected, so Faust used deterministic grounded mode.`, mode: "deterministic" }) },
   gemini: { key: "gemini", label: "Gemini-ready adapter", configured: false, answer: async ({ deterministicAnswer }) => ({ content: `${deterministicAnswer}\n\nProvider note: Gemini credentials are not connected, so Faust used deterministic grounded mode.`, mode: "deterministic" }) },
 };
