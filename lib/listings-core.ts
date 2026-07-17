@@ -109,11 +109,28 @@ export function createFiveChannelDrafts(data: OperatingData, input: CreateCrossL
   const quantity = Math.max(balance ? availableUnits(balance) : 0, 0);
   const physicalSku = input.physicalSku || variant.sku;
   for (const marketplace of crossListingChannels) {
-    if (data.channelListingDrafts!.some((draft) => draft.variantId === variant.id && draft.marketplace === marketplace)) continue;
     const account = data.marketplaceAccounts!.find((entry) => entry.marketplace === marketplace);
     const template = data.listingTemplates!.find((entry) => entry.marketplace === marketplace)!;
     const rendered = renderTemplate(template, { title: product?.title || variant.title, sku: variant.sku, physicalSku, condition: variant.condition });
     rendered.title = marketplaceTitle(marketplace, product?.title || variant.title, variant.sku);
+    const existingDraft = data.channelListingDrafts!.find((draft) => draft.variantId === variant.id && draft.marketplace === marketplace);
+    if (existingDraft) {
+      existingDraft.title = rendered.title;
+      existingDraft.description ||= rendered.description;
+      existingDraft.imageUrls = existingDraft.imageUrls.length ? existingDraft.imageUrls : input.imageUrls?.length ? input.imageUrls : [product?.image || "/placeholder-product.png"];
+      existingDraft.validationErrors = validateChannelDraft(existingDraft);
+      if (existingDraft.validationErrors.length) {
+        existingDraft.status = "failed";
+        existingDraft.syncState = "failed";
+        review(data, { channelDraftId: existingDraft.id, marketplace, severity: "warning", reason: "validation_error", detail: existingDraft.validationErrors.join(" ") });
+      } else if (existingDraft.status === "failed") {
+        existingDraft.status = "validated";
+        existingDraft.syncState = "pending";
+        data.listingReviewItems!.filter((entry) => entry.channelDraftId === existingDraft.id && entry.reason === "validation_error" && entry.status === "open").forEach((entry) => { entry.status = "resolved"; entry.resolvedAt = now(); });
+      }
+      existingDraft.updatedAt = now();
+      continue;
+    }
     const price = Math.round((input.basePrice ?? variant.defaultSalePrice) * (1 + template.priceAdjustmentPercent / 100) * 100) / 100;
     const listing: Listing = { id: id(), variantId: variant.id, marketplace, title: rendered.title, price, quantity, status: "draft", syncState: "manual", createdAt: now() };
     const mapping: PhysicalSkuMapping = { id: id(), variantId: variant.id, physicalSku, channelListingId: listing.id, channel: marketplace, externalSku: physicalSku, status: "active", confidence: 1, createdAt: now() };

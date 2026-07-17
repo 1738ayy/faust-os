@@ -79,6 +79,35 @@ test("extension import creates marketplace-safe draft titles for long 1688 produ
   assert.match(depop.title, / - FST-/);
 });
 
+test("extension import repairs existing failed marketplace drafts", () => {
+  const data = fixture();
+  const longTitleProduct = {
+    ...sourceProduct,
+    title: "Xijia NANA with the same pin Saturn chain necklace personality fashion, simple trend European and American design sweater chain",
+  };
+  importExtensionProduct(data, longTitleProduct, { rmbUsdRate: 0.14, quantity: 1 }, "long-title-repair");
+  for (const marketplace of ["Depop", "Poshmark"] as const) {
+    const draft = data.channelListingDrafts?.find((entry) => entry.marketplace === marketplace);
+    assert.ok(draft);
+    draft.title = `${longTitleProduct.title} - ${draft.physicalSku}`;
+    draft.status = "failed";
+    draft.syncState = "failed";
+    draft.validationErrors = [`${marketplace} title must be 80 characters or fewer.`];
+    data.listingReviewItems?.push({ id: crypto.randomUUID(), channelDraftId: draft.id, marketplace, severity: "warning", reason: "validation_error", status: "open", detail: draft.validationErrors.join(" "), actionLabel: "Review listing", createdAt: "2026-07-01T00:00:00.000Z" });
+  }
+  const repaired = importExtensionProduct(data, longTitleProduct, { rmbUsdRate: 0.14, quantity: 1 }, "long-title-repair-second");
+  assert.equal(repaired.idempotent, true);
+  for (const marketplace of ["Depop", "Poshmark"] as const) {
+    const draft = data.channelListingDrafts?.find((entry) => entry.marketplace === marketplace);
+    assert.ok(draft);
+    assert.equal(draft.status, "validated");
+    assert.equal(draft.syncState, "pending");
+    assert.ok(draft.title.length <= 80);
+    assert.deepEqual(draft.validationErrors, []);
+    assert.ok(data.listingReviewItems?.some((entry) => entry.channelDraftId === draft.id && entry.reason === "validation_error" && entry.status === "resolved"));
+  }
+});
+
 test("extension messages validate and marketplace mapping exposes fillable fields", () => {
   const parsed = extensionActionSchema.parse({ action: "analyze", product: sourceProduct, assumptions: { rmbUsdRate: 0.14 } });
   assert.equal(parsed.action, "analyze");
