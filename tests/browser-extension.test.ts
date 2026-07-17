@@ -42,6 +42,7 @@ test("extension import is approved, idempotent, and creates five channel drafts"
   assert.equal(data.suppliers.length, 1);
   assert.equal(data.variants.length, 1);
   assert.equal(data.purchaseBatches?.length, 1);
+  assert.ok(data.purchaseBatches?.[0].updatedAt);
   assert.equal(data.channelListingDrafts?.length, 5);
   data.channelListingDrafts = [];
   data.listings = [];
