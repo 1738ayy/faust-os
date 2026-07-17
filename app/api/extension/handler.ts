@@ -15,13 +15,13 @@ function cors(request?: Request) {
   return { ...extensionCorsHeaders, "Access-Control-Allow-Origin": allowed ? origin : "http://localhost:3000", "Vary": "Origin" };
 }
 
-export function extensionOptions() {
-  return new NextResponse(null, { status: 204, headers: cors() });
+export function extensionOptions(request?: Request) {
+  return new NextResponse(null, { status: 204, headers: cors(request) });
 }
 
-export async function extensionStatus() {
+export async function extensionStatus(request?: Request) {
   const data = await getOperatingData();
-  return NextResponse.json({ ok: true, extensionVersion, faust: { mode: data.mode, updatedAt: data.updatedAt }, session: "device-registration-required", extension: extensionConnectionSummary(data), allowedOrigins: ["superbuy.com", "1688.com", "depop.com", "ebay.com", "etsy.com", "mercari.com", "poshmark.com"] }, { headers: cors() });
+  return NextResponse.json({ ok: true, extensionVersion, faust: { mode: data.mode, updatedAt: data.updatedAt }, session: "device-registration-required", extension: extensionConnectionSummary(data), allowedOrigins: ["superbuy.com", "1688.com", "depop.com", "ebay.com", "etsy.com", "mercari.com", "poshmark.com"] }, { headers: cors(request) });
 }
 
 function validateExtensionSession(data: Awaited<ReturnType<typeof getOperatingData>>, request: Request, action: ExtensionAction["action"]) {
