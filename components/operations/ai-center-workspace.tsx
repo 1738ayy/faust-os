@@ -15,8 +15,8 @@ export function AiCenterWorkspace({ snapshot }: { snapshot: ReturnTypeSnapshot }
   const { data } = snapshot; ensureAiCollections(data); const context = buildAiOperatingContext(data);
   const configuredProvider = (process.env.AI_PROVIDER || "deterministic") as AiProviderKey;
   const latestBrief = data.aiDailyBriefs?.[0];
-  const latestConversation = data.aiConversations?.[0];
-  const latestMessages = latestConversation ? (data.aiMessages || []).filter((message) => message.conversationId === latestConversation.id) : [];
+  const latestConversation = [...(data.aiConversations || [])].sort((a, b) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime())[0];
+  const latestMessages = latestConversation ? (data.aiMessages || []).filter((message) => message.conversationId === latestConversation.id).sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) : [];
   return <div className="space-y-6"><Header eyebrow="AI center" title="Daily brief and evidence-backed recommendations" description="Faust answers questions by calling safe internal tools, citing real operating records, and routing risky actions through approval." />
     <AiCenterPanel data={data} provider={configuredProvider} />
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4"><Metric label="Provider mode" value={configuredProvider === "openai" ? "OpenAI" : "Deterministic"} /><Metric label="Evidence links" value={String((data.aiEvidenceLinks || []).length)} /><Metric label="Recommendations" value={String((data.aiRecommendations || []).length)} /><Metric label="Tool calls" value={String((data.aiToolCalls || []).length)} /></div>

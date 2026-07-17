@@ -12,6 +12,7 @@ export function AiCenterPanel({ data, provider }: { data: OperatingData; provide
   const router = useRouter();
   const [question, setQuestion] = useState("What should I reorder today?");
   const [status, setStatus] = useState("");
+  const [latestAnswer, setLatestAnswer] = useState("");
   const [busy, setBusy] = useState(false);
   const variantId = data.variants[0]?.id;
   const latestRecommendationId = useMemo(() => firstRecommendationId(data), [data]);
@@ -21,6 +22,8 @@ export function AiCenterPanel({ data, provider }: { data: OperatingData; provide
       const response = await fetch("/api/ai-center/actions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const body = await response.json();
       if (!response.ok) throw new Error(body.message || "AI Center action failed.");
+      const content = typeof body.actionResult?.message?.content === "string" ? body.actionResult.message.content : "";
+      if (content) setLatestAnswer(content);
       setStatus(success);
       router.refresh();
     } catch (error) {
@@ -39,6 +42,7 @@ export function AiCenterPanel({ data, provider }: { data: OperatingData; provide
       <button disabled={busy || !latestRecommendationId} className="border border-border px-4 py-2 text-sm disabled:opacity-50" onClick={() => run({ action: "request-approval", recommendationId: latestRecommendationId, reason: "Owner approval required before AI-suggested operating action." }, "Approval request created.")}>Send for approval</button>
     </div>
     <div role="status" className="mt-3 text-sm text-emerald-300">{status}</div>
+    {latestAnswer && <div className="mt-4 border border-border bg-background p-4 text-sm text-muted-foreground"><p className="mb-2 text-xs uppercase tracking-[0.18em] text-emerald-400">Latest answer</p><p className="whitespace-pre-wrap">{latestAnswer}</p></div>}
     <div className="mt-4 flex flex-wrap gap-2 text-xs text-muted-foreground">
       {["Which SKUs are tying up cash?", "Why did margin fall this month?", "Which channel is most profitable?", "Which supplier is becoming unreliable?", "Which shipments need attention?", "Which automations are failing?"].map((prompt) => <button key={prompt} className="border border-border px-3 py-1" onClick={() => setQuestion(prompt)}>{prompt}</button>)}
     </div>
