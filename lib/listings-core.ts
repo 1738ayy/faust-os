@@ -70,6 +70,22 @@ function renderTemplate(template: ListingTemplate, values: Record<string, string
   return { title: replace(template.titleFormat), description: replace(template.descriptionFormat) };
 }
 
+function compactTitle(value: string, limit: number) {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  if (normalized.length <= limit) return normalized;
+  return `${normalized.slice(0, Math.max(limit - 1, 0)).trimEnd()}…`;
+}
+
+function marketplaceTitle(marketplace: Channel, sourceTitle: string, sku: string) {
+  const limit = ["Depop", "eBay", "Mercari", "Poshmark"].includes(marketplace) ? 80 : 140;
+  const normalizedTitle = sourceTitle.replace(/\s+/g, " ").trim();
+  const suffix = ` - ${sku}`;
+  const full = `${normalizedTitle}${suffix}`;
+  if (full.length <= limit) return full;
+  if (suffix.length < limit - 12) return `${compactTitle(normalizedTitle, limit - suffix.length)}${suffix}`;
+  return compactTitle(full, limit);
+}
+
 export function validateChannelDraft(draft: ChannelListingDraft) {
   const errors: string[] = [];
   if (!draft.title.trim()) errors.push("Title is required.");
@@ -97,6 +113,7 @@ export function createFiveChannelDrafts(data: OperatingData, input: CreateCrossL
     const account = data.marketplaceAccounts!.find((entry) => entry.marketplace === marketplace);
     const template = data.listingTemplates!.find((entry) => entry.marketplace === marketplace)!;
     const rendered = renderTemplate(template, { title: product?.title || variant.title, sku: variant.sku, physicalSku, condition: variant.condition });
+    rendered.title = marketplaceTitle(marketplace, product?.title || variant.title, variant.sku);
     const price = Math.round((input.basePrice ?? variant.defaultSalePrice) * (1 + template.priceAdjustmentPercent / 100) * 100) / 100;
     const listing: Listing = { id: id(), variantId: variant.id, marketplace, title: rendered.title, price, quantity, status: "draft", syncState: "manual", createdAt: now() };
     const mapping: PhysicalSkuMapping = { id: id(), variantId: variant.id, physicalSku, channelListingId: listing.id, channel: marketplace, externalSku: physicalSku, status: "active", confidence: 1, createdAt: now() };

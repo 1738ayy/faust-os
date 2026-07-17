@@ -61,6 +61,24 @@ test("extension import is approved, idempotent, and creates five channel drafts"
   assert.equal(data.products.length, 1);
 });
 
+test("extension import creates marketplace-safe draft titles for long 1688 products", () => {
+  const data = fixture();
+  const longTitleProduct = {
+    ...sourceProduct,
+    title: "Xijia NANA with the same pin Saturn chain necklace personality fashion, simple trend European and American design sweater chain",
+  };
+  importExtensionProduct(data, longTitleProduct, { rmbUsdRate: 0.14, quantity: 1 }, "long-title-import");
+  const depop = data.channelListingDrafts?.find((draft) => draft.marketplace === "Depop");
+  const poshmark = data.channelListingDrafts?.find((draft) => draft.marketplace === "Poshmark");
+  assert.ok(depop);
+  assert.ok(poshmark);
+  assert.equal(depop.status, "validated");
+  assert.equal(poshmark.status, "validated");
+  assert.ok(depop.title.length <= 80);
+  assert.ok(poshmark.title.length <= 80);
+  assert.match(depop.title, / - FST-/);
+});
+
 test("extension messages validate and marketplace mapping exposes fillable fields", () => {
   const parsed = extensionActionSchema.parse({ action: "analyze", product: sourceProduct, assumptions: { rmbUsdRate: 0.14 } });
   assert.equal(parsed.action, "analyze");
