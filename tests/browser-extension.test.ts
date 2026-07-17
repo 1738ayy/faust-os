@@ -56,6 +56,7 @@ test("extension import is approved, idempotent, and creates five channel drafts"
   assert.equal(data.outboxEvents?.length, 5);
   assert.ok(data.outboxEvents?.every((event) => event.updatedAt));
   assert.equal(new Set(data.outboxEvents?.map((event) => event.idempotencyKey)).size, 5);
+  assert.ok(data.outboxEvents?.every((event) => /^[0-9a-f-]{36}$/.test(event.idempotencyKey || "")));
   assert.equal(data.products.length, 1);
 });
 
