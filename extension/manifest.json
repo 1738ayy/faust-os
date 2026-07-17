@@ -13,6 +13,7 @@
     "https://*.mercari.com/*",
     "https://*.poshmark.com/*",
     "http://localhost:3000/*",
+    "https://faust-os-staging.vercel.app/*",
     "https://*.faust.local/*"
   ],
   "background": { "service_worker": "background.js", "type": "module" },
