@@ -174,7 +174,17 @@ export async function readNormalizedOperatingData(): Promise<OperatingData> {
 
 export async function writeNormalizedOperatingData(data: OperatingData) {
   const { businessId, client } = await context();
-  const upsert = async (table: string, values: Row[]) => { if (!values.length) return; const { error } = await client.from(table).upsert(values.map((value) => ({ ...value, business_id: businessId }))); if (error) throw new Error(error.message); };
+  const normalizeRow = (value: Row) => {
+    const row: Row = {};
+    for (const [key, entry] of Object.entries(value)) {
+      if (entry !== undefined) row[key] = entry;
+    }
+    const timestamp = new Date().toISOString();
+    if ("created_at" in value && !row.created_at) row.created_at = timestamp;
+    if ("updated_at" in value && !row.updated_at) row.updated_at = String(row.created_at || timestamp);
+    return { ...row, business_id: businessId };
+  };
+  const upsert = async (table: string, values: Row[]) => { if (!values.length) return; const { error } = await client.from(table).upsert(values.map(normalizeRow)); if (error) throw new Error(error.message); };
   await upsert("suppliers", data.suppliers.map((x) => ({ id: x.id, name: x.name, source_platform: x.sourcePlatform, lead_days: x.leadDays, rating: x.rating, status: x.status, notes: x.notes })));
   await upsert("products", data.products.map((x) => ({ id: x.id, title: x.title, brand: x.brand, category: x.category, tags: x.tags, default_supplier_id: x.supplierId, source_url: x.sourceUrl, status: x.status, created_at: x.createdAt, updated_at: x.updatedAt })));
   await upsert("product_variants", data.variants.map((x) => ({ id: x.id, product_id: x.productId, sku: x.sku, title: x.title, condition: x.condition, landed_unit_cost: x.landedUnitCost, default_price: x.defaultSalePrice, weight_oz: x.weightOz, reorder_point: x.reorderPoint, reorder_quantity: x.reorderQuantity, active: x.active })));
