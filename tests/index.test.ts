@@ -13,5 +13,6 @@ import "./analytics.test";
 import "./automations.test";
 import "./ai-center.test";
 import "./browser-extension.test";
+import "./browser-extension-extractor.test";
 import "./production-connection.test";
 import "./easypost-adapter.test";
