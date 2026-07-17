@@ -63,6 +63,32 @@ test("AI Center OpenAI adapter uses grounded evidence when configured", async ()
   }
 });
 
+test("AI Center OpenAI adapter retries when the first response has no text", async () => {
+  const data = fixture();
+  const originalFetch = globalThis.fetch;
+  const originalKey = process.env.OPENAI_API_KEY;
+  const originalModel = process.env.OPENAI_MODEL;
+  process.env.OPENAI_API_KEY = "sk-test-openai";
+  process.env.OPENAI_MODEL = "gpt-5-mini";
+  const bodies: string[] = [];
+  globalThis.fetch = (async (_url: string | URL | Request, init?: RequestInit) => {
+    bodies.push(String(init?.body || ""));
+    const body = bodies.length === 1 ? { status: "completed", output: [{ type: "reasoning" }], usage: { input_tokens: 50, output_tokens: 1200 } } : { output: [{ type: "message", content: [{ type: "output_text", text: "Fallback grounded answer." }] }], usage: { input_tokens: 12, output_tokens: 8 } };
+    return new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
+  }) as typeof fetch;
+  try {
+    const result = await askAiCenter(data, { action: "ask-question", question: "What should I reorder today?", provider: "openai" });
+    assert.equal(bodies.length, 2);
+    assert.match(bodies[0], /"reasoning":\{"effort":"minimal"\}/);
+    assert.match(bodies[1], /Rewrite this grounded Faust operating answer/);
+    assert.equal(result.message.content, "Fallback grounded answer.");
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = originalKey;
+    if (originalModel === undefined) delete process.env.OPENAI_MODEL; else process.env.OPENAI_MODEL = originalModel;
+  }
+});
+
 test("AI Center creates evidence-backed recommendations and approval routes", () => {
   const data = fixture();
   ensureAiCollections(data);

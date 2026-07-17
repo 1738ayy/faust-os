@@ -32,18 +32,78 @@ function readResponsesText(body: unknown) {
   if (typeof body !== "object" || !body) return "";
   const record = body as Record<string, unknown>;
   if (typeof record.output_text === "string" && record.output_text.trim()) return record.output_text.trim();
-  const output = Array.isArray(record.output) ? record.output : [];
-  const chunks: string[] = [];
-  for (const item of output) {
-    if (typeof item !== "object" || !item) continue;
-    const content = Array.isArray((item as Record<string, unknown>).content) ? (item as Record<string, unknown>).content as unknown[] : [];
-    for (const part of content) {
-      if (typeof part !== "object" || !part) continue;
-      const text = (part as Record<string, unknown>).text;
-      if (typeof text === "string" && text.trim()) chunks.push(text.trim());
+  const texts: string[] = [];
+  const visit = (value: unknown, parentKey = "") => {
+    if (typeof value === "string") {
+      if (["text", "output_text", "content"].includes(parentKey) && value.trim()) texts.push(value.trim());
+      return;
     }
+    if (Array.isArray(value)) {
+      value.forEach((entry) => visit(entry, parentKey));
+      return;
+    }
+    if (typeof value === "object" && value) {
+      for (const [key, nested] of Object.entries(value as Record<string, unknown>)) visit(nested, key);
+    }
+  };
+  const output = Array.isArray(record.output) ? record.output : [];
+  visit(output, "output");
+  return texts.join("\n\n").trim();
+}
+
+function summarizeResponseShape(body: unknown) {
+  if (typeof body !== "object" || !body) return "non-object response";
+  const record = body as Record<string, unknown>;
+  const output = Array.isArray(record.output) ? record.output : [];
+  const outputTypes = output.map((item) => typeof item === "object" && item ? String((item as Record<string, unknown>).type || "unknown") : typeof item).join(", ") || "none";
+  const finishReasons = output.map((item) => typeof item === "object" && item ? String((item as Record<string, unknown>).finish_reason || "") : "").filter(Boolean).join(", ") || "none";
+  const usage = typeof record.usage === "object" && record.usage ? record.usage as Record<string, unknown> : {};
+  return `status=${String(record.status || "unknown")}; output types=${outputTypes}; finish reasons=${finishReasons}; input tokens=${String(usage.input_tokens || 0)}; output tokens=${String(usage.output_tokens || 0)}`;
+}
+
+function reasoningForModel(model: string) {
+  if (!/^(gpt-5|o\d)/i.test(model)) return undefined;
+  if (/^gpt-5\.1/i.test(model)) return { effort: "none" };
+  return { effort: "minimal" };
+}
+
+function maxOutputTokensForModel(model: string) {
+  if (/^gpt-5/i.test(model)) return 1200;
+  return 700;
+}
+
+function openAiPayload(model: string, input: string) {
+  const payload: Record<string, unknown> = {
+    model,
+    instructions: "You are Faust AI Center. Answer only from the supplied Faust evidence and deterministic operating summary. If evidence is missing, say what Faust does and does not know. Do not claim external facts, do not execute risky actions, and keep the response concise with practical next steps.",
+    input,
+    max_output_tokens: maxOutputTokensForModel(model),
+  };
+  const reasoning = reasoningForModel(model);
+  if (reasoning) payload.reasoning = reasoning;
+  return payload;
+}
+
+function openAiFallbackPayload(model: string, deterministicAnswer: string) {
+  const fallbackInput = `Rewrite this grounded Faust operating answer in one concise paragraph. Do not add facts:\n${deterministicAnswer}`;
+  const payload = openAiPayload(model, fallbackInput);
+  if (typeof payload.max_output_tokens === "number") payload.max_output_tokens = Math.max(500, payload.max_output_tokens);
+  return payload;
+}
+
+async function postOpenAiResponse(apiKey: string, payload: Record<string, unknown>, signal: AbortSignal) {
+  const response = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    signal,
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message = typeof body === "object" && body && "error" in body && typeof (body as { error?: { message?: unknown } }).error?.message === "string" ? (body as { error: { message: string } }).error.message : `OpenAI request failed with status ${response.status}.`;
+    throw new Error(message);
   }
-  return chunks.join("\n\n").trim();
+  return body;
 }
 
 async function askOpenAi(input: { question: string; deterministicAnswer: string; evidence: AiEvidenceLink[] }) {
@@ -54,24 +114,14 @@ async function askOpenAi(input: { question: string; deterministicAnswer: string;
   const model = configuredOpenAiModel();
   try {
     const evidence = input.evidence.length ? input.evidence.map((link, index) => `${index + 1}. ${link.label} (${link.sourceType}, ${link.href}): ${link.excerpt}`).join("\n") : "No Faust evidence records were found for this question.";
-    const response = await fetch("https://api.openai.com/v1/responses", {
-      method: "POST",
-      signal: controller.signal,
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model,
-        instructions: "You are Faust AI Center. Answer only from the supplied Faust evidence and deterministic operating summary. If evidence is missing, say what Faust does and does not know. Do not claim external facts, do not execute risky actions, and keep the response concise with practical next steps.",
-        input: `User question:\n${input.question}\n\nDeterministic Faust answer:\n${input.deterministicAnswer}\n\nFaust evidence records:\n${evidence}`,
-        max_output_tokens: 700,
-      }),
-    });
-    const body = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      const message = typeof body === "object" && body && "error" in body && typeof (body as { error?: { message?: unknown } }).error?.message === "string" ? (body as { error: { message: string } }).error.message : `OpenAI request failed with status ${response.status}.`;
-      throw new Error(message);
+    let body = await postOpenAiResponse(apiKey, openAiPayload(model, `User question:\n${input.question}\n\nDeterministic Faust answer:\n${input.deterministicAnswer}\n\nFaust evidence records:\n${evidence}`), controller.signal);
+    let content = readResponsesText(body);
+    if (!content) {
+      const firstShape = summarizeResponseShape(body);
+      body = await postOpenAiResponse(apiKey, openAiFallbackPayload(model, input.deterministicAnswer), controller.signal);
+      content = readResponsesText(body);
+      if (!content) throw new Error(`OpenAI returned no answer text (${firstShape}; retry ${summarizeResponseShape(body)}).`);
     }
-    const content = readResponsesText(body);
-    if (!content) throw new Error("OpenAI returned no answer text.");
     const usage = typeof body === "object" && body && "usage" in body ? (body as { usage?: Record<string, unknown> }).usage : undefined;
     const inputTokens = Number(usage?.input_tokens || usage?.prompt_tokens || 0);
     const outputTokens = Number(usage?.output_tokens || usage?.completion_tokens || 0);
