@@ -8,6 +8,11 @@ function send(message) {
   return chrome.runtime.sendMessage(message);
 }
 
+function importDrafts(response) {
+  const result = response?.result?.actionResult || response?.result || response?.actionResult || {};
+  return result?.drafts || [];
+}
+
 scanButton.addEventListener("click", async () => {
   scanButton.disabled = true;
   status.textContent = "Scanning and calculating...";
@@ -25,7 +30,7 @@ importButton.addEventListener("click", async () => {
   const response = await send({ type: "FAUST_IMPORT_LAST_PRODUCT" });
   importButton.disabled = false;
   if (!response?.ok) { status.textContent = response?.error || "Import failed."; return; }
-  const drafts = response.result?.actionResult?.drafts?.length || 0;
+  const drafts = importDrafts(response).length;
   status.textContent = `Imported into Faust with ${drafts} channel drafts.`;
 });
 
