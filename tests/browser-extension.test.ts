@@ -43,8 +43,13 @@ test("extension import is approved, idempotent, and creates five channel drafts"
   assert.equal(data.variants.length, 1);
   assert.equal(data.purchaseBatches?.length, 1);
   assert.equal(data.channelListingDrafts?.length, 5);
+  data.channelListingDrafts = [];
+  data.listings = [];
+  data.physicalSkuMappings = [];
   const second = importExtensionProduct(data, sourceProduct, { rmbUsdRate: 0.14, quantity: 3 }, "import-once");
   assert.equal(second.idempotent, true);
+  assert.equal(second.drafts.length, 5);
+  assert.equal(data.channelListingDrafts?.length, 5);
   assert.equal(data.products.length, 1);
 });
 

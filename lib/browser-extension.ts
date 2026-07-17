@@ -154,6 +154,10 @@ export function importExtensionProduct(data: OperatingData, input: unknown, assu
   const existing = data.products.find((entry) => entry.sourceUrl === product.superbuyUrl);
   if (existing) {
     const variant = data.variants.find((entry) => entry.productId === existing.id);
+    if (variant) {
+      seedMarketplaceAccountsAndTemplates(data);
+      createFiveChannelDrafts(data, { variantId: variant.id, physicalSku: variant.sku, basePrice: variant.defaultSalePrice, imageUrls: product.images, idempotencyKey });
+    }
     return { analysis, productId: existing.id, variantId: variant?.id, idempotent: true, drafts: data.channelListingDrafts?.filter((draft) => draft.variantId === variant?.id) || [] };
   }
   const createdAt = now();
