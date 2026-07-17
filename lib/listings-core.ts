@@ -54,9 +54,10 @@ function review(data: OperatingData, input: Omit<ListingReviewItem, "id" | "crea
 
 function addOutboxJob(data: OperatingData, topic: TransactionalOutboxEvent["topic"], draft: ChannelListingDraft, action: ListingSyncJob["action"], payload: Record<string, unknown>, idempotencyKey?: string) {
   ensureListingsCollections(data);
-  const event: TransactionalOutboxEvent = { id: id(), topic, aggregateType: "channel_listing_draft", aggregateId: draft.id, payload, status: "pending", attempts: 0, idempotencyKey, createdAt: now() };
-  const job: DurableJob = { id: id(), queue: topic.includes("quantity") || topic.includes("sold") ? "channel_sync" : "marketplace_publish", eventId: event.id, status: "queued", attempts: 0, maxAttempts: 3, payload, runAfter: now(), createdAt: now() };
-  const listingJob: ListingSyncJob = { id: id(), channelDraftId: draft.id, marketplace: draft.marketplace, action, status: action === "publish" && draft.publishMode !== "adapter" ? "manual_required" : "queued", attempts: 0, maxAttempts: 3, idempotencyKey, runAfter: now(), createdAt: now() };
+  const createdAt = now();
+  const event: TransactionalOutboxEvent = { id: id(), topic, aggregateType: "channel_listing_draft", aggregateId: draft.id, payload, status: "pending", attempts: 0, idempotencyKey, createdAt, updatedAt: createdAt };
+  const job: DurableJob = { id: id(), queue: topic.includes("quantity") || topic.includes("sold") ? "channel_sync" : "marketplace_publish", eventId: event.id, status: "queued", attempts: 0, maxAttempts: 3, payload, runAfter: createdAt, createdAt, updatedAt: createdAt };
+  const listingJob: ListingSyncJob = { id: id(), channelDraftId: draft.id, marketplace: draft.marketplace, action, status: action === "publish" && draft.publishMode !== "adapter" ? "manual_required" : "queued", attempts: 0, maxAttempts: 3, idempotencyKey, runAfter: createdAt, createdAt, updatedAt: createdAt };
   data.outboxEvents!.unshift(event);
   data.durableJobs!.unshift(job);
   data.listingSyncJobs!.unshift(listingJob);
