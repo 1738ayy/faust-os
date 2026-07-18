@@ -135,6 +135,16 @@ test("extension side panel exposes safe fill without publishing", () => {
   assert.doesNotMatch(script, /FAUST_CONFIRM_PUBLISH/);
   assert.doesNotMatch(script, /\.submit\(/);
   assert.doesNotMatch(script, /\.click\(/);
+  assert.match(script, /Number\(draft\.quantity\) > 0/);
+});
+
+test("extension marketplace filler avoids pretending complex controls are filled", () => {
+  const script = readFileSync(join(process.cwd(), "extension", "marketplace-content.js"), "utf8");
+  assert.match(script, /setNativeValue/);
+  assert.match(script, /InputEvent\("input"/);
+  assert.match(script, /interactive_control_requires_human_confirmation/);
+  assert.doesNotMatch(script, /\.click\(/);
+  assert.doesNotMatch(script, /\.submit\(/);
 });
 
 test("extension confirmation, sync, pause, delist, and failure reporting are auditable", () => {

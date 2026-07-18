@@ -11,7 +11,7 @@ async function guidedPublish(dryRun) {
   const host = tab?.url ? new URL(tab.url).hostname.toLowerCase() : "";
   const draft = drafts.find((entry) => host.includes(entry.marketplace.toLowerCase())) || drafts[0];
   if (!draft) { write("Import a product first, then open a marketplace listing form."); return; }
-  const mapping = { title: draft.title, description: draft.description, category: draft.category, price: draft.price, quantity: draft.quantity, sku: draft.physicalSku, condition: draft.attributes?.condition || "New with tags", shipping: "Standard" };
+  const mapping = { title: draft.title, description: draft.description, category: draft.category, price: draft.price, quantity: Number(draft.quantity) > 0 ? draft.quantity : undefined, sku: draft.physicalSku, condition: draft.attributes?.condition || "New with tags", shipping: "Standard" };
   write(await chrome.runtime.sendMessage({ type: "FAUST_GUIDED_PUBLISH", mapping, dryRun }));
 }
 

@@ -26,16 +26,49 @@
     return null;
   }
 
+  function controlType(element) {
+    const tag = element?.tagName?.toLowerCase();
+    const type = element?.getAttribute?.("type")?.toLowerCase();
+    if (element?.isContentEditable) return "contenteditable";
+    if (tag === "textarea") return "textarea";
+    if (tag === "select") return "select";
+    if (tag === "input" && !["button", "submit", "checkbox", "radio", "file", "hidden"].includes(type || "text")) return "input";
+    if (tag === "button" || element?.getAttribute?.("role") === "button" || element?.getAttribute?.("aria-haspopup")) return "interactive";
+    return "manual";
+  }
+
+  function setNativeValue(element, value) {
+    const prototype = element instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : element instanceof HTMLInputElement ? HTMLInputElement.prototype : null;
+    const setter = prototype ? Object.getOwnPropertyDescriptor(prototype, "value")?.set : null;
+    if (setter) setter.call(element, String(value));
+    else element.value = String(value);
+  }
+
+  function selectValue(element, value) {
+    const expected = String(value).toLowerCase();
+    const option = Array.from(element.options || []).find((entry) => entry.value.toLowerCase() === expected || entry.textContent?.trim().toLowerCase() === expected || entry.textContent?.toLowerCase().includes(expected));
+    if (!option) return false;
+    element.value = option.value;
+    return true;
+  }
+
   function setValue(element, value) {
     if (!element || value === undefined || value === null) return false;
+    const type = controlType(element);
+    if (type === "interactive" || type === "manual") return false;
     element.scrollIntoView({ block: "center", inline: "center" });
     element.classList.add("faust-field-highlight");
     element.focus();
-    if (element.isContentEditable) element.textContent = String(value);
-    else element.value = String(value);
-    element.dispatchEvent(new Event("input", { bubbles: true }));
+    if (type === "contenteditable") element.textContent = String(value);
+    else if (type === "select") {
+      if (!selectValue(element, value)) return false;
+    } else {
+      setNativeValue(element, value);
+    }
+    element.dispatchEvent(new InputEvent("input", { bubbles: true, data: String(value), inputType: "insertText" }));
     element.dispatchEvent(new Event("change", { bubbles: true }));
-    return true;
+    element.dispatchEvent(new Event("blur", { bubbles: true }));
+    return type === "contenteditable" ? element.textContent?.trim().length > 0 : String(element.value ?? "").trim().length > 0;
   }
 
   function detectLoginState() {
@@ -89,6 +122,12 @@
         match.element.classList.add("faust-field-highlight");
         filled[field] = { status: "preview", selector: match.selector, strategy: match.strategy };
       } else {
+        const type = controlType(match.element);
+        if (type === "interactive" || type === "manual") {
+          filled[field] = { status: "manual_required", reason: "interactive_control_requires_human_confirmation", selector: match.selector, strategy: match.strategy };
+          if (config.required) blocked.push({ field, reason: "interactive_control_requires_human_confirmation", selector: match.selector, labels: config.labels });
+          continue;
+        }
         const ok = setValue(match.element, value);
         filled[field] = { status: ok ? "filled" : "failed", selector: match.selector, strategy: match.strategy };
         if (!ok && config.required) blocked.push({ field, reason: "value_not_applied", selector: match.selector });
