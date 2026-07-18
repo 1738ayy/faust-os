@@ -1,10 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { marketplaces } from "@/lib/navigation";
 
 export function NavMarketplaces() {
-  const pathname = usePathname();
-  return <div className="mt-8"><h2 className="mb-3 px-3 text-xs font-semibold uppercase tracking-wider text-zinc-500">Marketplaces</h2><nav className="space-y-1">{marketplaces.map((marketplace) => { const Icon = marketplace.icon; return <Link key={marketplace.title} href={marketplace.href} className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${pathname === marketplace.href ? "bg-zinc-800 text-white" : "text-zinc-400 hover:bg-zinc-900 hover:text-white"}`}><Icon className="h-4 w-4" /><span>{marketplace.title}</span></Link>; })}</nav></div>;
+  return <div className="mt-8 rounded-2xl border border-zinc-800/80 bg-zinc-950/40 p-3"><p className="text-xs font-medium text-zinc-300">Marketplace channels</p><p className="mt-1 text-xs leading-5 text-zinc-500">Depop, eBay, Etsy, Mercari, and Poshmark drafts now live together in Listings.</p><Link href="/listings" className="mt-3 inline-flex text-xs font-semibold text-emerald-300 hover:text-emerald-200">Open Listings</Link></div>;
 }

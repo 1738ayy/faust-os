@@ -1,6 +1,6 @@
 import {
   LayoutDashboard,
-  Search, Package, DollarSign, BrainCircuit, Truck, Settings, Store, ShoppingBag, Tags, Factory, Users, Bot, ListTodo, Workflow, ClipboardList,
+  Search, Package, DollarSign, BrainCircuit, Truck, Settings, Store, ShoppingBag, Tags, Factory, Users, Bot, ListTodo, Workflow, ClipboardList, Boxes,
 } from "lucide-react";
 
 export const primaryNavigation = [
@@ -10,7 +10,12 @@ export const primaryNavigation = [
     icon: LayoutDashboard,
   },
   {
-    title: "Sourcing",
+    title: "Products",
+    href: "/catalog",
+    icon: Boxes,
+  },
+  {
+    title: "Opportunities",
     href: "/sourcing",
     icon: Search,
   },
@@ -20,11 +25,14 @@ export const primaryNavigation = [
   { title: "Purchasing", href: "/purchasing", icon: ClipboardList },
   { title: "Shipping", href: "/shipping", icon: Truck },
   { title: "Finance", href: "/finance", icon: DollarSign },
+  { title: "Analytics", href: "/analytics", icon: BrainCircuit },
+  { title: "Ask Faust", href: "/ai-center", icon: Bot },
+];
+
+export const systemNavigation = [
   { title: "Suppliers", href: "/suppliers", icon: Factory },
   { title: "Customers", href: "/customers", icon: Users },
-  { title: "Analytics", href: "/analytics", icon: BrainCircuit },
   { title: "Automations", href: "/automations", icon: Workflow },
-  { title: "AI Center", href: "/ai-center", icon: Bot },
   { title: "Tasks", href: "/tasks", icon: ListTodo },
   { title: "Global Search", href: "/search", icon: Search },
   { title: "Settings", href: "/settings", icon: Settings },

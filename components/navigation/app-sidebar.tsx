@@ -14,11 +14,11 @@ import { SignOutButton } from "@/components/auth/sign-out-button";
 export function AppSidebar() {
   return (
     <Sidebar variant="inset">
-      <SidebarHeader className="border-b border-zinc-800 p-4">
+      <SidebarHeader className="border-b border-zinc-800/80 p-4">
         <div>
-          <h1 className="text-lg font-bold">Faust OS</h1>
+          <h1 className="text-lg font-bold tracking-tight">Faust OS</h1>
           <p className="text-xs text-muted-foreground">
-            Business Operating System
+            Daily operating cockpit
           </p>
         </div>
       </SidebarHeader>
@@ -28,7 +28,7 @@ export function AppSidebar() {
         <NavMarketplaces />
       </SidebarContent>
 
-      <SidebarFooter className="border-t border-zinc-800 p-4">
+      <SidebarFooter className="border-t border-zinc-800/80 p-4">
         <div>
           <p className="font-medium">Henrry Reyes</p>
           <p className="text-xs text-muted-foreground">
