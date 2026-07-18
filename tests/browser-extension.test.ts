@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { test } from "node:test";
 import type { OperatingData } from "../domain/business";
 import { analyzeExtensionProduct, applyExtensionAction, extensionConnectionSummary, hashExtensionToken, importExtensionProduct, marketplaceFormMapping } from "../lib/browser-extension";
@@ -122,6 +124,17 @@ test("extension messages validate and marketplace mapping exposes fillable field
   assert.equal(mapping.sku, draft.physicalSku);
   assert.ok(mapping.images.length);
   assert.equal(mapping.adapterVersion, marketplaceAdapters[draft.marketplace].version);
+});
+
+test("extension side panel exposes safe fill without publishing", () => {
+  const html = readFileSync(join(process.cwd(), "extension", "sidepanel.html"), "utf8");
+  const script = readFileSync(join(process.cwd(), "extension", "sidepanel.js"), "utf8");
+  assert.match(html, /Fill supported fields — do not publish/);
+  assert.match(script, /FAUST_GUIDED_PUBLISH/);
+  assert.match(script, /guidedPublish\(false\)/);
+  assert.doesNotMatch(script, /FAUST_CONFIRM_PUBLISH/);
+  assert.doesNotMatch(script, /\.submit\(/);
+  assert.doesNotMatch(script, /\.click\(/);
 });
 
 test("extension confirmation, sync, pause, delist, and failure reporting are auditable", () => {
