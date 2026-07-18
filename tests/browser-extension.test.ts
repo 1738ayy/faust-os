@@ -76,6 +76,8 @@ test("extension import creates marketplace-safe draft titles for long 1688 produ
   assert.equal(poshmark.status, "validated");
   assert.ok(depop.title.length <= 80);
   assert.ok(poshmark.title.length <= 80);
+  assert.ok(depop.title.includes("..."));
+  assert.ok(!depop.title.includes("…"));
   assert.match(depop.title, / - FST-/);
 });
 

@@ -73,7 +73,7 @@ function renderTemplate(template: ListingTemplate, values: Record<string, string
 function compactTitle(value: string, limit: number) {
   const normalized = value.replace(/\s+/g, " ").trim();
   if (normalized.length <= limit) return normalized;
-  return `${normalized.slice(0, Math.max(limit - 1, 0)).trimEnd()}…`;
+  return `${normalized.slice(0, Math.max(limit - 3, 0)).trimEnd()}...`;
 }
 
 function marketplaceTitle(marketplace: Channel, sourceTitle: string, sku: string) {
