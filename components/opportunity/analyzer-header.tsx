@@ -27,16 +27,18 @@ export function AnalyzerHeader() {
   }
 
   return (
-    <div className="rounded-xl border border-border bg-card p-6">
+    <div className="rounded-3xl border border-red-950/45 bg-zinc-950/60 p-6 shadow-xl shadow-black/20 backdrop-blur">
       <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
         <div>
-          <p className="text-sm font-medium text-violet-400">Sourcing workspace</p>
-          <h1 className="mt-1 text-2xl font-bold">New opportunity</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Import a Superbuy product, review its costs, then save it to your catalog.</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-red-300">Opportunity Analyzer</p>
+          <h1 className="mt-2 text-3xl font-semibold">Review the buy before it becomes inventory.</h1>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+            Import the latest Superbuy/1688 scan, verify the captured fields, adjust landed costs, and compare marketplace economics before saving anything to Faust.
+          </p>
         </div>
-        <button onClick={importLatest} disabled={importing} className="flex items-center justify-center gap-2 rounded-xl bg-violet-600 px-5 py-3 font-medium text-white transition hover:bg-violet-500 disabled:cursor-wait disabled:opacity-60">
+        <button onClick={importLatest} disabled={importing} className="flex items-center justify-center gap-2 rounded-full bg-red-600 px-5 py-3 font-semibold text-white shadow-lg shadow-red-950/30 transition hover:bg-red-500 disabled:cursor-wait disabled:opacity-60">
           <Download className="h-5 w-5" />
-          {importing ? "Loading import…" : "Import Superbuy"}
+          {importing ? "Loading import..." : "Import latest scan"}
         </button>
       </div>
     </div>

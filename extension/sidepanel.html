@@ -1,17 +1,83 @@
 <!doctype html>
 <html lang="en">
-  <head><meta charset="utf-8" /><style>body{margin:0;padding:16px;background:#111113;color:#f7f7f8;font:14px system-ui,sans-serif}button{width:100%;margin:6px 0;padding:10px;border:1px solid #334155;background:#18181b;color:#d1fae5}pre{white-space:pre-wrap;font-size:12px;color:#a7f3d0}.card{border:1px solid #27272a;padding:12px;margin:10px 0}</style></head>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      :root { color-scheme: dark; }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        padding: 14px;
+        min-width: 320px;
+        background:
+          radial-gradient(circle at top right, rgba(190, 242, 100, .18), transparent 240px),
+          radial-gradient(circle at bottom left, rgba(45, 212, 191, .08), transparent 260px),
+          #09090b;
+        color: #f8fafc;
+        font: 14px/1.5 Aptos, Inter, "SF Pro Text", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+      }
+      .shell { border: 1px solid rgba(255,255,255,.09); border-radius: 28px; background: rgba(19,19,22,.92); overflow: hidden; box-shadow: 0 24px 70px rgba(0,0,0,.42); }
+      .hero { padding: 24px 18px 18px; text-align: center; border-bottom: 1px solid rgba(255,255,255,.08); }
+      .hero img { display: block; width: 104px; height: 104px; margin: 0 auto 14px; border-radius: 32px; object-fit: cover; border: 1px solid rgba(255,255,255,.12); box-shadow: 0 0 42px rgba(190,242,100,.16); }
+      h1 { margin: 0; font-size: 26px; letter-spacing: -.04em; }
+      p { margin: 7px 0 0; color: #a1a1aa; }
+      .content { padding: 14px; }
+      .section-title { margin: 4px 2px 9px; color: #71717a; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .12em; }
+      button { width: 100%; margin: 7px 0; padding: 13px 14px; border: 1px solid rgba(255,255,255,.08); border-radius: 18px; background: #242428; color: #e5e7eb; font: inherit; font-weight: 760; cursor: pointer; text-align: left; }
+      button.primary { background: #bef264; border-color: #bef264; color: #07110d; text-align: center; }
+      button:hover { filter: brightness(1.06); }
+      button:disabled { opacity: .55; cursor: wait; }
+      .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+      .grid button { text-align: center; margin: 0; padding: 12px 10px; }
+      .card { border: 1px solid rgba(255,255,255,.08); border-radius: 20px; padding: 13px; margin: 12px 0; background: #111114; }
+      .card strong { display: block; margin-bottom: 8px; color: #e5e7eb; letter-spacing: -.01em; }
+      #status { color: #bef264; font-size: 12px; min-height: 18px; }
+      pre { white-space: pre-wrap; margin: 0; font-size: 12px; color: #d4d4d8; }
+      details { margin-top: 12px; border: 1px solid rgba(255,255,255,.08); border-radius: 18px; background: #0d0d10; padding: 11px 12px; }
+      summary { cursor: pointer; color: #a1a1aa; font-size: 12px; font-weight: 800; }
+      #output { margin-top: 10px; max-height: 260px; overflow: auto; color: #a7f3d0; font-size: 11px; }
+    </style>
+  </head>
   <body>
-    <h1>Faust scanner</h1>
-    <p>Review source data, profitability, readiness, and publish status before sending anything risky.</p>
-    <button id="status-button">Check Faust session</button>
-    <button id="register-button">Register / rotate token</button>
-    <button id="scan-button">Scan current product</button>
-    <button id="import-button">Approve import + create drafts</button>
-    <button id="dry-run-button">Dry-run guided publish on current marketplace tab</button>
-    <button id="fill-button">Fill supported fields — do not publish</button>
-    <div class="card"><strong>Five-channel readiness</strong><pre id="readiness">No import yet.</pre></div>
-    <div class="card"><strong>Result</strong><pre id="output">Idle.</pre></div>
+    <main class="shell">
+      <section class="hero">
+        <img src="assets/faust-logo.png" alt="Faust logo" />
+        <h1>Faust Bridge</h1>
+        <p>Scan a product, review the numbers, then create marketplace drafts.</p>
+      </section>
+      <section class="content">
+        <p class="section-title">Product</p>
+        <button id="scan-button" class="primary">Scan product</button>
+        <button id="import-button" class="primary">Import to Faust</button>
+
+        <div class="card">
+          <strong>Review</strong>
+          <pre id="readiness">No product scanned yet.</pre>
+        </div>
+
+        <p class="section-title">Marketplace listing</p>
+        <div class="grid">
+          <button id="dry-run-button">Preview fill</button>
+          <button id="fill-button">Fill form</button>
+        </div>
+
+        <p class="section-title">Connection</p>
+        <div class="grid">
+          <button id="status-button">Check</button>
+          <button id="register-button">Connect</button>
+        </div>
+
+        <div class="card">
+          <strong>Status</strong>
+          <p id="status" role="status">Ready.</p>
+        </div>
+
+        <details>
+          <summary>Technical details</summary>
+          <pre id="output">No details yet.</pre>
+        </details>
+      </section>
+    </main>
     <script src="sidepanel.js"></script>
   </body>
 </html>

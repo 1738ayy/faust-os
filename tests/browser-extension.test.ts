@@ -129,7 +129,7 @@ test("extension messages validate and marketplace mapping exposes fillable field
 test("extension side panel exposes safe fill without publishing", () => {
   const html = readFileSync(join(process.cwd(), "extension", "sidepanel.html"), "utf8");
   const script = readFileSync(join(process.cwd(), "extension", "sidepanel.js"), "utf8");
-  assert.match(html, /Fill supported fields — do not publish/);
+  assert.match(html, /Fill form/);
   assert.match(script, /FAUST_GUIDED_PUBLISH/);
   assert.match(script, /guidedPublish\(false\)/);
   assert.doesNotMatch(script, /FAUST_CONFIRM_PUBLISH/);

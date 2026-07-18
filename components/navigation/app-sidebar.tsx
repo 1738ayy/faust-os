@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import {
   Sidebar,
   SidebarContent,
@@ -14,12 +15,21 @@ import { SignOutButton } from "@/components/auth/sign-out-button";
 export function AppSidebar() {
   return (
     <Sidebar variant="inset">
-      <SidebarHeader className="border-b border-zinc-800/80 p-4">
-        <div>
-          <h1 className="text-lg font-bold tracking-tight">Faust OS</h1>
-          <p className="text-xs text-muted-foreground">
-            Daily operating cockpit
-          </p>
+      <SidebarHeader className="border-b border-red-950/50 bg-black/20 p-5">
+        <div className="flex flex-col items-center text-center">
+          <Image
+            alt="Faust OS logo"
+            src="/brand/faust-logo.png"
+            width={72}
+            height={72}
+            className="h-18 w-18 rounded-3xl border border-red-500/20 object-cover shadow-xl shadow-red-950/30"
+          />
+          <div className="mt-3">
+            <h1 className="font-heading text-xl font-bold tracking-tight">Faust OS</h1>
+            <p className="text-xs text-muted-foreground">
+              Daily operating cockpit
+            </p>
+          </div>
         </div>
       </SidebarHeader>
 
@@ -28,7 +38,7 @@ export function AppSidebar() {
         <NavMarketplaces />
       </SidebarContent>
 
-      <SidebarFooter className="border-t border-zinc-800/80 p-4">
+      <SidebarFooter className="border-t border-red-950/50 bg-black/20 p-4">
         <div>
           <p className="font-medium">Henrry Reyes</p>
           <p className="text-xs text-muted-foreground">

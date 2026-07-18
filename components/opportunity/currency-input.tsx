@@ -18,7 +18,7 @@ export function CurrencyInput({ label, value, onChange }: CurrencyInputProps) {
           step="0.01"
           value={value || ""}
           onChange={(event) => onChange(Math.max(0, Number(event.target.value) || 0))}
-          className="w-full rounded-lg border border-border bg-background py-2 pl-7 pr-3 text-right outline-none transition focus:border-violet-500"
+          className="w-full rounded-lg border border-red-950/45 bg-black/35 py-2 pl-7 pr-3 text-right outline-none transition focus:border-red-500/60"
         />
       </div>
     </div>

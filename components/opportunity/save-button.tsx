@@ -24,5 +24,5 @@ export function SaveButton() {
     }
   }
 
-  return <button onClick={handleSave} disabled={!opportunity || saving} className="flex items-center justify-center gap-2 rounded-xl bg-violet-600 px-6 py-3 font-medium text-white transition hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-60"><Save className="h-5 w-5" />{saving ? "Saving…" : "Save opportunity"}</button>;
+  return <button onClick={handleSave} disabled={!opportunity || saving} className="flex items-center justify-center gap-2 rounded-full bg-red-600 px-6 py-3 font-medium text-white shadow-lg shadow-red-950/30 transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-60"><Save className="h-5 w-5" />{saving ? "Saving…" : "Save opportunity"}</button>;
 }
