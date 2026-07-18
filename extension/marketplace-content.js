@@ -4,7 +4,7 @@
   function findBySelectors(selectors = []) {
     for (const selector of selectors) {
       try {
-        const element = document.querySelector(selector);
+        const element = Array.from(document.querySelectorAll(selector)).find(isUsableControl);
         if (element) return { element, selector, strategy: "css" };
       } catch {
         // Invalid live-site selectors should be reported as field failures, not crash the whole run.
@@ -19,11 +19,20 @@
       const node = labelNodes.find((entry) => entry.textContent?.trim().toLowerCase() === label.toLowerCase() || entry.textContent?.toLowerCase().includes(label.toLowerCase()));
       const controlId = node?.getAttribute?.("for");
       const byFor = controlId ? document.getElementById(controlId) : null;
-      if (byFor) return { element: byFor, selector: `label:${label}`, strategy: "label" };
-      const nearby = node?.closest?.("div, section, fieldset")?.querySelector?.("input, textarea, select, [contenteditable='true']");
+      if (isUsableControl(byFor)) return { element: byFor, selector: `label:${label}`, strategy: "label" };
+      const nearby = Array.from(node?.closest?.("div, section, fieldset")?.querySelectorAll?.("input, textarea, select, iframe, [contenteditable='true']") || []).find(isUsableControl);
       if (nearby) return { element: nearby, selector: `near-label:${label}`, strategy: "label" };
     }
     return null;
+  }
+
+  function isUsableControl(element) {
+    if (!element) return false;
+    const tag = element.tagName?.toLowerCase();
+    const style = window.getComputedStyle(element);
+    const rect = element.getBoundingClientRect();
+    const visible = tag === "iframe" || (rect.width > 0 && rect.height > 0 && style.visibility !== "hidden" && style.display !== "none");
+    return visible && !element.disabled && element.getAttribute?.("aria-hidden") !== "true";
   }
 
   function controlType(element) {
@@ -32,6 +41,7 @@
     if (element?.isContentEditable) return "contenteditable";
     if (tag === "textarea") return "textarea";
     if (tag === "select") return "select";
+    if (tag === "iframe") return "iframe";
     if (tag === "input" && !["button", "submit", "checkbox", "radio", "file", "hidden"].includes(type || "text")) return "input";
     if (tag === "button" || element?.getAttribute?.("role") === "button" || element?.getAttribute?.("aria-haspopup")) return "interactive";
     return "manual";
@@ -52,6 +62,20 @@
     return true;
   }
 
+  function setFrameValue(element, value) {
+    try {
+      const target = element.contentDocument?.querySelector("[contenteditable='true'], body");
+      if (!target) return false;
+      target.focus();
+      target.textContent = String(value);
+      target.dispatchEvent(new InputEvent("input", { bubbles: true, data: String(value), inputType: "insertText" }));
+      target.dispatchEvent(new Event("change", { bubbles: true }));
+      return target.textContent?.trim().length > 0;
+    } catch {
+      return false;
+    }
+  }
+
   function setValue(element, value) {
     if (!element || value === undefined || value === null) return false;
     const type = controlType(element);
@@ -62,6 +86,8 @@
     if (type === "contenteditable") element.textContent = String(value);
     else if (type === "select") {
       if (!selectValue(element, value)) return false;
+    } else if (type === "iframe") {
+      return setFrameValue(element, value);
     } else {
       setNativeValue(element, value);
     }
@@ -112,6 +138,11 @@
     const blocked = [];
     for (const [field, config] of Object.entries(adapter.fields)) {
       const value = mapping[field];
+      if (value === undefined || value === null || value === "") {
+        filled[field] = { status: "skipped", reason: config.required ? "required_value_missing" : "optional_value_missing" };
+        if (config.required) blocked.push({ field, reason: "required_value_missing", labels: config.labels });
+        continue;
+      }
       const match = findBySelectors(config.primary) || findBySelectors(config.fallback) || findByLabel(config.labels);
       if (!match) {
         if (config.required) blocked.push({ field, reason: "selector_not_found", required: true, selectors: [...config.primary, ...config.fallback], labels: config.labels });

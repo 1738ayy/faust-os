@@ -140,8 +140,11 @@ test("extension side panel exposes safe fill without publishing", () => {
 
 test("extension marketplace filler avoids pretending complex controls are filled", () => {
   const script = readFileSync(join(process.cwd(), "extension", "marketplace-content.js"), "utf8");
+  assert.match(script, /isUsableControl/);
   assert.match(script, /setNativeValue/);
+  assert.match(script, /setFrameValue/);
   assert.match(script, /InputEvent\("input"/);
+  assert.match(script, /optional_value_missing/);
   assert.match(script, /interactive_control_requires_human_confirmation/);
   assert.doesNotMatch(script, /\.click\(/);
   assert.doesNotMatch(script, /\.submit\(/);
