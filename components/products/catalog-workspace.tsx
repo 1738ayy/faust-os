@@ -39,12 +39,6 @@ export function CatalogWorkspace({ products, mode }: { products: ProductExperien
     if (!response.ok || data.ok === false) throw new Error(data.message || "Product action failed.");
   }
 
-  async function resetData(mode: "empty" | "development_demo") {
-    const response = await fetch("/api/operating-system", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "reset", mode }) });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.message || "Could not update demo data.");
-  }
-
   function run(label: string, callback: () => Promise<void>) {
     startTransition(async () => {
       try {
@@ -62,7 +56,7 @@ export function CatalogWorkspace({ products, mode }: { products: ProductExperien
       <section className="flex flex-wrap items-center gap-3 rounded-3xl border border-red-950/45 bg-zinc-950/55 p-4 shadow-lg shadow-black/20 backdrop-blur">
         <div className="mr-auto">
           <p className="flex items-center gap-2 text-sm font-medium"><Filter className="h-4 w-4 text-red-300" />Catalog controls</p>
-          <p className="mt-1 text-xs text-muted-foreground">{mode === "development_demo" ? "Demo data is on. Clear it before entering your real catalog." : mode === "empty" ? "Empty workspace. Start clean or load demo data temporarily." : "Showing your saved product data."}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{mode === "empty" ? "No product records yet. Import your first item from the extension or sourcing workspace." : "Showing your saved product data."}</p>
         </div>
         <label className="flex items-center gap-2 text-xs text-muted-foreground">
           <ArrowDownAZ className="h-4 w-4 text-red-300" />
@@ -71,11 +65,6 @@ export function CatalogWorkspace({ products, mode }: { products: ProductExperien
             {sortOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
           </select>
         </label>
-        {mode === "development_demo" ? (
-          <button disabled={busy} className="rounded-full border border-amber-400/50 bg-zinc-950/60 px-4 py-2 text-sm font-semibold text-amber-200 transition hover:border-amber-300 hover:text-amber-100 disabled:opacity-50" onClick={() => run("Demo data cleared", () => resetData("empty"))}>Turn demo data off</button>
-        ) : (
-          <button disabled={busy} className="rounded-full border border-red-950/60 bg-zinc-950/60 px-4 py-2 text-sm font-semibold text-red-100 transition hover:border-red-500/60 disabled:opacity-50" onClick={() => run("Demo data loaded", () => resetData("development_demo"))}>Load demo data</button>
-        )}
       </section>
 
       <section className="grid gap-6 md:grid-cols-2 2xl:grid-cols-3" aria-label="Product cards">

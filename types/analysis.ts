@@ -9,5 +9,7 @@ export type OpportunityAnalysis = {
   roi: number;
   markup: number;
   breakEvenPrice: number;
+  recommendedPrice: number;
+  targetMargin: number;
   capitalRequired: number;
 };

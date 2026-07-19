@@ -2,6 +2,8 @@ import type { Costs } from "@/types/cost";
 import type { Opportunity } from "@/types/opportunity";
 import type { Product } from "@/types/product";
 import type { SuperbuyProduct } from "@/types/superbuy-product";
+import type { MarketplaceId } from "@/types/marketplace";
+import { getMarketplace } from "../marketplaces";
 
 const COST_LABELS = {
   product: "Product Cost",
@@ -65,16 +67,22 @@ export function buildProduct(source: SuperbuyProduct): Product {
   };
 }
 
-export function buildOpportunity(source: SuperbuyProduct): Opportunity {
+export function buildOpportunity(source: SuperbuyProduct, options: { targetMargin?: number; marketplaceId?: MarketplaceId } = {}): Opportunity {
   const now = new Date().toISOString();
   const product = buildProduct(source);
+  const marketplaceId = options.marketplaceId || "depop";
+  const marketplace = getMarketplace(marketplaceId);
+  const editableCost = (source.price ?? 0) + (source.domesticShipping ?? 0) + (source.internationalShipping ?? 0);
+  const targetMargin = Math.max(0, Math.min(95, options.targetMargin ?? 50)) / 100;
+  const feeRate = marketplace.sellingFeeRate + marketplace.paymentFeeRate;
+  const targetPrice = 1 - feeRate - targetMargin > 0 ? editableCost / (1 - feeRate - targetMargin) : editableCost * 3;
 
   return {
     id: crypto.randomUUID(),
     product,
     costs: buildCosts(source.price, source.domesticShipping, source.internationalShipping),
     listing: {
-      marketplaceId: "depop",
+      marketplaceId,
       title: product.name,
       description: product.description ?? "",
       category: product.category ?? "",
@@ -83,7 +91,7 @@ export function buildOpportunity(source: SuperbuyProduct): Opportunity {
       shippingPrice: 0,
       status: "draft",
     },
-    salePrice: Math.round(((source.price ?? 0) + (source.domesticShipping ?? 0) + (source.internationalShipping ?? 0)) * 3 * 100) / 100,
+    salePrice: Math.round(targetPrice * 100) / 100,
     notes: "",
     createdAt: now,
     updatedAt: now,

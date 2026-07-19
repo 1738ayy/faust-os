@@ -17,7 +17,7 @@ const baseEnv = {
 
 test("production environment validation separates local, staging, and production safely", () => {
   const local = validateProductionReadiness(readProductionEnv({ FAUST_ENV: "local", NEXT_PUBLIC_FAUST_AUTH_ENABLED: "false" }));
-  assert.equal(local.status, "local_demo");
+  assert.equal(local.status, "local_unconfigured");
   const staging = validateProductionReadiness(readProductionEnv(baseEnv));
   assert.equal(staging.status, "ready");
   assert.equal(staging.publicClientConfigured, true);

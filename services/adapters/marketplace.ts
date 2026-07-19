@@ -16,7 +16,7 @@ export class MockMarketplaceAdapter implements MarketplaceAdapter {
     const errors = this.validate(draft);
     if (errors.length) throw new Error(errors.join(" "));
     const externalId = `${this.provider.toUpperCase()}-${draft.listingId.slice(0, 8)}`;
-    return { externalId, externalUrl: `https://example.test/${this.provider}/listing/${externalId}`, status: "active", warnings: ["Mock adapter published locally; connect live credentials later."] };
+    return { externalId, externalUrl: `https://example.test/${this.provider}/listing/${externalId}`, status: "active", warnings: ["Local marketplace adapter recorded the publish result; connect live credentials before real publishing."] };
   }
   async endListing(externalId: string) { void externalId; }
 }

@@ -12,7 +12,7 @@ export const storageBucketKeys = [
 ] as const;
 
 export type FaustEnvironment = "local" | "staging" | "production";
-export type ProductionConfigStatus = "ready" | "missing_required" | "local_demo";
+export type ProductionConfigStatus = "ready" | "missing_required" | "local_unconfigured";
 
 const booleanFromEnv = z.preprocess((value) => value === true || value === "true", z.boolean());
 const optionalUrl = z.string().url().optional().or(z.literal("").transform(() => undefined));
@@ -85,7 +85,7 @@ export function validateProductionReadiness(env: ProductionEnv = readProductionE
   if (env.AI_PROVIDER === "gemini" && !env.GEMINI_API_KEY) missing.push("GEMINI_API_KEY");
   if (env.SHIPPING_PROVIDER === "easypost" && !env.EASYPOST_API_KEY) missing.push("EASYPOST_API_KEY");
   if (env.SHIPPING_PROVIDER === "shippo" && !env.SHIPPO_API_KEY) missing.push("SHIPPO_API_KEY");
-  return { status: missing.length ? "missing_required" as const : env.FAUST_ENV === "local" && !env.NEXT_PUBLIC_FAUST_AUTH_ENABLED ? "local_demo" as const : "ready" as const, environment: env.FAUST_ENV, missing, warnings, publicClientConfigured: Boolean(env.NEXT_PUBLIC_SUPABASE_URL && env.NEXT_PUBLIC_SUPABASE_ANON_KEY), serviceRoleServerOnly: Boolean(env.SUPABASE_SERVICE_ROLE_KEY) };
+  return { status: missing.length ? "missing_required" as const : env.FAUST_ENV === "local" && !env.NEXT_PUBLIC_FAUST_AUTH_ENABLED ? "local_unconfigured" as const : "ready" as const, environment: env.FAUST_ENV, missing, warnings, publicClientConfigured: Boolean(env.NEXT_PUBLIC_SUPABASE_URL && env.NEXT_PUBLIC_SUPABASE_ANON_KEY), serviceRoleServerOnly: Boolean(env.SUPABASE_SERVICE_ROLE_KEY) };
 }
 
 export function providerReadiness(env: ProductionEnv = readProductionEnv()) {

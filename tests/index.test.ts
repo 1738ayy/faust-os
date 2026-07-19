@@ -1,4 +1,5 @@
 import "./business-calculations.test";
+import "./opportunity-analysis.test";
 import "./operational-workflows.test";
 import "./security-contracts.test";
 import "./inventory-actions.test";

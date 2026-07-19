@@ -7,7 +7,7 @@ const fixture = (): OperatingData => {
   const time = new Date().toISOString();
   const supplierId = crypto.randomUUID(), productId = crypto.randomUUID(), variantId = crypto.randomUUID(), locationId = crypto.randomUUID(), customerId = crypto.randomUUID(), listingId = crypto.randomUUID(), orderId = crypto.randomUUID(), orderItemId = crypto.randomUUID(), poId = crypto.randomUUID();
   return {
-    version: 1, mode: "development_demo", updatedAt: time,
+    version: 1, mode: "local", updatedAt: time,
     suppliers: [{ id: supplierId, name: "Test supplier", sourcePlatform: "Superbuy", status: "active" }],
     products: [{ id: productId, title: "Test hoodie", category: "Streetwear", tags: [], supplierId, status: "active", createdAt: time, updatedAt: time }],
     variants: [{ id: variantId, productId, sku: "FST-HOOD-001", title: "Charcoal / L", condition: "New", landedUnitCost: 31.7, defaultSalePrice: 86, reorderPoint: 2, reorderQuantity: 8, active: true }],

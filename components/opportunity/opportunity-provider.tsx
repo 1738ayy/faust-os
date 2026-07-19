@@ -9,6 +9,7 @@ import type { CostKey } from "@/types/cost";
 import type { MarketplaceId } from "@/types/marketplace";
 import type { Opportunity } from "@/types/opportunity";
 import type { SuperbuyProduct } from "@/types/superbuy-product";
+import type { BusinessSettings } from "@/types/settings";
 
 type OpportunityContextType = {
   opportunity: Opportunity | null;
@@ -32,12 +33,12 @@ function touch(opportunity: Opportunity): Opportunity {
   return { ...opportunity, updatedAt: new Date().toISOString() };
 }
 
-export function OpportunityProvider({ children }: { children: ReactNode }) {
+export function OpportunityProvider({ children, settings }: { children: ReactNode; settings?: BusinessSettings }) {
   const [opportunity, setOpportunity] = useState<Opportunity | null>(null);
-  const analysis = useMemo(() => (opportunity ? analyzeOpportunity(opportunity) : null), [opportunity]);
+  const analysis = useMemo(() => (opportunity ? analyzeOpportunity(opportunity, { targetMargin: settings?.targetMargin }) : null), [opportunity, settings?.targetMargin]);
 
   function importSuperbuyProduct(product: SuperbuyProduct) {
-    setOpportunity(buildOpportunity(product));
+    setOpportunity(buildOpportunity(product, { targetMargin: settings?.targetMargin, marketplaceId: settings?.defaultMarketplace as MarketplaceId | undefined }));
   }
 
   function updateProduct(field: "name" | "category" | "description" | "material" | "dimensions" | "weight" | "packageInfo", value: string) {

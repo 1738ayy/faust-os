@@ -128,3 +128,12 @@ test("AI Center feedback persists against recommendation or answer records", asy
   assert.equal(feedback.rating, "useful");
   assert.equal(data.aiFeedback?.length, 1);
 });
+
+test("AI Center explains an empty business without fake records", async () => {
+  const time = "2026-07-01T12:00:00.000Z";
+  const data: OperatingData = { version: 1, mode: "empty", updatedAt: time, products: [], variants: [], locations: [], balances: [], stockMovements: [], suppliers: [], purchaseOrders: [], parcels: [], listings: [], customers: [], orders: [], transactions: [], tasks: [], notices: [], insights: [], activity: [] };
+  const products = await askAiCenter(data, { action: "ask-question", question: "How many products do I have?", provider: "deterministic" });
+  assert.match(products.message.content, /no products/i);
+  const revenue = await askAiCenter(data, { action: "ask-question", question: "What is my revenue?", provider: "deterministic" });
+  assert.match(revenue.message.content, /no recorded orders or revenue/i);
+});

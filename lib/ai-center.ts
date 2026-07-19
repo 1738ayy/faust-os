@@ -267,7 +267,15 @@ function answerForQuestion(data: OperatingData, question: string) {
   const ctx = buildAiOperatingContext(data);
   const evidenceLinks: AiEvidenceLink[] = [];
   let answer = "";
-  if (q.includes("reorder") || q.includes("buy")) {
+  if (!data.products.length && (q.includes("product") || q.includes("sku") || q.includes("catalog"))) {
+    answer = "You currently have no products in Faust. Import your first item from the browser extension or sourcing workspace, then Faust can analyze pricing, inventory, listings, and reorder decisions from your real records.";
+  } else if (!data.orders.length && (q.includes("revenue") || q.includes("sales") || q.includes("orders") || q.includes("margin") || q.includes("profit"))) {
+    answer = "You have no recorded orders or revenue yet. Once marketplace orders are imported, Faust will calculate sales, fees, COGS, profit, margin, and cash impact from those records.";
+  } else if (!data.suppliers.length && q.includes("supplier")) {
+    answer = "No supplier records exist yet. Importing a sourced product or creating a purchase order will add supplier context that Faust can use for lead time, defect rate, landed cost, and reorder recommendations.";
+  } else if (!data.fulfillmentShipments?.length && q.includes("shipment")) {
+    answer = "No shipments exist yet. After orders move into fulfillment, Faust will track picking, packing, labels, dispatch, tracking events, and exceptions.";
+  } else if (q.includes("reorder") || q.includes("buy")) {
     const top = ctx.reorders.filter((entry) => entry.suggested > 0)[0];
     if (top) {
       evidenceLinks.push(variantEvidence(data, top.variant, `${top.variant.sku}: ${top.available} available, ${top.balance?.incoming || 0} incoming, reorder quantity ${top.variant.reorderQuantity}.`));

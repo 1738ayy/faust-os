@@ -2,7 +2,6 @@ import { ArrowRight, Sparkles } from "lucide-react";
 import { AppLayout } from "@/components/navigation/app-layout";
 import { EmptyState, PageHeader, PrimaryButton, SecondaryButton } from "@/components/faust/design-system";
 import { CatalogWorkspace } from "@/components/products/catalog-workspace";
-import { OperationButton } from "@/components/operations/operation-button";
 import { buildProductExperiences } from "@/lib/product-experience";
 import { money } from "@/lib/business-calculations";
 import { getOperatingData } from "@/services/operating-system/repository";
@@ -36,8 +35,8 @@ export default async function CatalogPage() {
           <div className="space-y-4">
             <EmptyState title="Your product library is empty" description="Import your first item from Superbuy or create an opportunity, then Faust will turn it into a product workspace." action={{ label: "Start sourcing", href: "/sourcing" }} />
             <section className="flex flex-wrap items-center justify-center gap-3 rounded-3xl border border-red-950/45 bg-zinc-950/55 p-4 text-sm text-muted-foreground">
-              <span>{data.mode === "development_demo" ? "Demo data is currently loaded." : "You are in a clean workspace."}</span>
-              {data.mode === "development_demo" ? <OperationButton action="reset" mode="empty" className="border-amber-400/50 text-amber-200 hover:border-amber-300 hover:text-amber-100">Turn demo data off</OperationButton> : <OperationButton action="reset" mode="development_demo">Load demo data</OperationButton>}
+              <span>Start with your own data by importing from the browser extension or sourcing workspace.</span>
+              <SecondaryButton href="/settings">Complete business profile</SecondaryButton>
             </section>
           </div>
         ) : (

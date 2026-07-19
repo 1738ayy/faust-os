@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-export function OperationButton({ action, id, status, mode, children, className = "" }: { action: "reset" | "transition-order" | "receive-parcel"; id?: string; status?: string; mode?: "empty" | "development_demo"; children: React.ReactNode; className?: string }) {
+export function OperationButton({ action, id, status, children, className = "" }: { action: "reset" | "transition-order" | "receive-parcel"; id?: string; status?: string; children: React.ReactNode; className?: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const router = useRouter();
@@ -15,7 +15,7 @@ export function OperationButton({ action, id, status, mode, children, className 
       const response = await fetch("/api/operating-system", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, id, status, mode }),
+        body: JSON.stringify({ action, id, status }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || "Operation failed.");

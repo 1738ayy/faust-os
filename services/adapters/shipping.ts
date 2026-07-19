@@ -55,7 +55,7 @@ export class LocalMockShippingProvider implements ShippingProviderAdapter {
   async validateAddress(address: ShippingAddress): Promise<AddressValidationResult> {
     const warnings: string[] = [];
     if (!address.line1 || !address.city || !address.postalCode || !address.country) warnings.push("Street, city, postal code, and country are required.");
-    if (address.country !== "US") warnings.push("Demo provider only validates domestic US labels.");
+    if (address.country !== "US") warnings.push("Local shipping validation currently supports domestic US labels.");
     const suggested = { ...address, region: address.region?.toUpperCase(), postalCode: address.postalCode.trim() };
     return { status: warnings.length ? "invalid" : "valid", original: address, suggested, warnings, residential: !/suite|ste|unit|warehouse|dock/i.test(`${address.line1} ${address.line2 || ""}`), confirmedAt: warnings.length ? undefined : today() };
   }
@@ -68,7 +68,7 @@ export class LocalMockShippingProvider implements ShippingProviderAdapter {
     return [
       { id: `rate-local-usps-ground-${request.shipmentId}`, provider: this.provider, carrier: "USPS Mock", service: "Ground Advantage", deliveryDays: 3, retailRate: Number((base + 1.05).toFixed(2)), negotiatedRate: Number(base.toFixed(2)), currency: "USD", insuranceAvailable: true, signatureAvailable: true, warnings: dimensionalWarning, packageWeightOz: weight, dimensions: { lengthIn: first.lengthIn, widthIn: first.widthIn, heightIn: first.heightIn } },
       { id: `rate-local-ups-ground-${request.shipmentId}`, provider: this.provider, carrier: "UPS Mock", service: "Ground", deliveryDays: 4, retailRate: Number((base + 2.95).toFixed(2)), negotiatedRate: Number((base + 1.4).toFixed(2)), currency: "USD", insuranceAvailable: true, signatureAvailable: true, warnings: dimensionalWarning, packageWeightOz: weight, dimensions: { lengthIn: first.lengthIn, widthIn: first.widthIn, heightIn: first.heightIn } },
-      { id: `rate-local-usps-priority-${request.shipmentId}`, provider: this.provider, carrier: "USPS Mock", service: "Priority Mail", deliveryDays: 2, retailRate: Number((base + 5.5).toFixed(2)), negotiatedRate: Number((base + 3.85).toFixed(2)), currency: "USD", insuranceAvailable: true, signatureAvailable: true, warnings: ["Fastest deterministic demo rate."], packageWeightOz: weight, dimensions: { lengthIn: first.lengthIn, widthIn: first.widthIn, heightIn: first.heightIn } },
+      { id: `rate-local-usps-priority-${request.shipmentId}`, provider: this.provider, carrier: "USPS Mock", service: "Priority Mail", deliveryDays: 2, retailRate: Number((base + 5.5).toFixed(2)), negotiatedRate: Number((base + 3.85).toFixed(2)), currency: "USD", insuranceAvailable: true, signatureAvailable: true, warnings: ["Fastest local test rate."], packageWeightOz: weight, dimensions: { lengthIn: first.lengthIn, widthIn: first.widthIn, heightIn: first.heightIn } },
     ];
   }
   async buyLabel(request: LabelPurchaseRequest): Promise<ShippingLabelRecord> {
