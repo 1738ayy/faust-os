@@ -86,12 +86,31 @@
     return document.querySelector(selector)?.getAttribute("content") || "";
   }
 
+  function normalizeImageUrl(value) {
+    let url = String(value || "").trim().replace(/\\\//g, "/");
+    if (!url) return "";
+    if (url.startsWith("//")) url = `${location.protocol}${url}`;
+    if (url.startsWith("/")) {
+      try { url = new URL(url, location.origin).href; } catch { return ""; }
+    }
+    return /^https?:\/\//.test(url) ? url : "";
+  }
+
   function productImages() {
     return unique([...document.images]
       .filter((image) => image.naturalWidth >= 240 && image.naturalHeight >= 240)
-      .map((image) => image.currentSrc || image.src)
-      .filter((url) => /^https?:\/\//.test(url))
-      .filter((url) => !/(logo|icon|flag|avatar|banner|ad[_-]?|placeholder|qrcode|qr[_-]?code)/i.test(url)));
+      .flatMap((image) => [
+        image.currentSrc,
+        image.src,
+        image.getAttribute?.("data-src"),
+        image.getAttribute?.("data-original"),
+        image.getAttribute?.("data-lazy-src"),
+        image.getAttribute?.("data-url"),
+      ])
+      .map(normalizeImageUrl)
+      .filter(Boolean)
+      .filter((url) => !/(logo|icon|flag|avatar|banner|ad[_-]?|placeholder|qrcode|qr[_-]?code|common-img|toolbar|sprite|blank|loading)/i.test(url))
+      .filter((url) => /\.(jpg|jpeg|png|webp)(?:[?#].*)?$/i.test(url) || /alicdn|cbu01|superbuycdn|image|img/i.test(url)));
   }
 
   function jsonLdProduct() {
@@ -331,7 +350,7 @@
       supplierStoreUrl: [...document.links].find((element) => /store|shop|member\.1688/i.test(element.href) && /superbuy\.com|1688\.com/i.test(element.href))?.href || "",
       category: labeledCategory(structured),
       description: cleanText(structured?.description) || cleanText(document.querySelector('[class*="description" i]')?.textContent),
-      material: firstCleanMatch(/Material\s*:?\s*([^\n]+)/i) || valueAfterLabel(/Material/i),
+      material: firstCleanMatch(/(?:Main\s*)?Fabric\s*Composition\s*:?\s*([^\n]+)/i) || valueAfterLabel(/(?:Main\s*)?Fabric\s*Composition/i) || firstCleanMatch(/Material\s*:?\s*([^\n]+)/i) || valueAfterLabel(/Material/i),
       dimensions: firstCleanMatch(/(?:Dimensions?|Size)\s*:?\s*([^\n]+)/i),
       weight,
       shippingWeight,

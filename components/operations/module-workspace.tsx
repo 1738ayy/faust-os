@@ -52,10 +52,6 @@ export function ModuleWorkspace({ module, snapshot }: { module: ModuleName; snap
   return (
     <div className="space-y-6">
       <PageHeader eyebrow="Workspace" title={info.title} description={info.description} action={info.action ? { label: info.action[0], href: info.action[1] } : undefined} />
-      <section className="rounded-3xl border border-red-950/45 bg-zinc-950/55 p-5 shadow-lg shadow-black/20 backdrop-blur">
-        <p className="text-xs font-medium uppercase tracking-[0.16em] text-red-300">Primary question</p>
-        <h2 className="mt-2 text-xl font-semibold">{info.question}</h2>
-      </section>
       {!empty && <ModuleRecommendation module={module} snapshot={snapshot} />}
       {!empty && <DecisionSummary module={module} snapshot={snapshot} />}
       {empty ? <Empty module={module} /> : <Content module={module} snapshot={snapshot} />}

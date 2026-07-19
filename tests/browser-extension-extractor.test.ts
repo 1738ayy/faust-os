@@ -111,6 +111,7 @@ test("Superbuy extractor prefers product facts over navigation text", () => {
       domesticShipping: number;
       internationalShipping: number;
       internationalShippingEstimateSource: string;
+      material: string;
       weight: string;
       variantOptions: { colors: string[]; sizes: string[] };
       variants: { name: string; options: string[] }[];
@@ -144,6 +145,8 @@ test("Superbuy extractor prefers product facts over navigation text", () => {
         "Shopping AssistantShipping Calculator >Forwarding >Parcel Tracking >Shopping Enquiry >",
         "Product Category",
         "T-shirt",
+        "Main fabric composition",
+        "Cotton",
         "Store Name",
         "Guangzhou Blank Apparel Co.",
         "Domestic shipping: ¥12",
@@ -191,6 +194,7 @@ test("Superbuy extractor prefers product facts over navigation text", () => {
   assert.equal(product?.title, "Heavyweight oversized blank T-shirt");
   assert.equal(product?.supplier, "Guangzhou Blank Apparel Co.");
   assert.equal(product?.category, "T-shirt");
+  assert.equal(product?.material, "Cotton");
   assert.equal(product?.price, 4.5);
   assert.equal(product?.domesticShipping, 12);
   assert.equal(product?.weight, "650g");

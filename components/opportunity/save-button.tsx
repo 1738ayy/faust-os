@@ -17,7 +17,7 @@ export function SaveButton() {
     try {
       const response = await fetch("/api/opportunities", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(opportunity) });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.message ?? "Product creation failed.");
+      if (!response.ok || data.success === false) throw new Error(data.message ?? "Product creation failed.");
       toast.success("Product created", { description: `${opportunity.product.name} is now in Products.` });
       router.push("/catalog");
       router.refresh();

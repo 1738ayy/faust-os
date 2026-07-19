@@ -1,6 +1,6 @@
 "use client";
+/* eslint-disable @next/next/no-img-element -- auth must render even if Next image optimization rejects a cached logo. */
 
-import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -55,13 +55,11 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" | "forgot-passw
     <main className="grid min-h-screen place-items-center bg-background p-5">
       <form onSubmit={submit} className="faust-surface w-full max-w-md p-7">
         <div className="flex flex-col items-center text-center">
-          <Image
+          <img
             alt="Faust OS logo"
             src="/brand/faust-logo.png"
-            width={112}
-            height={112}
-            priority
             className="h-28 w-28 rounded-[2rem] border border-red-500/20 object-contain p-1 shadow-2xl shadow-red-950/40"
+            onError={(event) => { event.currentTarget.style.display = "none"; }}
           />
           <p className="mt-4 text-xs font-medium uppercase tracking-[0.2em] text-red-300">Faust OS</p>
           <h1 className="mt-3 text-2xl font-semibold">{title}</h1>

@@ -42,7 +42,7 @@ export function ProductPreview() {
   }
   return (
     <section className="faust-surface p-6"><h2 className="text-xl font-semibold">Imported product</h2><p className="mt-1 text-sm text-muted-foreground">The factual product record captured from Superbuy.</p>
-      <div className="mt-6 flex h-72 items-center justify-center overflow-hidden rounded-3xl border border-red-950/45 bg-black/35">{image ? <img src={image} alt={product.name} className="h-full w-full object-cover" /> : <div className="text-center text-muted-foreground"><ImageIcon className="mx-auto h-10 w-10 text-red-300" /><p className="mt-3 text-sm">No product image was available</p></div>}</div>
+      <div className="mt-6 flex h-72 items-center justify-center overflow-hidden rounded-3xl border border-red-950/45 bg-black/35">{image ? <img src={image} alt={product.name} className="h-full w-full object-cover" onError={(event) => { event.currentTarget.style.display = "none"; }} /> : <div className="text-center text-muted-foreground"><ImageIcon className="mx-auto h-10 w-10 text-red-300" /><p className="mt-3 text-sm">No product image was available</p></div>}</div>
       <div className="mt-4 rounded-2xl border border-red-950/35 bg-black/25 p-4">
         <div className="flex flex-col gap-3 sm:flex-row">
           <label className="flex-1 text-sm font-medium">
@@ -61,7 +61,7 @@ export function ProductPreview() {
           <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
             {product.media.images.slice(0, 15).map((src, index) => (
               <div key={src} className="overflow-hidden rounded-2xl border border-red-950/45 bg-zinc-950/60">
-                <img src={src} alt="" className="aspect-square w-full object-cover" />
+                <img src={src} alt="" className="aspect-square w-full object-cover" onError={(event) => { event.currentTarget.closest("div")?.remove(); }} />
                 <div className="grid grid-cols-2 gap-1 p-2 text-[11px]">
                   <button type="button" onClick={() => makePrimary(src)} disabled={index === 0} className="rounded-full border border-red-950/60 px-2 py-1 text-red-100 transition hover:border-red-500/50 disabled:cursor-default disabled:opacity-50">
                     {index === 0 ? "Primary" : "Make first"}

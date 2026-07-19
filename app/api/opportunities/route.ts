@@ -12,13 +12,19 @@ export async function POST(request: Request) {
     if (!opportunity?.id || !opportunity.product?.name) {
       return NextResponse.json({ success: false, message: "A product opportunity is required." }, { status: 400 });
     }
-    await saveOpportunity(opportunity);
-    await ensureInventoryForOpportunity(opportunity);
-    await convertOpportunity(opportunity);
-    await recordActivity({ type: "opportunity_saved", title: "Opportunity saved", detail: opportunity.product.name });
-    return NextResponse.json({ success: true, opportunity });
-  } catch {
-    return NextResponse.json({ success: false, message: "Unable to save this opportunity." }, { status: 500 });
+
+    const operatingData = await convertOpportunity(opportunity);
+    const product = operatingData.products.find((entry) => entry.sourceUrl === opportunity.product.sourcing.superbuyUrl);
+
+    await Promise.allSettled([
+      saveOpportunity(opportunity),
+      ensureInventoryForOpportunity(opportunity),
+      recordActivity({ type: "opportunity_saved", title: "Opportunity saved", detail: opportunity.product.name }),
+    ]);
+
+    return NextResponse.json({ success: true, opportunity, product });
+  } catch (error) {
+    return NextResponse.json({ success: false, message: error instanceof Error ? error.message : "Unable to save this opportunity." }, { status: 500 });
   }
 }
 

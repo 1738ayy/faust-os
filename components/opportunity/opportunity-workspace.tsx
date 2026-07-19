@@ -75,9 +75,8 @@ export function OpportunityWorkspace() {
       <SourceDataReview />
       <div className="grid gap-8 lg:grid-cols-2"><ProductInformation /><ProductPreview /></div>
       <MarketplaceSelector />
-      <div className="grid gap-8 lg:grid-cols-2"><CostBreakdown /><FinancialResults /></div>
-      <div className="grid gap-8 lg:grid-cols-2"><OpportunityScore /><AiRecommendation /></div>
-      <SaveOpportunity />
+      <div className="grid gap-6 xl:grid-cols-3"><FinancialResults /><OpportunityScore /><AiRecommendation /></div>
+      <div className="grid gap-8 lg:grid-cols-2"><CostBreakdown /><SaveOpportunity /></div>
     </>}
   </div>;
 }
