@@ -1,6 +1,6 @@
 "use client";
+/* eslint-disable @next/next/no-img-element -- the brand mark is a static SVG and should not depend on image optimization. */
 
-import Image from "next/image";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -33,12 +33,9 @@ export function OnboardingForm() {
     <main className="grid min-h-screen place-items-center bg-background p-5">
       <form onSubmit={submit} className="faust-surface w-full max-w-xl p-7">
         <div className="flex flex-col items-center text-center">
-          <Image
+          <img
             alt="Faust OS logo"
-            src="/brand/faust-logo.png"
-            width={112}
-            height={112}
-            priority
+            src="/brand/faust-pony.svg"
             className="h-28 w-28 rounded-[2rem] border border-red-500/20 object-contain p-1 shadow-2xl shadow-red-950/40"
           />
           <p className="mt-4 text-xs font-medium uppercase tracking-[0.2em] text-red-300">Faust OS / onboarding</p>

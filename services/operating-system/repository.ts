@@ -79,6 +79,49 @@ export function developmentDemo(): OperatingData {
 
 export async function getOperatingData() { return read(); }
 export async function resetOperatingData(mode: "empty" | "development_demo") { return write(mode === "development_demo" ? developmentDemo() : empty()); }
+function nextCopySku(data: OperatingData, sku: string) {
+ const base = `${sku}-COPY`; let candidate = base, count = 2;
+ while (data.variants.some((entry) => entry.sku.toLowerCase() === candidate.toLowerCase())) candidate = `${base}-${count++}`;
+ return candidate;
+}
+function nextCopyTitle(data: OperatingData, title: string) {
+ const base = `${title} copy`; let candidate = base, count = 2;
+ while (data.products.some((entry) => entry.title.toLowerCase() === candidate.toLowerCase())) candidate = `${base} ${count++}`;
+ return candidate;
+}
+export async function duplicateCatalogProduct(variantId: string) {
+ const data = await read(); const sourceVariant = data.variants.find((entry) => entry.id === variantId); if (!sourceVariant) throw new Error("Product variant not found.");
+ const sourceProduct = data.products.find((entry) => entry.id === sourceVariant.productId); if (!sourceProduct) throw new Error("Product not found.");
+ const createdAt = now(); const productId = id(); const newVariantId = id();
+ const product = { ...sourceProduct, id: productId, title: nextCopyTitle(data, sourceProduct.title), sourceUrl: undefined, status: "draft" as const, createdAt, updatedAt: createdAt };
+ const variant = { ...sourceVariant, id: newVariantId, productId, sku: nextCopySku(data, sourceVariant.sku), active: true };
+ data.products.unshift(product); data.variants.unshift(variant); data.balances.unshift({ id: id(), variantId: newVariantId, onHand: 0, reserved: 0, incoming: 0, damaged: 0, returned: 0, lost: 0, quarantined: 0 });
+ for (const listing of data.listings.filter((entry) => entry.variantId === sourceVariant.id)) data.listings.unshift({ ...listing, id: id(), variantId: newVariantId, quantity: 0, status: "draft", marketplaceUrl: undefined, syncState: "manual", createdAt });
+ for (const draft of data.channelListingDrafts?.filter((entry) => entry.variantId === sourceVariant.id) || []) data.channelListingDrafts!.unshift({ ...draft, id: id(), variantId: newVariantId, physicalSku: variant.sku, quantity: 0, status: "draft", externalListingId: undefined, externalUrl: undefined, lastSyncAt: undefined, syncState: "pending", riskLockId: undefined, idempotencyKey: id(), createdAt, updatedAt: createdAt });
+ activity(data, "Product duplicated", "product", product.id, `${sourceProduct.title} was copied as ${product.title}. Stock was not duplicated.`);
+ return write(data);
+}
+export async function deleteCatalogProduct(variantId: string) {
+ const data = await read(); const variant = data.variants.find((entry) => entry.id === variantId); if (!variant) throw new Error("Product variant not found.");
+ const product = data.products.find((entry) => entry.id === variant.productId); if (!product) throw new Error("Product not found.");
+ const hasOrderHistory = data.orders.some((order) => order.items.some((item) => item.variantId === variant.id));
+ if (hasOrderHistory) {
+  variant.active = false; product.status = "paused"; product.updatedAt = now();
+  activity(data, "Product hidden from catalog", "product", product.id, `${product.title} has order history, so Faust hid it instead of deleting history.`);
+  return write(data);
+ }
+ data.variants = data.variants.filter((entry) => entry.id !== variant.id);
+ data.balances = data.balances.filter((entry) => entry.variantId !== variant.id);
+ data.stockMovements = data.stockMovements.filter((entry) => entry.variantId !== variant.id);
+ data.listings = data.listings.filter((entry) => entry.variantId !== variant.id);
+ data.channelListingDrafts = data.channelListingDrafts?.filter((entry) => entry.variantId !== variant.id);
+ data.inventoryLots = data.inventoryLots?.filter((entry) => entry.variantId !== variant.id);
+ data.physicalSkuMappings = data.physicalSkuMappings?.filter((entry) => entry.variantId !== variant.id);
+ data.inventoryRiskLocks = data.inventoryRiskLocks?.filter((entry) => entry.variantId !== variant.id);
+ if (!data.variants.some((entry) => entry.productId === product.id)) data.products = data.products.filter((entry) => entry.id !== product.id);
+ activity(data, "Product deleted", "product", product.id, `${product.title} was removed from the catalog.`);
+ return write(data);
+}
 /** Converts a reviewed sourcing opportunity into connected catalog, stock, and listing-draft records. */
 export async function convertOpportunity(opportunity: LegacyOpportunity) {
  const data = await read(); const sourceUrl = opportunity.product.sourcing.superbuyUrl; let product = data.products.find((entry) => entry.sourceUrl === sourceUrl);

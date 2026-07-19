@@ -1,7 +1,8 @@
 import { ArrowRight, Sparkles } from "lucide-react";
 import { AppLayout } from "@/components/navigation/app-layout";
 import { EmptyState, PageHeader, PrimaryButton, SecondaryButton } from "@/components/faust/design-system";
-import { ProductCard } from "@/components/products/product-card";
+import { CatalogWorkspace } from "@/components/products/catalog-workspace";
+import { OperationButton } from "@/components/operations/operation-button";
 import { buildProductExperiences } from "@/lib/product-experience";
 import { money } from "@/lib/business-calculations";
 import { getOperatingData } from "@/services/operating-system/repository";
@@ -32,7 +33,13 @@ export default async function CatalogPage() {
         />
 
         {products.length === 0 ? (
-          <EmptyState title="Your product library is empty" description="Import your first item from Superbuy or create an opportunity, then Faust will turn it into a product workspace." action={{ label: "Start sourcing", href: "/sourcing" }} />
+          <div className="space-y-4">
+            <EmptyState title="Your product library is empty" description="Import your first item from Superbuy or create an opportunity, then Faust will turn it into a product workspace." action={{ label: "Start sourcing", href: "/sourcing" }} />
+            <section className="flex flex-wrap items-center justify-center gap-3 rounded-3xl border border-red-950/45 bg-zinc-950/55 p-4 text-sm text-muted-foreground">
+              <span>{data.mode === "development_demo" ? "Demo data is currently loaded." : "You are in a clean workspace."}</span>
+              {data.mode === "development_demo" ? <OperationButton action="reset" mode="empty" className="border-amber-400/50 text-amber-200 hover:border-amber-300 hover:text-amber-100">Turn demo data off</OperationButton> : <OperationButton action="reset" mode="development_demo">Load demo data</OperationButton>}
+            </section>
+          </div>
         ) : (
           <>
             <section className="rounded-[2rem] border border-red-950/45 bg-zinc-950/60 p-5 shadow-2xl shadow-black/25 backdrop-blur">
@@ -65,9 +72,7 @@ export default async function CatalogPage() {
               <SecondaryButton href="/purchasing">Plan reorder</SecondaryButton>
             </section>
 
-            <section className="grid gap-6 md:grid-cols-2 2xl:grid-cols-3" aria-label="Product cards">
-              {products.map((item) => <ProductCard key={item.variant.id} item={item} />)}
-            </section>
+            <CatalogWorkspace products={products} mode={data.mode} />
           </>
         )}
       </div>

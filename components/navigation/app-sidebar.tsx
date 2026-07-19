@@ -1,6 +1,6 @@
 "use client";
+/* eslint-disable @next/next/no-img-element -- the app shell should render the static SVG brand mark directly. */
 
-import Image from "next/image";
 import {
   Sidebar,
   SidebarContent,
@@ -17,11 +17,9 @@ export function AppSidebar() {
     <Sidebar variant="inset">
       <SidebarHeader className="border-b border-red-950/50 bg-black/20 p-5">
         <div className="flex flex-col items-center text-center">
-          <Image
+          <img
             alt="Faust OS logo"
-            src="/brand/faust-logo.png"
-            width={72}
-            height={72}
+            src="/brand/faust-pony.svg"
             className="h-20 w-20 rounded-3xl border border-red-500/20 object-contain p-1 shadow-xl shadow-red-950/30"
           />
           <div className="mt-3">

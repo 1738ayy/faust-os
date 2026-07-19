@@ -40,7 +40,7 @@ export function UpdatePasswordForm() {
         <div className="flex flex-col items-center text-center">
           <img
             alt="Faust OS logo"
-            src="/brand/faust-logo.png"
+            src="/brand/faust-pony.svg"
             className="h-24 w-24 rounded-[1.75rem] border border-red-500/20 object-contain p-1 shadow-2xl shadow-red-950/40"
             onError={(event) => { event.currentTarget.style.display = "none"; }}
           />

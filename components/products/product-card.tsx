@@ -1,8 +1,8 @@
-/* eslint-disable @next/next/no-img-element -- product images can be imported from external sourcing pages. */
 import Link from "next/link";
-import { ArrowRight, PackageOpen } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { MarketplaceBadge, StatusBadge } from "@/components/faust/design-system";
 import { ReadinessRing } from "@/components/products/readiness-ring";
+import { ProductImage } from "@/components/products/product-image";
 import type { ProductExperience } from "@/lib/product-experience";
 import { money } from "@/lib/business-calculations";
 import { readinessLabel } from "@/lib/product-readiness";
@@ -21,7 +21,7 @@ export function ProductCard({ item }: { item: ProductExperience }) {
       <article className="relative min-h-[560px] overflow-hidden rounded-[2rem] border border-red-950/45 bg-zinc-950/70 shadow-2xl shadow-black/25 backdrop-blur transition duration-300 motion-safe:group-hover:-translate-y-1 motion-safe:group-hover:shadow-red-950/20">
         <div className="absolute inset-x-0 top-0 h-48 bg-gradient-to-b from-red-950/30 to-transparent" />
         <div className="relative h-64 overflow-hidden bg-black/35">
-          {item.image ? <img src={item.image} alt={item.product.title} className="h-full w-full object-cover transition duration-500 motion-safe:group-hover:scale-105" /> : <div className="grid h-full place-items-center text-muted-foreground"><PackageOpen className="h-10 w-10" /></div>}
+          <ProductImage src={item.image} alt={item.product.title} className="h-full w-full object-cover transition duration-500 motion-safe:group-hover:scale-105" fallbackClassName="h-full w-full" />
           <div className="absolute right-4 top-4"><ReadinessRing readiness={item.readiness} size="sm" /></div>
           <div className="absolute bottom-4 left-4 right-4 flex flex-wrap items-center gap-2">
             <StatusBadge value={readinessLabel(item.readiness.status)} />

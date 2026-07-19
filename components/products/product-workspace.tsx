@@ -1,8 +1,8 @@
-/* eslint-disable @next/next/no-img-element -- product images can come from dynamic sourcing hosts. */
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { ArrowLeft, ArrowRight, Camera, CheckCircle2, CircleAlert, PackageOpen } from "lucide-react";
+import { ArrowLeft, ArrowRight, Camera, CheckCircle2, CircleAlert } from "lucide-react";
 import { ActivityTimeline, MarketplaceBadge, PrimaryButton, StatusBadge } from "@/components/faust/design-system";
+import { ProductImage } from "@/components/products/product-image";
 import { ReadinessRing } from "@/components/products/readiness-ring";
 import type { ProductExperience } from "@/lib/product-experience";
 import { money } from "@/lib/business-calculations";
@@ -20,7 +20,7 @@ export function ProductWorkspace({ item }: { item: ProductExperience }) {
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(185,28,28,.28),transparent_28rem)]" />
         <div className="relative grid gap-6 p-5 lg:grid-cols-[340px_1fr] lg:p-7">
           <div className="overflow-hidden rounded-[1.7rem] border border-red-950/45 bg-black/35">
-            {item.image ? <img src={item.image} alt={item.product.title} className="aspect-square h-full w-full object-cover" /> : <div className="grid aspect-square place-items-center text-muted-foreground"><PackageOpen className="h-12 w-12" /></div>}
+            <ProductImage src={item.image} alt={item.product.title} className="aspect-square h-full w-full object-cover" fallbackClassName="aspect-square h-full w-full" />
           </div>
           <div className="flex flex-col justify-between gap-6">
             <div className="flex flex-wrap items-start justify-between gap-5">
@@ -149,7 +149,7 @@ export function ProductWorkspace({ item }: { item: ProductExperience }) {
       <section className="grid gap-6 xl:grid-cols-3">
         <Panel title="Photos">
           <div className="grid grid-cols-4 gap-2">
-            {item.image ? <img src={item.image} alt="" className="col-span-2 aspect-square rounded-2xl object-cover" /> : <div className="col-span-2 grid aspect-square place-items-center rounded-2xl border border-dashed border-red-950/45 text-muted-foreground"><Camera className="h-7 w-7" /></div>}
+            {item.image ? <ProductImage src={item.image} alt="" className="col-span-2 aspect-square rounded-2xl object-cover" fallbackClassName="col-span-2 aspect-square rounded-2xl border border-dashed border-red-950/45" /> : <div className="col-span-2 grid aspect-square place-items-center rounded-2xl border border-dashed border-red-950/45 text-muted-foreground"><Camera className="h-7 w-7" /></div>}
             <PhotoPlaceholder label="Front" />
             <PhotoPlaceholder label="Detail" />
           </div>
@@ -172,10 +172,14 @@ export function ProductWorkspace({ item }: { item: ProductExperience }) {
             )) : <p className="text-sm text-muted-foreground">No strong product relationships are proven yet. Shared supplier, category, marketplace, and pricing patterns will appear here as the catalog grows.</p>}
           </div>
         </Panel>
-        <Panel title="Product timeline">
-          <ActivityTimeline items={item.timeline.map((event) => ({ id: event.id, title: event.title, detail: event.detail, at: new Date(event.at).toLocaleString() }))} />
-        </Panel>
       </section>
+
+      <details className="faust-surface p-5">
+        <summary className="cursor-pointer text-xl font-semibold">Product timeline</summary>
+        <div className="mt-4">
+          <ActivityTimeline items={item.timeline.map((event) => ({ id: event.id, title: event.title, detail: event.detail, at: new Date(event.at).toLocaleString() }))} />
+        </div>
+      </details>
 
       <Panel title="Advanced">
         <details className="rounded-2xl border border-red-950/35 bg-black/35 p-4 text-sm text-muted-foreground">

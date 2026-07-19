@@ -71,6 +71,7 @@ const marketplaceOrder: Exclude<Marketplace, "Manual">[] = ["Depop", "eBay", "Et
 
 export function buildProductExperiences(data: OperatingData): ProductExperience[] {
   return data.variants
+    .filter((variant) => variant.active)
     .map((variant) => {
       const product = data.products.find((entry) => entry.id === variant.productId);
       if (!product) return null;
