@@ -22,7 +22,7 @@ export function AppSidebar() {
             src="/brand/faust-logo.png"
             width={72}
             height={72}
-            className="h-18 w-18 rounded-3xl border border-red-500/20 object-cover shadow-xl shadow-red-950/30"
+            className="h-20 w-20 rounded-3xl border border-red-500/20 object-contain p-1 shadow-xl shadow-red-950/30"
           />
           <div className="mt-3">
             <h1 className="font-heading text-xl font-bold tracking-tight">Faust OS</h1>

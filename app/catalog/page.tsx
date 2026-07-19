@@ -1,12 +1,80 @@
-/* eslint-disable @next/next/no-img-element -- imported Superbuy image hosts are dynamic and external. */
-import Link from "next/link";
-import { ExternalLink, PackageOpen, Plus } from "lucide-react";
+import { ArrowRight, Sparkles } from "lucide-react";
 import { AppLayout } from "@/components/navigation/app-layout";
-import { getMarketplace } from "@/lib/marketplaces";
-import { analyzeOpportunity } from "@/lib/analyze-opportunity";
-import { getOpportunities } from "@/services/opportunities/local-opportunity-store";
+import { EmptyState, PageHeader, PrimaryButton, SecondaryButton } from "@/components/faust/design-system";
+import { ProductCard } from "@/components/products/product-card";
+import { buildProductExperiences } from "@/lib/product-experience";
+import { money } from "@/lib/business-calculations";
+import { getOperatingData } from "@/services/operating-system/repository";
+
+export const dynamic = "force-dynamic";
 
 export default async function CatalogPage() {
-  const opportunities = await getOpportunities();
-  return <AppLayout><div className="space-y-6"><div className="flex items-start justify-between"><div><h1 className="text-3xl font-bold">Product Catalog</h1><p className="mt-2 text-muted-foreground">Every opportunity imported from Superbuy and saved in Faust.</p></div><Link href="/opportunity-analyzer" className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-3 font-medium text-white hover:bg-violet-500"><Plus className="h-5 w-5" />New opportunity</Link></div>{opportunities.length === 0 ? <div className="rounded-xl border border-dashed border-border bg-card p-12 text-center"><PackageOpen className="mx-auto h-10 w-10 text-violet-400" /><h2 className="mt-4 text-lg font-semibold">Your catalog is ready</h2><p className="mt-2 text-sm text-muted-foreground">Import a Superbuy product and save its opportunity to see it here.</p></div> : <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">{opportunities.map((opportunity) => { const analysis = analyzeOpportunity(opportunity); const marketplace = getMarketplace(opportunity.listing.marketplaceId); return <article key={opportunity.id} className="overflow-hidden rounded-xl border border-border bg-card"><div className="h-44 bg-muted/40">{opportunity.product.media.images[0] && <img src={opportunity.product.media.images[0]} alt="" className="h-full w-full object-cover" />}</div><div className="p-5"><p className="text-xs font-medium text-violet-400">{marketplace.name} · {opportunity.listing.status}</p><h2 className="mt-1 truncate text-lg font-semibold">{opportunity.product.name}</h2><p className="mt-1 truncate text-sm text-muted-foreground">{opportunity.product.supplier.name || "Unknown supplier"}</p><div className="mt-5 grid grid-cols-2 gap-3 text-sm"><div><p className="text-muted-foreground">Sale price</p><p className="font-semibold">${opportunity.salePrice.toFixed(2)}</p></div><div><p className="text-muted-foreground">Net profit</p><p className="font-semibold text-emerald-400">${analysis.netProfit.toFixed(2)}</p></div></div><a href={opportunity.product.sourcing.superbuyUrl} target="_blank" rel="noreferrer" className="mt-5 inline-flex items-center gap-2 text-sm font-medium text-violet-400 hover:text-violet-300">Open Superbuy <ExternalLink className="h-4 w-4" /></a></div></article>; })}</div>}</div></AppLayout>;
+  const data = await getOperatingData();
+  const products = buildProductExperiences(data);
+  const ready = products.filter((item) => item.readiness.score >= 85).length;
+  const live = products.filter((item) => item.marketplaces.some((marketplace) => marketplace.status === "live")).length;
+  const inventoryValue = products.reduce((sum, item) => sum + item.inventory.value, 0);
+  const attention = products.filter((item) => item.intelligence.faustScore.score < 65 || item.intelligence.health.some((signal) => signal.status === "risk")).length;
+  const readyToPublish = products.filter((item) => item.readiness.score >= 85 && !item.marketplaces.some((marketplace) => marketplace.status === "live")).length;
+  const recommendedReorders = products.filter((item) => item.inventory.available <= item.purchasing.reorderPoint).length;
+  const deployableProfit = products.reduce((sum, item) => sum + Math.max(0, item.finance.projectedRevenue - item.inventory.value), 0);
+  const topProduct = [...products].sort((a, b) => b.intelligence.faustScore.score - a.intelligence.faustScore.score)[0];
+  const attentionProduct = [...products].sort((a, b) => a.intelligence.faustScore.score - b.intelligence.faustScore.score)[0];
+
+  return (
+    <AppLayout>
+      <div className="space-y-6">
+        <PageHeader
+          eyebrow="Products"
+          title="Products"
+          description="The living product command center for sourcing, inventory, listings, purchasing, finance, analytics, and AI."
+          action={{ label: "Import product", href: "/sourcing" }}
+        />
+
+        {products.length === 0 ? (
+          <EmptyState title="Your product library is empty" description="Import your first item from Superbuy or create an opportunity, then Faust will turn it into a product workspace." action={{ label: "Start sourcing", href: "/sourcing" }} />
+        ) : (
+          <>
+            <section className="rounded-[2rem] border border-red-950/45 bg-zinc-950/60 p-5 shadow-2xl shadow-black/25 backdrop-blur">
+              <div className="grid gap-5 lg:grid-cols-[1.4fr_auto] lg:items-center">
+                <div>
+                  <p className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.16em] text-red-300"><Sparkles size={14} />Faust recommendation</p>
+                  <h2 className="mt-3 text-2xl font-semibold">{attentionProduct && attentionProduct.intelligence.faustScore.score < 65 ? `Review ${attentionProduct.variant.sku} first.` : topProduct ? `Open ${topProduct.variant.sku} first.` : "Build your first product workspace."}</h2>
+                  <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
+                    {attentionProduct && attentionProduct.intelligence.faustScore.score < 65 ? `${attentionProduct.intelligence.recommendation.situation} ${attentionProduct.intelligence.recommendation.expectedOutcome}` : topProduct ? `${topProduct.intelligence.recommendation.situation} Faust Score ${topProduct.intelligence.faustScore.score}/100 with ${topProduct.inventory.available} sellable unit(s).` : "Products become the hub for sourcing, listing, purchasing, inventory, finance, and AI."}
+                  </p>
+                </div>
+                {(attentionProduct || topProduct) && <PrimaryButton href={(attentionProduct && attentionProduct.intelligence.faustScore.score < 65 ? attentionProduct : topProduct).href}>Open product<ArrowRight size={15} /></PrimaryButton>}
+              </div>
+            </section>
+
+            <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <Metric label="Active products" value={String(products.length)} detail="living product workspaces" />
+              <Metric label="Inventory value" value={money(inventoryValue)} detail="cash tied to stock" />
+              <Metric label="Deployable profit" value={money(deployableProfit)} detail="projected upside from sellable stock" />
+              <Metric label="Needs attention" value={String(attention)} detail="low score or health risk" />
+              <Metric label="Ready to publish" value={String(readyToPublish)} detail="high readiness, not live yet" />
+              <Metric label="Recommended reorders" value={String(recommendedReorders)} detail="at or below reorder point" />
+              <Metric label="Ready products" value={String(ready)} detail="85%+ readiness" />
+              <Metric label="Live products" value={String(live)} detail="published somewhere" />
+            </section>
+
+            <section className="flex flex-wrap items-center gap-3">
+              <SecondaryButton href="/opportunity-analyzer">Analyze opportunity</SecondaryButton>
+              <SecondaryButton href="/listings">Generate drafts</SecondaryButton>
+              <SecondaryButton href="/purchasing">Plan reorder</SecondaryButton>
+            </section>
+
+            <section className="grid gap-6 md:grid-cols-2 2xl:grid-cols-3" aria-label="Product cards">
+              {products.map((item) => <ProductCard key={item.variant.id} item={item} />)}
+            </section>
+          </>
+        )}
+      </div>
+    </AppLayout>
+  );
+}
+
+function Metric({ label, value, detail }: { label: string; value: string; detail: string }) {
+  return <article className="faust-card p-5"><p className="text-sm text-muted-foreground">{label}</p><p className="mt-3 font-heading text-3xl font-semibold tabular-nums">{value}</p><p className="mt-1 text-xs text-muted-foreground">{detail}</p></article>;
 }

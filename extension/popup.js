@@ -13,11 +13,6 @@ function writeDetails(value) {
   rawOutput.textContent = typeof value === "string" ? value : JSON.stringify(value, null, 2);
 }
 
-function importDrafts(response) {
-  const result = response?.result?.actionResult || response?.result || response?.actionResult || {};
-  return result?.drafts || [];
-}
-
 function compactScanSummary(response) {
   const product = response.product;
   const top = response.analysis?.actionResult?.byMarketplace?.[0] || response.analysis?.byMarketplace?.[0];
@@ -50,8 +45,8 @@ scanButton.addEventListener("click", async () => {
 
 importButton.addEventListener("click", async () => {
   importButton.disabled = true;
-  status.textContent = "Creating drafts...";
-  const response = await send({ type: "FAUST_IMPORT_LAST_PRODUCT" });
+  status.textContent = "Importing to Faust...";
+  const response = await send({ type: "FAUST_IMPORT_TO_ANALYZER" });
   importButton.disabled = false;
   writeDetails(response);
   if (!response?.ok) {
@@ -59,9 +54,8 @@ importButton.addEventListener("click", async () => {
     summary.textContent = "Open Technical details to inspect the error.";
     return;
   }
-  const drafts = importDrafts(response).length;
   status.textContent = "Imported to Faust.";
-  summary.textContent = `${drafts} marketplace draft${drafts === 1 ? "" : "s"} created.`;
+  summary.textContent = compactScanSummary(response);
 });
 
 optionsButton.addEventListener("click", () => chrome.runtime.openOptionsPage());

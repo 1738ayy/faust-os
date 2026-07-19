@@ -17,6 +17,9 @@ const actions: { id: Action; label: string; description: string }[] = [
   { id: "location", label: "Assign location", description: "Assign currently unlocated stock to a bin." },
 ];
 
+const field = "faust-field faust-focus px-3 py-2 text-sm";
+const actionButton = "rounded-full border border-red-950/60 bg-zinc-950/50 px-3 py-2 text-xs font-medium transition hover:border-red-500/50 hover:text-white";
+
 export function InventoryMutationPanel({ balances, locations }: { balances: StockBalance[]; locations: Location[] }) {
   const [action, setAction] = useState<Action>("adjust");
   const [message, setMessage] = useState("");
@@ -25,15 +28,17 @@ export function InventoryMutationPanel({ balances, locations }: { balances: Stoc
   const label = (balance: StockBalance) => `${locations.find((location) => location.id === balance.locationId)?.label || "Unassigned"} · ${balance.variantId.slice(0, 8)} · ${balance.onHand} on hand`;
   const selected = actions.find((entry) => entry.id === action)!;
   const requiresQuantity = action !== "location";
+
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    // React clears currentTarget after the synchronous event handler. Keep the
-    // actual form node before awaiting the mutation so a successful response
-    // cannot be turned into a false client-side failure during reset.
     const formElement = event.currentTarget;
-    setMessage(""); const form = new FormData(formElement);
-    if (form.get("confirm") !== "on") { setMessage("Confirm this inventory mutation before saving."); return; }
-    const quantity = Number(form.get("quantity")); const reason = String(form.get("reason") || ""); const notes = String(form.get("notes") || ""); const relatedEntityId = String(form.get("relatedEntityId") || "") || undefined;
+    setMessage("");
+    const form = new FormData(formElement);
+    if (form.get("confirm") !== "on") { setMessage("Confirm this inventory movement before saving."); return; }
+    const quantity = Number(form.get("quantity"));
+    const reason = String(form.get("reason") || "");
+    const notes = String(form.get("notes") || "");
+    const relatedEntityId = String(form.get("relatedEntityId") || "") || undefined;
     const idempotencyKey = crypto.randomUUID();
     const endpoint = action === "adjust" ? "/api/inventory/adjust" : action === "transfer" ? "/api/inventory/transfer" : action === "count" ? "/api/inventory/cycle-count" : action === "location" ? "/api/inventory/location" : "/api/inventory/damage";
     const body = action === "adjust" ? { balanceId: form.get("balanceId"), quantity, reason, notes, relatedEntityId, idempotencyKey }
@@ -42,22 +47,32 @@ export function InventoryMutationPanel({ balances, locations }: { balances: Stoc
       : action === "location" ? { balanceId: form.get("balanceId"), locationId: form.get("locationId"), reason, notes, idempotencyKey }
       : { balanceId: form.get("balanceId"), quantity, action, reason, notes, relatedEntityId, idempotencyKey };
     setSubmitting(true);
-    try { const response = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); const result = await response.json(); if (!response.ok) { setMessage(result.message || "Mutation failed. No inventory was changed."); return; } setMessage("Saved. Balances, movement history, and activity history have refreshed."); router.refresh(); formElement.reset(); }
-    catch { setMessage("The request could not be completed. No inventory was changed."); }
-    finally { setSubmitting(false); }
+    try {
+      const response = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const result = await response.json();
+      if (!response.ok) { setMessage(result.message || "Inventory was not changed."); return; }
+      setMessage("Saved. Balances, movement history, and activity history have refreshed.");
+      router.refresh();
+      formElement.reset();
+    } catch {
+      setMessage("The request could not be completed. No inventory was changed.");
+    } finally {
+      setSubmitting(false);
+    }
   }
-  return <section className="border border-border bg-card p-5" aria-label="Inventory actions">
-    <div><p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Inventory actions</p><h2 className="mt-1 text-lg font-semibold">{selected.label}</h2><p className="mt-1 text-sm text-muted-foreground">{selected.description}</p></div>
-    <div className="mt-4 flex flex-wrap gap-2">{actions.map((entry) => <button key={entry.id} type="button" className={`border px-3 py-2 text-xs ${action === entry.id ? "border-emerald-400 bg-emerald-400/10" : "border-border"}`} onClick={() => { setAction(entry.id); setMessage(""); }}>{entry.label}</button>)}</div>
+
+  return <section className="rounded-3xl border border-red-950/45 bg-zinc-950/55 p-5 shadow-lg shadow-black/20 backdrop-blur" aria-label="Inventory actions">
+    <div><p className="text-xs font-medium uppercase tracking-[0.16em] text-red-300">Inventory action</p><h2 className="mt-2 text-xl font-semibold">{selected.label}</h2><p className="mt-2 text-sm leading-6 text-muted-foreground">{selected.description}</p></div>
+    <div className="mt-5 flex flex-wrap gap-2">{actions.map((entry) => <button key={entry.id} type="button" className={`${actionButton} ${action === entry.id ? "border-red-500/50 bg-red-500/10 text-red-100" : ""}`} onClick={() => { setAction(entry.id); setMessage(""); }}>{entry.label}</button>)}</div>
     <form className="mt-5 grid gap-3 md:grid-cols-3" onSubmit={submit}>
-      {action === "transfer" ? <><label className="grid gap-1 text-xs">Source balance<select required name="sourceBalanceId" className="border bg-background p-2">{balances.map((balance) => <option key={balance.id} value={balance.id}>{label(balance)}</option>)}</select></label><label className="grid gap-1 text-xs">Destination balance<select required name="destinationBalanceId" className="border bg-background p-2">{balances.map((balance) => <option key={balance.id} value={balance.id}>{label(balance)}</option>)}</select></label></> : <label className="grid gap-1 text-xs">Inventory balance<select required name="balanceId" className="border bg-background p-2">{balances.map((balance) => <option key={balance.id} value={balance.id}>{label(balance)}</option>)}</select></label>}
-      {action === "location" ? <label className="grid gap-1 text-xs">Destination location<select required name="locationId" className="border bg-background p-2">{locations.map((location) => <option key={location.id} value={location.id}>{location.label}</option>)}</select></label> : <label className="grid gap-1 text-xs">{action === "count" ? "Physical count" : action === "adjust" ? "Quantity delta" : "Quantity"}<input required name="quantity" type="number" step="1" min={action === "adjust" ? undefined : "1"} className="border bg-background p-2" placeholder={action === "adjust" ? "Example: -2" : "Whole units"} /></label>}
-      {(action !== "count") && <label className="grid gap-1 text-xs">Reason<input required name="reason" className="border bg-background p-2" placeholder="What happened?" /></label>}
-      {(action === "damage" || action === "quarantine" || action === "release_quarantine" || action === "lost" || action === "found" || action === "adjust") && <label className="grid gap-1 text-xs">Related order / supplier / receipt ID (optional)<input name="relatedEntityId" className="border bg-background p-2" placeholder="UUID if linked" /></label>}
-      <label className="grid gap-1 text-xs md:col-span-2">Notes (optional)<input name="notes" className="border bg-background p-2" placeholder="Inspection, supplier issue, or receiving note" /></label>
-      <label className="flex items-center gap-2 text-xs md:col-span-2"><input required name="confirm" type="checkbox" />I confirm this is the intended inventory movement.</label>
-      <button disabled={submitting || (requiresQuantity && !balances.length)} className="bg-emerald-500 px-3 py-2 text-sm font-semibold text-zinc-950 disabled:opacity-50">{submitting ? "Saving…" : `Confirm ${selected.label}`}</button>
+      {action === "transfer" ? <><label className="grid gap-1 text-sm">Source balance<select required name="sourceBalanceId" className={field}>{balances.map((balance) => <option key={balance.id} value={balance.id}>{label(balance)}</option>)}</select></label><label className="grid gap-1 text-sm">Destination balance<select required name="destinationBalanceId" className={field}>{balances.map((balance) => <option key={balance.id} value={balance.id}>{label(balance)}</option>)}</select></label></> : <label className="grid gap-1 text-sm">Inventory balance<select required name="balanceId" className={field}>{balances.map((balance) => <option key={balance.id} value={balance.id}>{label(balance)}</option>)}</select></label>}
+      {action === "location" ? <label className="grid gap-1 text-sm">Destination location<select required name="locationId" className={field}>{locations.map((location) => <option key={location.id} value={location.id}>{location.label}</option>)}</select></label> : <label className="grid gap-1 text-sm">{action === "count" ? "Physical count" : action === "adjust" ? "Quantity delta" : "Quantity"}<input required name="quantity" type="number" step="1" min={action === "adjust" ? undefined : "1"} className={field} placeholder={action === "adjust" ? "Example: -2" : "Whole units"} /></label>}
+      {(action !== "count") && <label className="grid gap-1 text-sm">Reason<input required name="reason" className={field} placeholder="What happened?" /></label>}
+      {(action === "damage" || action === "quarantine" || action === "release_quarantine" || action === "lost" || action === "found" || action === "adjust") && <label className="grid gap-1 text-sm">Related order / supplier / receipt ID (optional)<input name="relatedEntityId" className={field} placeholder="UUID if linked" /></label>}
+      <label className="grid gap-1 text-sm md:col-span-2">Notes (optional)<input name="notes" className={field} placeholder="Inspection, supplier issue, or receiving note" /></label>
+      <label className="flex items-center gap-2 text-sm md:col-span-2"><input required name="confirm" type="checkbox" />I confirm this is the intended inventory movement.</label>
+      <button disabled={submitting || (requiresQuantity && !balances.length)} className="rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-red-950/30 transition hover:bg-red-500 disabled:opacity-50">{submitting ? "Saving…" : `Confirm ${selected.label}`}</button>
     </form>
-    {message && <p role="status" className="mt-3 text-sm text-muted-foreground">{message}</p>}
+    {message && <p role="status" className="mt-4 rounded-2xl border border-red-950/35 bg-black/35 p-3 text-sm text-muted-foreground">{message}</p>}
   </section>;
 }

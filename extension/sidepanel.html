@@ -10,45 +10,45 @@
         padding: 14px;
         min-width: 320px;
         background:
-          radial-gradient(circle at top right, rgba(190, 242, 100, .18), transparent 240px),
-          radial-gradient(circle at bottom left, rgba(45, 212, 191, .08), transparent 260px),
+          radial-gradient(circle at top right, rgba(185, 28, 28, .32), transparent 245px),
+          radial-gradient(circle at bottom left, rgba(127, 29, 29, .18), transparent 270px),
           #09090b;
         color: #f8fafc;
         font: 14px/1.5 Aptos, Inter, "SF Pro Text", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
       }
-      .shell { border: 1px solid rgba(255,255,255,.09); border-radius: 28px; background: rgba(19,19,22,.92); overflow: hidden; box-shadow: 0 24px 70px rgba(0,0,0,.42); }
+      .shell { border: 1px solid rgba(248,113,113,.16); border-radius: 28px; background: rgba(19,19,22,.92); overflow: hidden; box-shadow: 0 26px 76px rgba(0,0,0,.48), 0 0 46px rgba(127,29,29,.2); }
       .hero { padding: 24px 18px 18px; text-align: center; border-bottom: 1px solid rgba(255,255,255,.08); }
-      .hero img { display: block; width: 104px; height: 104px; margin: 0 auto 14px; border-radius: 32px; object-fit: cover; border: 1px solid rgba(255,255,255,.12); box-shadow: 0 0 42px rgba(190,242,100,.16); }
+      .hero img { display: block; width: 116px; height: 116px; margin: 0 auto 14px; padding: 6px; border-radius: 34px; object-fit: contain; object-position: center; border: 1px solid rgba(248,113,113,.18); background: rgba(9,9,11,.38); box-shadow: 0 18px 48px rgba(0,0,0,.4), 0 0 40px rgba(185,28,28,.24); }
       h1 { margin: 0; font-size: 26px; letter-spacing: -.04em; }
       p { margin: 7px 0 0; color: #a1a1aa; }
       .content { padding: 14px; }
       .section-title { margin: 4px 2px 9px; color: #71717a; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .12em; }
-      button { width: 100%; margin: 7px 0; padding: 13px 14px; border: 1px solid rgba(255,255,255,.08); border-radius: 18px; background: #242428; color: #e5e7eb; font: inherit; font-weight: 760; cursor: pointer; text-align: left; }
-      button.primary { background: #bef264; border-color: #bef264; color: #07110d; text-align: center; }
+      button { width: 100%; margin: 7px 0; padding: 13px 14px; border: 1px solid rgba(248,113,113,.14); border-radius: 18px; background: rgba(36,36,40,.92); color: #f4f4f5; font: inherit; font-weight: 760; cursor: pointer; text-align: left; box-shadow: 0 10px 26px rgba(0,0,0,.24); }
+      button.primary { background: linear-gradient(180deg, #dc2626, #991b1b); border-color: rgba(248,113,113,.28); color: #fff7f7; text-align: center; box-shadow: 0 12px 32px rgba(127,29,29,.34); }
       button:hover { filter: brightness(1.06); }
       button:disabled { opacity: .55; cursor: wait; }
       .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
       .grid button { text-align: center; margin: 0; padding: 12px 10px; }
       .card { border: 1px solid rgba(255,255,255,.08); border-radius: 20px; padding: 13px; margin: 12px 0; background: #111114; }
       .card strong { display: block; margin-bottom: 8px; color: #e5e7eb; letter-spacing: -.01em; }
-      #status { color: #bef264; font-size: 12px; min-height: 18px; }
+      #status { color: #fca5a5; font-size: 12px; min-height: 18px; }
       pre { white-space: pre-wrap; margin: 0; font-size: 12px; color: #d4d4d8; }
       details { margin-top: 12px; border: 1px solid rgba(255,255,255,.08); border-radius: 18px; background: #0d0d10; padding: 11px 12px; }
       summary { cursor: pointer; color: #a1a1aa; font-size: 12px; font-weight: 800; }
-      #output { margin-top: 10px; max-height: 260px; overflow: auto; color: #a7f3d0; font-size: 11px; }
+      #output { margin-top: 10px; max-height: 260px; overflow: auto; color: #fecaca; font-size: 11px; }
     </style>
   </head>
   <body>
     <main class="shell">
       <section class="hero">
         <img src="assets/faust-logo.png" alt="Faust logo" />
-        <h1>Faust Bridge</h1>
-        <p>Scan a product, review the numbers, then create marketplace drafts.</p>
+        <h1>Faust</h1>
+        <p>Import a source product and continue the review in Faust.</p>
       </section>
       <section class="content">
-        <p class="section-title">Product</p>
-        <button id="scan-button" class="primary">Scan product</button>
+        <p class="section-title">Source product</p>
         <button id="import-button" class="primary">Import to Faust</button>
+        <button id="scan-button">Preview scan only</button>
 
         <div class="card">
           <strong>Review</strong>

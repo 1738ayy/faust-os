@@ -36,6 +36,17 @@ test("extension parser and profitability calculate landed economics", () => {
   assert.ok(analysis.byMarketplace.find((entry) => entry.marketplace === "Depop")?.expectedProfit);
 });
 
+test("extension scan intake persists the latest source scan for the web analyzer", () => {
+  const data = fixture();
+  const result = applyExtensionAction(data, { action: "scan-intake", payload: sourceProduct }) as { product: typeof sourceProduct };
+  assert.equal(result.product.title, sourceProduct.title);
+  const latestScan = data.extensionArtifacts?.find((artifact) => artifact.metadata.kind === "latest_source_scan");
+  assert.ok(latestScan);
+  assert.deepEqual(latestScan.metadata.product, result.product);
+  assert.ok(data.activity.some((entry) => entry.action === "Extension product scanned"));
+  assert.ok(data.extensionActionAudits?.some((entry) => entry.action === "scan-intake" && entry.status === "succeeded"));
+});
+
 test("extension import is approved, idempotent, and creates five channel drafts", () => {
   const data = fixture();
   assert.throws(() => applyExtensionAction(data, { action: "import-product", product: sourceProduct, approved: false }), /approved/);
@@ -61,6 +72,39 @@ test("extension import is approved, idempotent, and creates five channel drafts"
   assert.equal(new Set(data.outboxEvents?.map((event) => event.idempotencyKey)).size, 5);
   assert.ok(data.outboxEvents?.every((event) => /^[0-9a-f-]{36}$/.test(event.idempotencyKey || "")));
   assert.equal(data.products.length, 1);
+});
+
+test("extension import preserves every scanned color row as a Faust SKU variant", () => {
+  const data = fixture();
+  const scanned = {
+    ...sourceProduct,
+    title: "Xijia Saturn chain necklace",
+    superbuyUrl: "https://detail.1688.com/offer/982693242069.html",
+    variantOptions: {
+      colors: [
+        "Copper inlaid zirconia pin necklace silver (high version + original buckle)",
+        "Copper zirconia pin necklace gold (high version + original buckle)",
+        "Alloy pin bracelet in gold",
+      ],
+    },
+    variants: [
+      { id: "variant-0", name: "Copper inlaid zirconia pin necklace silver (high version + original buckle)", options: ["Copper inlaid zirconia pin necklace silver (high version + original buckle)"], price: 1.59, stock: 3741 },
+      { id: "variant-1", name: "Copper zirconia pin necklace gold (high version + original buckle)", options: ["Copper zirconia pin necklace gold (high version + original buckle)"], price: 1.59, stock: 9568 },
+      { id: "variant-2", name: "Alloy pin bracelet in gold", options: ["Alloy pin bracelet in gold"], price: 0.63, stock: 9892 },
+    ],
+    price: 0.63,
+    priceRange: { min: 0.63, max: 1.59 },
+    weight: "10g",
+  };
+  const result = importExtensionProduct(data, scanned, { rmbUsdRate: 0.14, quantity: 1 }, "scan-import-all-variants");
+  assert.equal(result.idempotent, false);
+  assert.equal(data.products.length, 1);
+  assert.equal(data.variants.length, 3);
+  assert.equal(data.variants.map((variant) => variant.title).join("|"), scanned.variants.map((variant) => variant.name).join("|"));
+  assert.equal(data.channelListingDrafts?.length, 15);
+  assert.equal(result.drafts.length, 15);
+  assert.ok(data.variants.every((variant) => variant.sku.startsWith("FST-")));
+  assert.ok(data.activity.some((entry) => entry.detail.includes("3 scanned variant")));
 });
 
 test("extension import creates marketplace-safe draft titles for long 1688 products", () => {
@@ -130,12 +174,23 @@ test("extension side panel exposes safe fill without publishing", () => {
   const html = readFileSync(join(process.cwd(), "extension", "sidepanel.html"), "utf8");
   const script = readFileSync(join(process.cwd(), "extension", "sidepanel.js"), "utf8");
   assert.match(html, /Fill form/);
+  assert.match(html, /Import to Faust/);
   assert.match(script, /FAUST_GUIDED_PUBLISH/);
+  assert.match(script, /FAUST_IMPORT_TO_ANALYZER/);
   assert.match(script, /guidedPublish\(false\)/);
   assert.doesNotMatch(script, /FAUST_CONFIRM_PUBLISH/);
   assert.doesNotMatch(script, /\.submit\(/);
   assert.doesNotMatch(script, /\.click\(/);
   assert.match(script, /Number\(draft\.quantity\) > 0/);
+});
+
+test("extension import opens the web analyzer instead of leaving the user in the extension", () => {
+  const script = readFileSync(join(process.cwd(), "extension", "background.js"), "utf8");
+  assert.match(script, /FAUST_IMPORT_TO_ANALYZER/);
+  assert.match(script, /\/api\/extension\/scan/);
+  assert.match(script, /\/api\/extension\/analyze/);
+  assert.match(script, /opportunity-analyzer\?source=extension-import/);
+  assert.match(script, /chrome\.tabs\.create/);
 });
 
 test("extension marketplace filler avoids pretending complex controls are filled", () => {

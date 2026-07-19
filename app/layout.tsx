@@ -10,6 +10,10 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Faust OS",
   description: "Business Operating System",
+  icons: {
+    icon: "/icon.png",
+    apple: "/icon.png",
+  },
 };
 
 export default function RootLayout({

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -50,5 +51,46 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" | "forgot-passw
     }
   }
 
-  return <main className="grid min-h-screen place-items-center bg-background p-5"><form onSubmit={submit} className="w-full max-w-md border border-border bg-card p-7"><p className="text-xs uppercase tracking-[0.2em] text-emerald-400">Faust OS</p><h1 className="mt-2 text-2xl font-semibold">{title}</h1><p className="mt-2 text-sm text-muted-foreground">Secure, refreshable Supabase session access.</p><label className="mt-6 block text-sm">Email<input required type="email" value={email} onChange={(event) => setEmail(event.target.value)} className="mt-2 w-full border border-border bg-background px-3 py-2" /></label>{mode !== "forgot-password" && <label className="mt-4 block text-sm">Password<input required minLength={8} type="password" value={password} onChange={(event) => setPassword(event.target.value)} className="mt-2 w-full border border-border bg-background px-3 py-2" /></label>}<button disabled={busy} className="mt-6 w-full bg-emerald-500 px-4 py-2 text-sm font-semibold text-zinc-950 disabled:opacity-50">{busy ? "Working…" : mode === "sign-in" ? "Sign in" : mode === "sign-up" ? "Create account" : "Send reset email"}</button>{message && <p className="mt-4 text-sm text-muted-foreground">{message}</p>}<div className="mt-5 flex justify-between text-xs text-emerald-400">{mode !== "sign-in" ? <Link href="/sign-in">Sign in</Link> : <Link href="/sign-up">Create account</Link>}<Link href="/forgot-password">Reset password</Link></div></form></main>;
+  return (
+    <main className="grid min-h-screen place-items-center bg-background p-5">
+      <form onSubmit={submit} className="faust-surface w-full max-w-md p-7">
+        <div className="flex flex-col items-center text-center">
+          <Image
+            alt="Faust OS logo"
+            src="/brand/faust-logo.png"
+            width={112}
+            height={112}
+            priority
+            className="h-28 w-28 rounded-[2rem] border border-red-500/20 object-contain p-1 shadow-2xl shadow-red-950/40"
+          />
+          <p className="mt-4 text-xs font-medium uppercase tracking-[0.2em] text-red-300">Faust OS</p>
+          <h1 className="mt-3 text-2xl font-semibold">{title}</h1>
+          <p className="mt-3 text-sm leading-6 text-muted-foreground">Secure, refreshable Supabase session access.</p>
+        </div>
+
+        <label className="mt-6 block text-sm">
+          Email
+          <input required type="email" value={email} onChange={(event) => setEmail(event.target.value)} className="faust-field faust-focus mt-2 w-full px-3 py-2" />
+        </label>
+
+        {mode !== "forgot-password" && (
+          <label className="mt-4 block text-sm">
+            Password
+            <input required minLength={8} type="password" value={password} onChange={(event) => setPassword(event.target.value)} className="faust-field faust-focus mt-2 w-full px-3 py-2" />
+          </label>
+        )}
+
+        <button disabled={busy} className="mt-6 w-full rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-red-950/30 transition hover:bg-red-500 disabled:opacity-50">
+          {busy ? "Working..." : mode === "sign-in" ? "Sign in" : mode === "sign-up" ? "Create account" : "Send reset email"}
+        </button>
+
+        {message && <p className="mt-4 text-sm text-muted-foreground">{message}</p>}
+
+        <div className="mt-5 flex justify-between text-xs font-medium text-red-300">
+          {mode !== "sign-in" ? <Link href="/sign-in">Sign in</Link> : <Link href="/sign-up">Create account</Link>}
+          <Link href="/forgot-password">Reset password</Link>
+        </div>
+      </form>
+    </main>
+  );
 }

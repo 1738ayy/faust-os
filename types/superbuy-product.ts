@@ -31,6 +31,7 @@ export type SuperbuyProduct = {
   pageTimestamp?: string;
   priceRange?: { min: number; max: number };
   images: string[];
+  variantOptions?: { colors?: string[]; sizes?: string[] };
   variants: SuperbuyVariant[];
   storeStats?: StoreStats;
 };

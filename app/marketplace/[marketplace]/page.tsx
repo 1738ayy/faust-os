@@ -1,7 +1,37 @@
 import { notFound } from "next/navigation";
-import { Store } from "lucide-react";
 import { AppLayout } from "@/components/navigation/app-layout";
+import { EmptyState, PageHeader, StatusBadge } from "@/components/faust/design-system";
 import { getMarketplace } from "@/lib/marketplaces";
 import { getOpportunities } from "@/services/opportunities/local-opportunity-store";
+
 const valid = ["depop", "mercari", "poshmark", "ebay", "etsy"] as const;
-export default async function MarketplacePage({ params }: { params: Promise<{ marketplace: string }> }) { const { marketplace: id } = await params; if (!valid.includes(id as typeof valid[number])) notFound(); const marketplace = getMarketplace(id as typeof valid[number]); const listings = (await getOpportunities()).filter((opportunity) => opportunity.listing.marketplaceId === id); return <AppLayout><div className="space-y-6"><div><h1 className="text-3xl font-bold">{marketplace.name}</h1><p className="mt-2 text-muted-foreground">Listings and opportunity drafts targeted for {marketplace.name}.</p></div><div className="rounded-xl border border-border bg-card">{listings.length === 0 ? <div className="p-12 text-center"><Store className="mx-auto h-10 w-10 text-violet-400" /><h2 className="mt-4 text-lg font-semibold">No {marketplace.name} listings yet</h2><p className="mt-2 text-sm text-muted-foreground">Choose {marketplace.name} while saving an opportunity to add it here.</p></div> : listings.map((listing) => <div key={listing.id} className="flex items-center justify-between border-b border-border px-6 py-5 last:border-0"><div><p className="font-medium">{listing.product.name}</p><p className="mt-1 text-sm text-muted-foreground">{listing.listing.status}</p></div><p className="font-semibold">${listing.salePrice.toFixed(2)}</p></div>)}</div></div></AppLayout>; }
+
+export default async function MarketplacePage({ params }: { params: Promise<{ marketplace: string }> }) {
+  const { marketplace: id } = await params;
+  if (!valid.includes(id as typeof valid[number])) notFound();
+  const marketplace = getMarketplace(id as typeof valid[number]);
+  const listings = (await getOpportunities()).filter((opportunity) => opportunity.listing.marketplaceId === id);
+
+  return (
+    <AppLayout>
+      <div className="space-y-6">
+        <PageHeader eyebrow="Marketplace" title={marketplace.name} description={`Listings and opportunity drafts targeted for ${marketplace.name}.`} />
+        {listings.length === 0 ? (
+          <EmptyState title={`No ${marketplace.name} listings yet`} description={`Choose ${marketplace.name} while saving an opportunity to add it here.`} action={{ label: "Create opportunity", href: "/opportunity-analyzer" }} />
+        ) : (
+          <section className="faust-surface overflow-hidden">
+            {listings.map((listing) => (
+              <div key={listing.id} className="flex items-center justify-between gap-4 border-b border-red-950/35 px-6 py-5 last:border-0">
+                <div>
+                  <p className="font-medium">{listing.product.name}</p>
+                  <div className="mt-2"><StatusBadge value={listing.listing.status} /></div>
+                </div>
+                <p className="text-lg font-semibold tabular-nums">${listing.salePrice.toFixed(2)}</p>
+              </div>
+            ))}
+          </section>
+        )}
+      </div>
+    </AppLayout>
+  );
+}

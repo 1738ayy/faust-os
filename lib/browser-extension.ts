@@ -144,8 +144,27 @@ function supplierName(product: SuperbuyProduct) {
   return product.storeName || product.factoryName || product.supplier || "Extension supplier";
 }
 
-function physicalSku(product: SuperbuyProduct) {
-  return `FST-${supplierName(product).slice(0, 3).replace(/[^a-z0-9]/gi, "").toUpperCase() || "SRC"}-${Math.abs([...product.superbuyUrl].reduce((sum, char) => sum + char.charCodeAt(0), 0)).toString(36).toUpperCase()}`;
+function physicalSku(product: SuperbuyProduct, suffix?: string) {
+  const cleanSuffix = suffix?.slice(0, 18).replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toUpperCase();
+  const source = `${product.superbuyUrl}:${suffix || ""}`;
+  return `FST-${supplierName(product).slice(0, 3).replace(/[^a-z0-9]/gi, "").toUpperCase() || "SRC"}-${Math.abs([...source].reduce((sum, char) => sum + char.charCodeAt(0), 0)).toString(36).toUpperCase()}${cleanSuffix ? `-${cleanSuffix}` : ""}`;
+}
+
+function scannedVariants(product: SuperbuyProduct) {
+  return product.variants.length ? product.variants : [{ id: "default", name: "Default variant", options: [], price: product.price, stock: product.stock }];
+}
+
+function variantLandedUnitCost(product: SuperbuyProduct, analysis: ReturnType<typeof analyzeExtensionProduct>, variantPrice?: number) {
+  if (!variantPrice || variantPrice === product.price || variantPrice === product.priceRange?.min) return analysis.landedUnitCost;
+  const purchaseCostUsd = Math.round(variantPrice * analysis.assumptions.rmbUsdRate * 100) / 100;
+  const dutyCustomsUsd = Math.round((purchaseCostUsd * analysis.assumptions.dutyRate + analysis.assumptions.customsFlatUsd) * 100) / 100;
+  return Math.round((purchaseCostUsd + analysis.domesticFreightUsd + analysis.internationalFreightUsd + dutyCustomsUsd) * 100) / 100;
+}
+
+function targetPriceForLandedCost(landedUnitCost: number, analysis: ReturnType<typeof analyzeExtensionProduct>) {
+  const current = analysis.byMarketplace[0]?.targetSalePrice;
+  if (current && analysis.landedUnitCost) return Math.round(Math.max(landedUnitCost * (current / analysis.landedUnitCost), landedUnitCost + 25) * 100) / 100;
+  return Math.round(Math.max(landedUnitCost * 2.7, landedUnitCost + 25) * 100) / 100;
 }
 
 export function importExtensionProduct(data: OperatingData, input: unknown, assumptions: Partial<ProfitabilityAssumptions> = {}, idempotencyKey?: string) {
@@ -153,33 +172,40 @@ export function importExtensionProduct(data: OperatingData, input: unknown, assu
   const product = analysis.product;
   const existing = data.products.find((entry) => entry.sourceUrl === product.superbuyUrl);
   if (existing) {
-    const variant = data.variants.find((entry) => entry.productId === existing.id);
-    if (variant) {
+    const variants = data.variants.filter((entry) => entry.productId === existing.id);
+    if (variants.length) {
       seedMarketplaceAccountsAndTemplates(data);
-      createFiveChannelDrafts(data, { variantId: variant.id, physicalSku: variant.sku, basePrice: variant.defaultSalePrice, imageUrls: product.images, idempotencyKey });
+      for (const variant of variants) createFiveChannelDrafts(data, { variantId: variant.id, physicalSku: variant.sku, basePrice: variant.defaultSalePrice, imageUrls: product.images, idempotencyKey: `${idempotencyKey || product.superbuyUrl}:${variant.id}` });
     }
-    return { analysis, productId: existing.id, variantId: variant?.id, idempotent: true, drafts: data.channelListingDrafts?.filter((draft) => draft.variantId === variant?.id) || [] };
+    const variantIds = variants.map((variant) => variant.id);
+    return { analysis, productId: existing.id, variantId: variants[0]?.id, variantIds, idempotent: true, drafts: data.channelListingDrafts?.filter((draft) => variantIds.includes(draft.variantId)) || [] };
   }
   const createdAt = now();
   let supplier: Supplier | undefined = data.suppliers.find((entry) => entry.name.toLowerCase() === supplierName(product).toLowerCase());
   if (!supplier) { supplier = { id: id(), name: supplierName(product), contact: product.supplier, sourcePlatform: product.source, leadDays: 12, rating: product.sellerRating, status: "active", notes: `Created by Faust extension from ${product.superbuyUrl}` }; data.suppliers.push(supplier); }
   const catalogProduct: Product = { id: id(), title: product.title, category: product.category || "Imported source product", tags: ["extension-import", product.source], supplierId: supplier.id, sourceUrl: product.superbuyUrl, image: product.images[0], status: "draft", createdAt, updatedAt: createdAt };
   data.products.push(catalogProduct);
-  const sku = physicalSku(product);
-  const variant: Variant = { id: id(), productId: catalogProduct.id, sku, title: product.variants[0]?.name || "Default variant", condition: "New with tags", landedUnitCost: analysis.landedUnitCost, defaultSalePrice: analysis.byMarketplace[0]?.targetSalePrice || analysis.landedUnitCost * 3, weightOz: Math.round(weightKg(product) * 35.274 * 10) / 10, reorderPoint: Math.max(1, Math.min(5, product.minimumOrderQuantity || 2)), reorderQuantity: Math.max(product.minimumOrderQuantity || 1, analysis.quantity), active: true };
-  data.variants.push(variant);
-  data.balances.push({ id: id(), variantId: variant.id, onHand: 0, reserved: 0, incoming: analysis.quantity, damaged: 0, returned: 0, lost: 0, quarantined: 0 });
+  const createdVariants: Variant[] = [];
+  for (const scannedVariant of scannedVariants(product)) {
+    const landedUnitCost = variantLandedUnitCost(product, analysis, scannedVariant.price);
+    const sku = physicalSku(product, scannedVariant.name);
+    const variant: Variant = { id: id(), productId: catalogProduct.id, sku, title: scannedVariant.name || "Default variant", condition: "New with tags", landedUnitCost, defaultSalePrice: targetPriceForLandedCost(landedUnitCost, analysis), weightOz: Math.round(weightKg(product) * 35.274 * 10) / 10, reorderPoint: Math.max(1, Math.min(5, product.minimumOrderQuantity || 2)), reorderQuantity: Math.max(product.minimumOrderQuantity || 1, analysis.quantity), active: true };
+    data.variants.push(variant);
+    data.balances.push({ id: id(), variantId: variant.id, onHand: 0, reserved: 0, incoming: analysis.quantity, damaged: 0, returned: 0, lost: 0, quarantined: 0 });
+    createdVariants.push(variant);
+  }
   data.purchaseBatches ||= [];
   data.landedCostComponents ||= [];
   const batchId = id();
-  data.purchaseBatches.push({ id: batchId, supplierId: supplier.id, reference: `EXT-DRAFT-${sku}`, currency: product.source === "1688" ? "RMB" : "USD", status: "draft", itemCount: analysis.quantity, subtotalOriginal: product.price || 0, subtotalUsd: analysis.purchaseCostUsd * analysis.quantity, landedCostUsd: (analysis.domesticFreightUsd + analysis.internationalFreightUsd + analysis.dutyCustomsUsd) * analysis.quantity, totalCostUsd: analysis.cashCommitment, receivedAt: createdAt, idempotencyKey, createdAt, updatedAt: createdAt });
+  data.purchaseBatches.push({ id: batchId, supplierId: supplier.id, reference: `EXT-DRAFT-${createdVariants[0].sku}`, currency: product.source === "1688" ? "RMB" : "USD", status: "draft", itemCount: analysis.quantity * createdVariants.length, subtotalOriginal: product.price || 0, subtotalUsd: analysis.purchaseCostUsd * analysis.quantity, landedCostUsd: (analysis.domesticFreightUsd + analysis.internationalFreightUsd + analysis.dutyCustomsUsd) * analysis.quantity, totalCostUsd: analysis.cashCommitment, receivedAt: createdAt, idempotencyKey, createdAt, updatedAt: createdAt });
   data.landedCostComponents.push({ id: id(), batchId, type: "product", description: "Extension source product estimate", amountOriginal: product.price || 0, currency: product.source === "1688" ? "RMB" : "USD", amountUsd: analysis.purchaseCostUsd, allocationMethod: "by_quantity", linkedObjectType: "manual", linkedObjectId: catalogProduct.id, createdAt });
   seedMarketplaceAccountsAndTemplates(data);
-  createFiveChannelDrafts(data, { variantId: variant.id, physicalSku: sku, basePrice: variant.defaultSalePrice, imageUrls: product.images, idempotencyKey });
-  const drafts = data.channelListingDrafts?.filter((draft) => draft.variantId === variant.id) || [];
-  audit(data, "Extension product imported", "product", catalogProduct.id, `${product.title} imported with ${drafts.length} channel drafts. Cash commitment ${money(analysis.cashCommitment)}.`);
-  data.notices.unshift({ id: id(), severity: "info", title: "Extension import ready", detail: `${product.title} created ${drafts.length} marketplace drafts.`, actionLabel: "Open listings", href: "/listings", createdAt, category: "system", entityType: "product", entityId: catalogProduct.id, read: false });
-  return { analysis, productId: catalogProduct.id, variantId: variant.id, idempotent: false, drafts };
+  for (const variant of createdVariants) createFiveChannelDrafts(data, { variantId: variant.id, physicalSku: variant.sku, basePrice: variant.defaultSalePrice, imageUrls: product.images, idempotencyKey: `${idempotencyKey || product.superbuyUrl}:${variant.id}` });
+  const variantIds = createdVariants.map((variant) => variant.id);
+  const drafts = data.channelListingDrafts?.filter((draft) => variantIds.includes(draft.variantId)) || [];
+  audit(data, "Extension product imported", "product", catalogProduct.id, `${product.title} imported with ${createdVariants.length} scanned variant(s) and ${drafts.length} channel drafts. Cash commitment ${money(analysis.cashCommitment)}.`);
+  data.notices.unshift({ id: id(), severity: "info", title: "Extension import ready", detail: `${product.title} created ${createdVariants.length} SKU variant(s) and ${drafts.length} marketplace drafts.`, actionLabel: "Open listings", href: "/listings", createdAt, category: "system", entityType: "product", entityId: catalogProduct.id, read: false });
+  return { analysis, productId: catalogProduct.id, variantId: createdVariants[0].id, variantIds, idempotent: false, drafts };
 }
 
 export function createExtensionPublishJob(data: OperatingData, draftId: string, idempotencyKey?: string) {
@@ -236,7 +262,13 @@ export function applyExtensionAction(data: OperatingData, input: ExtensionAction
   ensureExtensionCollections(data);
   if (input.action === "register-device") return registerExtensionDevice(data, input);
   if (input.action === "revoke-device") return revokeExtensionDevice(data, input);
-  if (input.action === "scan-intake") return { product: parseSuperbuyProduct(input.payload), extensionVersion };
+  if (input.action === "scan-intake") {
+    const product = parseSuperbuyProduct(input.payload);
+    const artifact = persistArtifact(data, { type: "log", metadata: { kind: "latest_source_scan", product } }, { type: "log" });
+    audit(data, "Extension product scanned", "extension_scan", artifact?.id || product.superbuyUrl, `${product.title} scanned from ${product.source}.`);
+    actionAudit(data, "scan-intake", "succeeded", `${product.title} captured for Opportunity Analyzer.`, { artifactIds: artifact ? [artifact.id] : [] });
+    return { product, extensionVersion };
+  }
   if (input.action === "analyze") return analyzeExtensionProduct(input.product, input.assumptions);
   if (input.action === "import-product") { if (!input.approved) throw new Error("Import must be approved from the extension review screen."); return importExtensionProduct(data, input.product, input.assumptions, input.idempotencyKey); }
   if (input.action === "create-publish-job") return createExtensionPublishJob(data, input.draftId, input.idempotencyKey);

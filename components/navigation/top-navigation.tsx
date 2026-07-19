@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -43,7 +43,7 @@ export function TopNavigation() {
         <div className="min-w-0">
           <h1 className="font-heading truncate text-base font-semibold">{title}</h1>
           <p className="hidden text-xs text-zinc-500 sm:block">
-            Business workspace · {environmentLabel()}
+            Business workspace / {environmentLabel()}
           </p>
         </div>
       </div>
@@ -55,7 +55,7 @@ export function TopNavigation() {
         <Link href="/tasks" aria-label="Open notifications" className="rounded-full border border-red-950/60 bg-zinc-950/50 p-2 text-zinc-300 transition hover:border-red-500/50 hover:text-white">
           <Bell size={15} />
         </Link>
-        <Link href="/sourcing" className="inline-flex items-center gap-1.5 rounded-full bg-red-600 px-3 py-2 text-xs font-semibold text-white shadow-lg shadow-red-950/30 transition hover:bg-red-500">
+        <Link href="/sourcing" className="faust-action px-3 py-2 text-xs">
           <Plus size={15} />
           Import
         </Link>

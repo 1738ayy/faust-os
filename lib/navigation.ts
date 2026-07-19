@@ -1,6 +1,6 @@
 import {
   LayoutDashboard,
-  Search, Package, DollarSign, BrainCircuit, Truck, Settings, Store, ShoppingBag, Tags, Factory, Users, Bot, ListTodo, Workflow, ClipboardList, Boxes,
+  Search, Package, DollarSign, BrainCircuit, Truck, Settings, Store, ShoppingBag, Tags, Factory, BarChart3, Bot, Workflow, ClipboardList, Boxes,
 } from "lucide-react";
 
 export const primaryNavigation = [
@@ -31,13 +31,16 @@ export const primaryNavigation = [
 
 export const systemNavigation = [
   { title: "Suppliers", href: "/suppliers", icon: Factory },
-  { title: "Customers", href: "/customers", icon: Users },
   { title: "Automations", href: "/automations", icon: Workflow },
-  { title: "Tasks", href: "/tasks", icon: ListTodo },
-  { title: "Global Search", href: "/search", icon: Search },
+  { title: "Reports", href: "/analytics", icon: BarChart3 },
   { title: "Settings", href: "/settings", icon: Settings },
-  /* Legacy paths are kept in place for existing saved links. */
-  { title: "Opportunity Analyzer", href: "/opportunity-analyzer", icon: Search },
+];
+
+export const utilityNavigation = [
+  { title: "Customers", href: "/customers" },
+  { title: "Tasks", href: "/tasks" },
+  { title: "Search", href: "/search" },
+  { title: "Opportunity Analyzer", href: "/opportunity-analyzer" },
 ];
 
 export const marketplaces = [

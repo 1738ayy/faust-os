@@ -38,29 +38,29 @@ function SourceDataReview() {
             Review this before saving. Faust should not pretend a source scan is clean if Superbuy/1688 gave us modal text, missing weight, weak supplier data, or no usable variant rows.
           </p>
         </div>
-        <span className={`rounded-full px-3 py-1 text-xs font-semibold ${missing.length ? "bg-amber-400/10 text-amber-200" : "bg-emerald-400/10 text-emerald-200"}`}>
+        <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${missing.length ? "border-amber-500/25 bg-amber-400/10 text-amber-200" : "border-red-500/25 bg-red-500/10 text-red-100"}`}>
           {missing.length ? `${missing.length} field${missing.length === 1 ? "" : "s"} need review` : "Ready to analyze"}
         </span>
       </div>
       <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         {checks.map(([label, value]) => (
-          <div key={label} className="rounded-2xl border border-border bg-background/45 p-4">
-            <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
+          <div key={label} className="faust-card p-4">
+            <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
             <p className="mt-2 truncate text-sm font-medium">{value || "Needs review"}</p>
           </div>
         ))}
       </div>
       <div className="mt-4 grid gap-3 lg:grid-cols-3">
-        <div className="rounded-2xl border border-border bg-background/45 p-4">
-          <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Original source</p>
-          <a className="mt-2 block truncate text-sm font-medium text-emerald-300" href={product.sourcing.original1688Url || product.sourcing.superbuyUrl}>{source.original1688Url || source.superbuyUrl}</a>
+        <div className="faust-card p-4">
+          <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Original source</p>
+          <a className="mt-2 block truncate text-sm font-medium text-red-200" href={product.sourcing.original1688Url || product.sourcing.superbuyUrl}>{source.original1688Url || source.superbuyUrl}</a>
         </div>
-        <div className="rounded-2xl border border-border bg-background/45 p-4">
-          <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Stock / MOQ</p>
+        <div className="faust-card p-4">
+          <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Stock / MOQ</p>
           <p className="mt-2 text-sm font-medium">{product.sourcing.stock ?? "unknown"} units · MOQ {product.sourcing.minimumOrderQuantity ?? "unknown"}</p>
         </div>
-        <div className="rounded-2xl border border-border bg-background/45 p-4">
-          <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Extension note</p>
+        <div className="faust-card p-4">
+          <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Extension note</p>
           <p className="mt-2 text-sm text-muted-foreground">{source.notes || "No scanner note was provided."}</p>
         </div>
       </div>

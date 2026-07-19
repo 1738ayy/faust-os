@@ -1,22 +1,11 @@
 export function TopNavigation() {
   return (
-    <header className="mb-8 flex items-center justify-between border-b border-zinc-800 pb-6">
+    <header className="mb-8 flex items-center justify-between border-b border-red-950/50 pb-6">
       <div>
-        <h1 className="text-3xl font-bold">Dashboard</h1>
-        <p className="mt-1 text-zinc-400">
-          Welcome back, Henrry.
-        </p>
+        <h2 className="font-heading text-xl font-semibold">Mission Control</h2>
+        <p className="text-sm text-muted-foreground">One operating language for Faust.</p>
       </div>
-
-      <div className="flex items-center gap-4">
-        <button className="rounded-lg border border-zinc-700 px-3 py-2 hover:bg-zinc-800">
-          🔔
-        </button>
-
-        <div className="rounded-lg border border-zinc-700 px-4 py-2">
-          Henrry
-        </div>
-      </div>
+      <button className="faust-secondary-action">Search</button>
     </header>
   );
 }

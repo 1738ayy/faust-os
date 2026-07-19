@@ -32,6 +32,14 @@ function asVariants(value: unknown): SuperbuyVariant[] {
   });
 }
 
+function asVariantOptions(value: unknown): SuperbuyProduct["variantOptions"] {
+  if (!value || typeof value !== "object") return undefined;
+  const input = value as Record<string, unknown>;
+  const colors = Array.isArray(input.colors) ? input.colors.filter((option): option is string => typeof option === "string" && option.trim().length > 0) : undefined;
+  const sizes = Array.isArray(input.sizes) ? input.sizes.filter((option): option is string => typeof option === "string" && option.trim().length > 0) : undefined;
+  return colors?.length || sizes?.length ? { colors, sizes } : undefined;
+}
+
 /** Converts untrusted extension data into the one import model used by Faust. */
 export function parseSuperbuyProduct(value: unknown): SuperbuyProduct {
   if (!value || typeof value !== "object") throw new Error("Import payload must be an object.");
@@ -79,6 +87,7 @@ export function parseSuperbuyProduct(value: unknown): SuperbuyProduct {
     pageTimestamp: asText(input.pageTimestamp),
     priceRange: min !== undefined && max !== undefined ? { min, max } : undefined,
     images: asImages(input.images),
+    variantOptions: asVariantOptions(input.variantOptions),
     variants: asVariants(input.variants),
   };
 }

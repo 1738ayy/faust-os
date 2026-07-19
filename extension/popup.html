@@ -10,37 +10,39 @@
         margin: 0;
         padding: 14px;
         background:
-          radial-gradient(circle at top right, rgba(190, 242, 100, .2), transparent 180px),
+          radial-gradient(circle at top right, rgba(185, 28, 28, .34), transparent 185px),
+          radial-gradient(circle at bottom left, rgba(127, 29, 29, .2), transparent 220px),
           linear-gradient(180deg, #151518, #09090b);
         color: #f8fafc;
         font: 14px/1.45 Aptos, Inter, "SF Pro Text", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
       }
-      .shell { border: 1px solid rgba(255,255,255,.09); border-radius: 26px; background: rgba(19,19,22,.88); overflow: hidden; box-shadow: 0 22px 60px rgba(0,0,0,.38); }
+      .shell { border: 1px solid rgba(248,113,113,.16); border-radius: 26px; background: rgba(19,19,22,.9); overflow: hidden; box-shadow: 0 24px 70px rgba(0,0,0,.46), 0 0 42px rgba(127,29,29,.2); }
       .hero { padding: 22px 18px 18px; text-align: center; border-bottom: 1px solid rgba(255,255,255,.08); }
-      .hero img { display: block; width: 88px; height: 88px; margin: 0 auto 14px; border-radius: 28px; object-fit: cover; border: 1px solid rgba(255,255,255,.12); box-shadow: 0 0 36px rgba(190,242,100,.18); }
+      .hero img { display: block; width: 96px; height: 96px; margin: 0 auto 14px; padding: 5px; border-radius: 28px; object-fit: contain; object-position: center; border: 1px solid rgba(248,113,113,.18); background: rgba(9,9,11,.38); box-shadow: 0 16px 42px rgba(0,0,0,.38), 0 0 34px rgba(185,28,28,.26); }
       h1 { margin: 0; font-size: 24px; letter-spacing: -.04em; }
       p { margin: 7px 0 0; color: #a1a1aa; }
       .content { padding: 14px; }
-      button { width: 100%; border: 0; border-radius: 18px; padding: 13px 14px; color: #07110d; background: #bef264; font: inherit; font-weight: 800; cursor: pointer; margin-top: 9px; }
-      button.secondary { color: #e5e7eb; background: #242428; border: 1px solid rgba(255,255,255,.08); }
+      button { width: 100%; border: 0; border-radius: 18px; padding: 13px 14px; color: #fff7f7; background: linear-gradient(180deg, #dc2626, #991b1b); font: inherit; font-weight: 800; cursor: pointer; margin-top: 9px; box-shadow: 0 12px 30px rgba(127,29,29,.32); }
+      button.secondary { color: #f4f4f5; background: rgba(36,36,40,.92); border: 1px solid rgba(248,113,113,.14); box-shadow: 0 10px 26px rgba(0,0,0,.24); }
+      button:hover { filter: brightness(1.08); }
       button:disabled { opacity: .55; cursor: wait; }
-      #status { min-height: 20px; margin: 12px 2px 0; color: #bef264; font-size: 12px; }
+      #status { min-height: 20px; margin: 12px 2px 0; color: #fca5a5; font-size: 12px; }
       #summary { margin: 10px 0 0; white-space: pre-wrap; color: #d4d4d8; font-size: 12px; }
       details { margin-top: 12px; border: 1px solid rgba(255,255,255,.08); border-radius: 16px; background: #101014; padding: 10px 12px; }
       summary { cursor: pointer; color: #a1a1aa; font-size: 12px; font-weight: 700; }
-      pre { white-space: pre-wrap; max-height: 180px; overflow: auto; color: #a7f3d0; font-size: 11px; }
+      pre { white-space: pre-wrap; max-height: 180px; overflow: auto; color: #fecaca; font-size: 11px; }
     </style>
   </head>
   <body>
     <main class="shell">
       <section class="hero">
         <img src="assets/faust-logo.png" alt="Faust logo" />
-        <h1>Faust Bridge</h1>
-        <p>Scan products and send clean drafts to Faust.</p>
+        <h1>Faust</h1>
+        <p>Import a source product and continue the review in Faust.</p>
       </section>
       <section class="content">
-        <button id="scan-product">Scan product</button>
-        <button id="import-product" class="secondary">Import to Faust</button>
+        <button id="import-product">Import to Faust</button>
+        <button id="scan-product" class="secondary">Preview scan only</button>
         <button id="open-options" class="secondary">Settings</button>
         <p id="status" role="status">Ready.</p>
         <pre id="summary"></pre>

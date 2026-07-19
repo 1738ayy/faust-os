@@ -2,11 +2,14 @@ import { NextResponse } from "next/server";
 import { extensionActionSchema } from "@/lib/validation/requests";
 import { extensionConnectionSummary, extensionVersion, hashExtensionToken } from "@/lib/browser-extension";
 import { getOperatingData, mutateBrowserExtension, snapshot } from "@/services/operating-system/repository";
+import { saveLatestImportedProduct } from "@/services/imports/local-product-store";
 import type { ExtensionAction } from "@/lib/browser-extension";
+import type { SuperbuyProduct } from "@/types/superbuy-product";
 
 export const extensionCorsHeaders = {
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, X-Faust-Extension-Version, X-Faust-Device-Id, X-Faust-Extension-Token, X-Faust-Nonce",
+  "Access-Control-Allow-Credentials": "true",
 };
 
 function cors(request?: Request) {
@@ -48,6 +51,13 @@ export async function extensionPost(request: Request, forcedAction?: ExtensionAc
     const data = await getOperatingData();
     const session = validateExtensionSession(data, request, input.action);
     const result = await mutateBrowserExtension(input, session);
+    if (input.action === "scan-intake" && typeof result.actionResult === "object" && result.actionResult && "product" in result.actionResult) {
+      try {
+        await saveLatestImportedProduct((result.actionResult as { product: SuperbuyProduct }).product);
+      } catch {
+        // The operating repository is the durable source in staging/production; this file is only a local analyzer fallback.
+      }
+    }
     return NextResponse.json({ ok: true, extensionVersion, actionResult: result.actionResult, ...snapshot(result.data) }, { headers: cors(request) });
   } catch (error) {
     return NextResponse.json({ ok: false, extensionVersion, message: error instanceof Error ? error.message : "Extension request failed." }, { status: 400, headers: cors(request) });

@@ -19,21 +19,18 @@ function productReview(product, analysis) {
     `${product.title || "Untitled product"}`,
     "",
     `Price: ${money(product.price)}${product.priceRange ? ` (${money(product.priceRange.min)}-${money(product.priceRange.max)})` : ""}`,
+    `Domestic shipping: ${money(product.domesticShipping)}`,
+    `Freight to US: ${money(product.internationalShipping)}${product.internationalShippingEstimateSource ? ` (${product.internationalShippingEstimateSource})` : ""}`,
     `Supplier: ${product.storeName || product.supplier || "Needs review"}`,
     `Category: ${product.category || "Needs review"}`,
     `Stock / MOQ: ${product.stock ?? "unknown"} / ${product.minimumOrderQuantity ?? "unknown"}`,
     `Weight: ${product.weight || product.shippingWeight || "Needs review"}`,
     `Images: ${(product.images || []).length}`,
-    `Variants: ${(product.variants || []).length}`,
+    `Color variants: ${(product.variantOptions?.colors || []).length || (product.variants || []).length}`,
+    `Sizes: ${(product.variantOptions?.sizes || []).length}`,
   ];
-  if (best) rows.push("", `Best estimate: ${best.marketplace} · ${money(best.expectedProfit)} profit · ${Number(best.contributionMargin || 0).toFixed(1)}% margin`);
+  if (best) rows.push("", `Best estimate: ${best.marketplace} - ${money(best.expectedProfit)} profit - ${Number(best.contributionMargin || 0).toFixed(1)}% margin`);
   return rows.join("\n");
-}
-
-function draftReview(response) {
-  const drafts = importDrafts(response);
-  if (!drafts.length) return "No drafts returned yet.";
-  return drafts.map((draft) => `${draft.marketplace}: ${draft.status} · ${draft.publishMode}`).join("\n");
 }
 
 async function guidedPublish(dryRun) {
@@ -81,15 +78,15 @@ document.getElementById("scan-button").addEventListener("click", async () => {
   setStatus("Scanning product...");
   const response = await chrome.runtime.sendMessage({ type: "FAUST_SCAN_PRODUCT" });
   readiness.textContent = response?.ok ? productReview(response.product, response.analysis) : "Scan failed. Open Technical details to inspect the error.";
-  setStatus(response?.ok ? "Product scanned. Review it, then import to Faust." : "Scan failed.");
+  setStatus(response?.ok ? "Preview ready. Use Import to Faust when you want to continue." : "Scan failed.");
   writeDetails(response);
 });
 
 document.getElementById("import-button").addEventListener("click", async () => {
-  setStatus("Creating Faust drafts...");
-  const response = await chrome.runtime.sendMessage({ type: "FAUST_IMPORT_LAST_PRODUCT" });
-  readiness.textContent = response?.ok ? draftReview(response) : "Import failed. Open Technical details to inspect the error.";
-  setStatus(response?.ok ? "Imported. Drafts are ready in Faust." : "Import failed.");
+  setStatus("Importing to Faust...");
+  const response = await chrome.runtime.sendMessage({ type: "FAUST_IMPORT_TO_ANALYZER" });
+  readiness.textContent = response?.ok ? productReview(response.product, response.analysis) : "Import failed. Open Technical details to inspect the error.";
+  setStatus(response?.ok ? "Imported. Continue in Faust to review and create the product." : "Import failed.");
   writeDetails(response);
 });
 

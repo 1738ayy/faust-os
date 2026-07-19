@@ -15,6 +15,9 @@ type OpportunityContextType = {
   analysis: OpportunityAnalysis | null;
   importSuperbuyProduct: (product: SuperbuyProduct) => void;
   updateProduct: (field: "name" | "category" | "description" | "material" | "dimensions" | "weight" | "packageInfo", value: string) => void;
+  updateSupplier: (field: "name" | "storeName" | "storeUrl" | "factoryName", value: string) => void;
+  updateSourceFact: (field: "sourcePrice" | "stock" | "minimumOrderQuantity", value: number | undefined) => void;
+  updateImages: (images: string[]) => void;
   updateCost: (key: CostKey, amount: number) => void;
   updateCostNotes: (key: CostKey, notes: string) => void;
   updateSalePrice: (amount: number) => void;
@@ -42,6 +45,45 @@ export function OpportunityProvider({ children }: { children: ReactNode }) {
       ...current,
       product: { ...current.product, [field]: value },
       listing: field === "name" ? { ...current.listing, title: value } : current.listing,
+    }) : current);
+  }
+
+  function updateSupplier(field: "name" | "storeName" | "storeUrl" | "factoryName", value: string) {
+    setOpportunity((current) => current ? touch({
+      ...current,
+      product: {
+        ...current.product,
+        supplier: { ...current.product.supplier, [field]: value },
+      },
+    }) : current);
+  }
+
+  function updateSourceFact(field: "sourcePrice" | "stock" | "minimumOrderQuantity", value: number | undefined) {
+    setOpportunity((current) => current ? touch({
+      ...current,
+      product: {
+        ...current.product,
+        sourcing: { ...current.product.sourcing, [field]: value },
+        source: {
+          ...current.product.source,
+          price: field === "sourcePrice" ? value : current.product.source.price,
+          stock: field === "stock" ? value : current.product.source.stock,
+          minimumOrderQuantity: field === "minimumOrderQuantity" ? value : current.product.source.minimumOrderQuantity,
+        },
+      },
+      costs: field === "sourcePrice" ? { ...current.costs, product: { ...current.costs.product, amount: value ?? 0 } } : current.costs,
+    }) : current);
+  }
+
+  function updateImages(images: string[]) {
+    const cleanImages = Array.from(new Set(images.map((image) => image.trim()).filter(Boolean)));
+    setOpportunity((current) => current ? touch({
+      ...current,
+      product: {
+        ...current.product,
+        media: { ...current.product.media, images: cleanImages },
+        source: { ...current.product.source, images: cleanImages },
+      },
     }) : current);
   }
 
@@ -80,6 +122,9 @@ export function OpportunityProvider({ children }: { children: ReactNode }) {
       analysis,
       importSuperbuyProduct,
       updateProduct,
+      updateSupplier,
+      updateSourceFact,
+      updateImages,
       updateCost,
       updateCostNotes,
       updateSalePrice,

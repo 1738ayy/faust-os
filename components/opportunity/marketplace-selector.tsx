@@ -18,7 +18,7 @@ export function MarketplaceSelector() {
       <div className="mt-6 rounded-2xl border border-red-950/35 bg-black/25 p-4 text-sm">
         <div className="flex justify-between"><span>Selling fee</span><span>{(marketplace.sellingFeeRate * 100).toFixed(1)}%</span></div>
         <div className="mt-2 flex justify-between"><span>Payment processing</span><span>{(marketplace.paymentFeeRate * 100).toFixed(2)}%</span></div>
-        <div className="mt-4 flex justify-between border-t border-border pt-4 font-medium"><span>Calculated fees</span><span>${(analysis.marketplaceFees + analysis.paymentProcessingFees).toFixed(2)}</span></div>
+        <div className="mt-4 flex justify-between border-t border-red-950/35 pt-4 font-medium"><span>Calculated fees</span><span>${(analysis.marketplaceFees + analysis.paymentProcessingFees).toFixed(2)}</span></div>
       </div>
     </section>
   );
