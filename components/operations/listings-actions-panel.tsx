@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { OperatingData } from "@/domain/business";
 
-const button = "rounded-full border border-red-950/60 bg-zinc-950/50 px-3 py-1.5 text-xs font-medium transition hover:border-red-500/50 hover:text-white disabled:opacity-50";
+const button = "rounded-full border border-sky-950/60 bg-zinc-950/50 px-3 py-1.5 text-xs font-medium transition hover:border-sky-400/50 hover:text-white disabled:opacity-50";
 const input = "faust-field faust-focus mt-1 w-full px-3 py-2 text-sm";
 
 export function ListingsActionsPanel({ data }: { data: OperatingData }) {
@@ -31,7 +31,7 @@ export function ListingsActionsPanel({ data }: { data: OperatingData }) {
   }
 
   return <section aria-label="Listings workflows" className="faust-surface overflow-hidden">
-    <h2 className="border-b border-red-950/45 px-5 py-4 font-semibold">Listings Workflows</h2>
+    <h2 className="border-b border-sky-950/45 px-5 py-4 font-semibold">Listings Workflows</h2>
     <div className="grid gap-5 p-5 lg:grid-cols-2">
       <form className="faust-card p-4" onSubmit={(event) => { event.preventDefault(); const fields = new FormData(event.currentTarget); void run("create-five-drafts", { variantId: String(fields.get("variantId")), physicalSku: String(fields.get("physicalSku")), basePrice: Number(fields.get("basePrice")), imageUrls: [String(fields.get("imageUrl"))].filter(Boolean) }); }}>
         <h3 className="font-semibold">Create five channel drafts</h3>
@@ -55,6 +55,6 @@ export function ListingsActionsPanel({ data }: { data: OperatingData }) {
         <div className="mt-3 flex flex-wrap gap-2"><button className={button} disabled={!draft} onClick={() => draft && run("pause-draft", { draftId: draft.id, reason: "Seasonal pause" })}>Pause listing</button><button className={button} disabled={!draft} onClick={() => draft && run("delist-draft", { draftId: draft.id, reason: "Manual delist" })}>Delist listing</button><button className={button} disabled={!draft} onClick={() => draft && run("coordinate-sold", { draftId: draft.id })}>Coordinate sold item</button></div>
       </div>
     </div>
-    {message && <p role="status" className="border-t border-red-950/45 px-5 py-3 text-sm text-red-200">{message}</p>}
+    {message && <p role="status" className="border-t border-sky-950/45 px-5 py-3 text-sm text-sky-100">{message}</p>}
   </section>;
 }

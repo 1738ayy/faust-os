@@ -15,12 +15,12 @@ import { SignOutButton } from "@/components/auth/sign-out-button";
 export function AppSidebar() {
   return (
     <Sidebar variant="inset">
-      <SidebarHeader className="border-b border-red-950/50 bg-black/20 p-5">
+      <SidebarHeader className="border-b border-sky-950/50 bg-black/20 p-5">
         <div className="flex flex-col items-center text-center">
           <img
             alt="Faust OS logo"
             src="/brand/faust-pony.svg"
-            className="h-20 w-20 rounded-3xl border border-red-500/20 object-contain p-1 shadow-xl shadow-red-950/30"
+            className="h-20 w-20 rounded-3xl border border-sky-400/20 object-contain p-1 shadow-xl shadow-sky-950/30"
           />
           <div className="mt-3">
             <h1 className="font-heading text-xl font-bold tracking-tight">Faust OS</h1>
@@ -36,7 +36,7 @@ export function AppSidebar() {
         <NavMarketplaces />
       </SidebarContent>
 
-      <SidebarFooter className="border-t border-red-950/50 bg-black/20 p-4">
+      <SidebarFooter className="border-t border-sky-950/50 bg-black/20 p-4">
         <div>
           <p className="font-medium">Henrry Reyes</p>
           <p className="text-xs text-muted-foreground">

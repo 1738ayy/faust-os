@@ -4,20 +4,20 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
-  "group/button inline-flex shrink-0 items-center justify-center rounded-full border border-transparent bg-clip-padding text-sm font-semibold whitespace-nowrap transition-all duration-200 outline-none select-none focus-visible:border-red-500/50 focus-visible:ring-3 focus-visible:ring-red-500/25 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-red-500/50 aria-invalid:ring-3 aria-invalid:ring-red-500/20 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "group/button inline-flex shrink-0 items-center justify-center rounded-full border border-transparent bg-clip-padding text-sm font-semibold whitespace-nowrap transition-all duration-200 outline-none select-none focus-visible:border-sky-400/50 focus-visible:ring-3 focus-visible:ring-sky-300/25 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-red-500/50 aria-invalid:ring-3 aria-invalid:ring-red-500/20 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
-        default: "bg-red-600 text-white shadow-lg shadow-red-950/30 hover:bg-red-500 hover:shadow-red-950/40",
+        default: "bg-sky-500 text-white shadow-lg shadow-sky-950/30 hover:bg-sky-400 hover:shadow-sky-950/40",
         outline:
-          "border-red-950/60 bg-zinc-950/50 text-zinc-100 shadow-sm shadow-black/10 hover:border-red-500/50 hover:bg-red-950/15 hover:text-white aria-expanded:border-red-500/50 aria-expanded:bg-red-950/20",
+          "border-sky-950/60 bg-zinc-950/50 text-zinc-100 shadow-sm shadow-black/10 hover:border-sky-400/50 hover:bg-sky-950/15 hover:text-white aria-expanded:border-sky-400/50 aria-expanded:bg-sky-950/20",
         secondary:
-          "border border-red-950/60 bg-zinc-950/50 text-zinc-100 hover:border-red-500/50 hover:bg-red-950/15 hover:text-white aria-expanded:border-red-500/50 aria-expanded:bg-red-950/20",
+          "border border-sky-950/60 bg-zinc-950/50 text-zinc-100 hover:border-sky-400/50 hover:bg-sky-950/15 hover:text-white aria-expanded:border-sky-400/50 aria-expanded:bg-sky-950/20",
         ghost:
-          "text-zinc-300 hover:bg-red-950/15 hover:text-white aria-expanded:bg-red-950/20 aria-expanded:text-white",
+          "text-zinc-300 hover:bg-sky-950/15 hover:text-white aria-expanded:bg-sky-950/20 aria-expanded:text-white",
         destructive:
           "border border-red-500/40 bg-red-500/10 text-red-200 hover:bg-red-500/20 focus-visible:border-red-500/50 focus-visible:ring-red-500/25",
-        link: "text-red-300 underline-offset-4 hover:text-red-100 hover:underline",
+        link: "text-sky-200 underline-offset-4 hover:text-sky-50 hover:underline",
       },
       size: {
         default:

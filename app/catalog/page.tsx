@@ -34,17 +34,17 @@ export default async function CatalogPage() {
         {products.length === 0 ? (
           <div className="space-y-4">
             <EmptyState title="Your product library is empty" description="Import your first item from Superbuy or create an opportunity, then Faust will turn it into a product workspace." action={{ label: "Start sourcing", href: "/sourcing" }} />
-            <section className="flex flex-wrap items-center justify-center gap-3 rounded-3xl border border-red-950/45 bg-zinc-950/55 p-4 text-sm text-muted-foreground">
+            <section className="flex flex-wrap items-center justify-center gap-3 rounded-3xl border border-sky-950/45 bg-zinc-950/55 p-4 text-sm text-muted-foreground">
               <span>Start with your own data by importing from the browser extension or sourcing workspace.</span>
               <SecondaryButton href="/settings">Complete business profile</SecondaryButton>
             </section>
           </div>
         ) : (
           <>
-            <section className="rounded-[2rem] border border-red-950/45 bg-zinc-950/60 p-5 shadow-2xl shadow-black/25 backdrop-blur">
+            <section className="rounded-[2rem] border border-sky-950/45 bg-zinc-950/60 p-5 shadow-2xl shadow-black/25 backdrop-blur">
               <div className="grid gap-5 lg:grid-cols-[1.4fr_auto] lg:items-center">
                 <div>
-                  <p className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.16em] text-red-300"><Sparkles size={14} />Faust recommendation</p>
+                  <p className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.16em] text-sky-200"><Sparkles size={14} />Faust recommendation</p>
                   <h2 className="mt-3 text-2xl font-semibold">{attentionProduct && attentionProduct.intelligence.faustScore.score < 65 ? `Review ${attentionProduct.variant.sku} first.` : topProduct ? `Open ${topProduct.variant.sku} first.` : "Build your first product workspace."}</h2>
                   <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
                     {attentionProduct && attentionProduct.intelligence.faustScore.score < 65 ? `${attentionProduct.intelligence.recommendation.situation} ${attentionProduct.intelligence.recommendation.expectedOutcome}` : topProduct ? `${topProduct.intelligence.recommendation.situation} Faust Score ${topProduct.intelligence.faustScore.score}/100 with ${topProduct.inventory.available} sellable unit(s).` : "Products become the hub for sourcing, listing, purchasing, inventory, finance, and AI."}

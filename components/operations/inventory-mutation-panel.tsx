@@ -18,7 +18,7 @@ const actions: { id: Action; label: string; description: string }[] = [
 ];
 
 const field = "faust-field faust-focus px-3 py-2 text-sm";
-const actionButton = "rounded-full border border-red-950/60 bg-zinc-950/50 px-3 py-2 text-xs font-medium transition hover:border-red-500/50 hover:text-white";
+const actionButton = "rounded-full border border-sky-950/60 bg-zinc-950/50 px-3 py-2 text-xs font-medium transition hover:border-sky-400/50 hover:text-white";
 
 export function InventoryMutationPanel({ balances, locations }: { balances: StockBalance[]; locations: Location[] }) {
   const [action, setAction] = useState<Action>("adjust");
@@ -61,9 +61,9 @@ export function InventoryMutationPanel({ balances, locations }: { balances: Stoc
     }
   }
 
-  return <section className="rounded-3xl border border-red-950/45 bg-zinc-950/55 p-5 shadow-lg shadow-black/20 backdrop-blur" aria-label="Inventory actions">
-    <div><p className="text-xs font-medium uppercase tracking-[0.16em] text-red-300">Inventory action</p><h2 className="mt-2 text-xl font-semibold">{selected.label}</h2><p className="mt-2 text-sm leading-6 text-muted-foreground">{selected.description}</p></div>
-    <div className="mt-5 flex flex-wrap gap-2">{actions.map((entry) => <button key={entry.id} type="button" className={`${actionButton} ${action === entry.id ? "border-red-500/50 bg-red-500/10 text-red-100" : ""}`} onClick={() => { setAction(entry.id); setMessage(""); }}>{entry.label}</button>)}</div>
+  return <section className="rounded-3xl border border-sky-950/45 bg-zinc-950/55 p-5 shadow-lg shadow-black/20 backdrop-blur" aria-label="Inventory actions">
+    <div><p className="text-xs font-medium uppercase tracking-[0.16em] text-sky-200">Inventory action</p><h2 className="mt-2 text-xl font-semibold">{selected.label}</h2><p className="mt-2 text-sm leading-6 text-muted-foreground">{selected.description}</p></div>
+    <div className="mt-5 flex flex-wrap gap-2">{actions.map((entry) => <button key={entry.id} type="button" className={`${actionButton} ${action === entry.id ? "border-sky-400/50 bg-sky-400/10 text-sky-50" : ""}`} onClick={() => { setAction(entry.id); setMessage(""); }}>{entry.label}</button>)}</div>
     <form className="mt-5 grid gap-3 md:grid-cols-3" onSubmit={submit}>
       {action === "transfer" ? <><label className="grid gap-1 text-sm">Source balance<select required name="sourceBalanceId" className={field}>{balances.map((balance) => <option key={balance.id} value={balance.id}>{label(balance)}</option>)}</select></label><label className="grid gap-1 text-sm">Destination balance<select required name="destinationBalanceId" className={field}>{balances.map((balance) => <option key={balance.id} value={balance.id}>{label(balance)}</option>)}</select></label></> : <label className="grid gap-1 text-sm">Inventory balance<select required name="balanceId" className={field}>{balances.map((balance) => <option key={balance.id} value={balance.id}>{label(balance)}</option>)}</select></label>}
       {action === "location" ? <label className="grid gap-1 text-sm">Destination location<select required name="locationId" className={field}>{locations.map((location) => <option key={location.id} value={location.id}>{location.label}</option>)}</select></label> : <label className="grid gap-1 text-sm">{action === "count" ? "Physical count" : action === "adjust" ? "Quantity delta" : "Quantity"}<input required name="quantity" type="number" step="1" min={action === "adjust" ? undefined : "1"} className={field} placeholder={action === "adjust" ? "Example: -2" : "Whole units"} /></label>}
@@ -71,8 +71,8 @@ export function InventoryMutationPanel({ balances, locations }: { balances: Stoc
       {(action === "damage" || action === "quarantine" || action === "release_quarantine" || action === "lost" || action === "found" || action === "adjust") && <label className="grid gap-1 text-sm">Related order / supplier / receipt ID (optional)<input name="relatedEntityId" className={field} placeholder="UUID if linked" /></label>}
       <label className="grid gap-1 text-sm md:col-span-2">Notes (optional)<input name="notes" className={field} placeholder="Inspection, supplier issue, or receiving note" /></label>
       <label className="flex items-center gap-2 text-sm md:col-span-2"><input required name="confirm" type="checkbox" />I confirm this is the intended inventory movement.</label>
-      <button disabled={submitting || (requiresQuantity && !balances.length)} className="rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-red-950/30 transition hover:bg-red-500 disabled:opacity-50">{submitting ? "Saving…" : `Confirm ${selected.label}`}</button>
+      <button disabled={submitting || (requiresQuantity && !balances.length)} className="rounded-full bg-sky-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-sky-950/30 transition hover:bg-sky-400 disabled:opacity-50">{submitting ? "Saving…" : `Confirm ${selected.label}`}</button>
     </form>
-    {message && <p role="status" className="mt-4 rounded-2xl border border-red-950/35 bg-black/35 p-3 text-sm text-muted-foreground">{message}</p>}
+    {message && <p role="status" className="mt-4 rounded-2xl border border-sky-950/35 bg-black/35 p-3 text-sm text-muted-foreground">{message}</p>}
   </section>;
 }

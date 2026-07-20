@@ -6,15 +6,15 @@ export function InventoryDetail({ data }: { data: OperatingData }) {
 
   return (
     <section className="faust-surface overflow-hidden" aria-label="Inventory detail">
-      <div className="border-b border-red-950/45 px-5 py-5">
-        <p className="text-sm font-medium text-red-200">Stock detail and movement history</p>
+      <div className="border-b border-sky-950/45 px-5 py-5">
+        <p className="text-sm font-medium text-sky-100">Stock detail and movement history</p>
         <h2 className="mt-2 text-2xl font-semibold">Every unit is tied to a location and an audit trail.</h2>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
           Use this view to see what can sell, what is reserved, what is incoming, and which products need a physical stock check.
         </p>
       </div>
 
-      <div className="divide-y divide-red-950/35">
+      <div className="divide-y divide-sky-950/35">
         {data.variants.map((variant) => {
           const balances = data.balances.filter((balance) => balance.variantId === variant.id);
           const product = data.products.find((entry) => entry.id === variant.productId);
@@ -56,7 +56,7 @@ export function InventoryDetail({ data }: { data: OperatingData }) {
                     <div className="faust-card p-4" key={balance.id}>
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <b>{data.locations.find((location) => location.id === balance.locationId)?.label || "Unassigned"}</b>
-                        <span className="rounded-full border border-red-950/45 bg-red-500/10 px-2.5 py-1 text-xs text-red-100">
+                        <span className="rounded-full border border-sky-950/45 bg-sky-400/10 px-2.5 py-1 text-xs text-sky-50">
                           {availableUnits(balance)} available
                         </span>
                       </div>
@@ -77,7 +77,7 @@ export function InventoryDetail({ data }: { data: OperatingData }) {
                 <div className="mt-3 space-y-3">
                   {movements.map((movement) => (
                     <div className="relative pl-5 text-sm" key={movement.id}>
-                      <span className="absolute left-0 top-1.5 h-2 w-2 rounded-full bg-red-400 shadow-[0_0_16px_rgba(248,113,113,.55)]" />
+                      <span className="absolute left-0 top-1.5 h-2 w-2 rounded-full bg-sky-300 shadow-[0_0_16px_rgba(186,230,253,.55)]" />
                       <p className="font-medium capitalize">{movement.type.replaceAll("_", " ")}: {movement.quantity > 0 ? "+" : ""}{movement.quantity}</p>
                       {movement.note && <p className="mt-1 text-xs leading-5 text-muted-foreground">{movement.note}</p>}
                     </div>
@@ -90,7 +90,7 @@ export function InventoryDetail({ data }: { data: OperatingData }) {
         })}
       </div>
 
-      <div className="border-t border-red-950/45 px-5 py-5">
+      <div className="border-t border-sky-950/45 px-5 py-5">
         <h3 className="font-semibold">Activity history</h3>
         <div className="mt-3 space-y-3">
           {inventoryActivity.map((event) => (

@@ -36,9 +36,9 @@ export function OnboardingForm() {
           <img
             alt="Faust OS logo"
             src="/brand/faust-pony.svg"
-            className="h-28 w-28 rounded-[2rem] border border-red-500/20 object-contain p-1 shadow-2xl shadow-red-950/40"
+            className="h-28 w-28 rounded-[2rem] border border-sky-400/20 object-contain p-1 shadow-2xl shadow-sky-950/40"
           />
-          <p className="mt-4 text-xs font-medium uppercase tracking-[0.2em] text-red-300">Faust OS / onboarding</p>
+          <p className="mt-4 text-xs font-medium uppercase tracking-[0.2em] text-sky-200">Faust OS / onboarding</p>
           <h1 className="mt-3 text-2xl font-semibold">Create your business workspace</h1>
           <p className="mt-3 text-sm leading-6 text-muted-foreground">This creates the business boundary used to protect your catalog, orders, finance, and operations data.</p>
         </div>
@@ -68,10 +68,10 @@ export function OnboardingForm() {
           </label>
         </div>
 
-        <button disabled={busy} className="mt-6 rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-red-950/30 transition hover:bg-red-500 disabled:opacity-50">
+        <button disabled={busy} className="mt-6 rounded-full bg-sky-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-sky-950/30 transition hover:bg-sky-400 disabled:opacity-50">
           {busy ? "Creating..." : "Create workspace"}
         </button>
-        {error && <p className="mt-4 text-sm text-red-300">{error}</p>}
+        {error && <p className="mt-4 text-sm text-sky-200">{error}</p>}
       </form>
     </main>
   );

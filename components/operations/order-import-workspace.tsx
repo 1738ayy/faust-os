@@ -14,8 +14,8 @@ type Preview = {
 };
 
 const field = "faust-field faust-focus px-3 py-2 text-sm";
-const smallButton = "rounded-full border border-red-950/60 bg-zinc-950/50 px-3 py-1.5 text-xs font-medium transition hover:border-red-500/50 hover:text-white";
-const primaryButton = "rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-red-950/30 transition hover:bg-red-500 disabled:opacity-60";
+const smallButton = "rounded-full border border-sky-950/60 bg-zinc-950/50 px-3 py-1.5 text-xs font-medium transition hover:border-sky-400/50 hover:text-white";
+const primaryButton = "rounded-full bg-sky-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-sky-950/30 transition hover:bg-sky-400 disabled:opacity-60";
 
 export function OrderImportWorkspace({ data }: { data: OperatingData }) {
   const router = useRouter();
@@ -82,7 +82,7 @@ export function OrderImportWorkspace({ data }: { data: OperatingData }) {
     <section className="faust-surface p-5" aria-label="Order import workspace">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-sm font-medium text-red-200">Order import</p>
+          <p className="text-sm font-medium text-sky-100">Order import</p>
           <h2 className="mt-2 text-2xl font-semibold">Bring marketplace orders into Faust safely.</h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
             Upload a CSV, resolve unmatched items, confirm clean rows, and keep a history of every import batch.
@@ -133,11 +133,11 @@ export function OrderImportWorkspace({ data }: { data: OperatingData }) {
 
       <div className="mt-6 grid gap-5 lg:grid-cols-[1fr_1.4fr]">
         <div className="faust-card overflow-hidden">
-          <div className="border-b border-red-950/35 p-4 text-sm font-semibold">Import batch history</div>
+          <div className="border-b border-sky-950/35 p-4 text-sm font-semibold">Import batch history</div>
           {batches.map((batch) => (
-            <button type="button" key={batch.id} onClick={() => setActiveBatchId(batch.id)} className={`block w-full border-b border-red-950/30 p-4 text-left text-xs transition hover:bg-red-500/5 ${activeBatch?.id === batch.id ? "bg-red-500/10" : ""}`}>
+            <button type="button" key={batch.id} onClick={() => setActiveBatchId(batch.id)} className={`block w-full border-b border-sky-950/30 p-4 text-left text-xs transition hover:bg-sky-400/5 ${activeBatch?.id === batch.id ? "bg-sky-400/10" : ""}`}>
               <b>{batch.filename}</b>
-              <span className="ml-2 rounded-full border border-red-950/45 bg-black/35 px-2 py-0.5 capitalize text-red-100">{batch.status.replaceAll("_", " ")}</span>
+              <span className="ml-2 rounded-full border border-sky-950/45 bg-black/35 px-2 py-0.5 capitalize text-sky-50">{batch.status.replaceAll("_", " ")}</span>
               <p className="mt-2 text-muted-foreground">Accepted {batch.acceptedRows} · Rejected {batch.rejectedRows} · Unresolved {batch.unresolvedRows} · Failed {batch.failedRows} · Imported {batch.importedOrders}</p>
             </button>
           ))}
@@ -145,7 +145,7 @@ export function OrderImportWorkspace({ data }: { data: OperatingData }) {
         </div>
 
         <div className="faust-card overflow-hidden">
-          <div className="flex flex-wrap items-center gap-2 border-b border-red-950/35 p-4">
+          <div className="flex flex-wrap items-center gap-2 border-b border-sky-950/35 p-4">
             <b className="mr-auto text-sm">Batch detail</b>
             {activeBatch && (
               <>
@@ -158,16 +158,16 @@ export function OrderImportWorkspace({ data }: { data: OperatingData }) {
             )}
           </div>
           {activeBatch ? (
-            <div className="max-h-[460px] overflow-auto divide-y divide-red-950/30">
+            <div className="max-h-[460px] overflow-auto divide-y divide-sky-950/30">
               {activeBatch.rows.map((row) => {
                 const review = reviews.find((item) => item.id === row.reviewId);
                 return (
                   <div className="grid gap-3 p-4 text-xs md:grid-cols-[1fr_auto]" key={row.id}>
                     <div>
                       <b>Row {row.rowNumber}: {row.externalOrderId}</b>
-                      <span className="ml-2 rounded-full border border-red-950/45 bg-black/35 px-2 py-0.5 capitalize text-red-100">{row.status.replaceAll("_", " ")}</span>
+                      <span className="ml-2 rounded-full border border-sky-950/45 bg-black/35 px-2 py-0.5 capitalize text-sky-50">{row.status.replaceAll("_", " ")}</span>
                       <p className="mt-2 text-muted-foreground">{row.itemTitle} x{row.quantity} · SKU {row.externalSku || "none"} · listing {row.externalListingId || "none"}</p>
-                      {row.error && <p className="mt-1 text-red-300">{row.error}</p>}
+                      {row.error && <p className="mt-1 text-sky-200">{row.error}</p>}
                       {row.orderId && <p className="mt-1 text-muted-foreground">Created order {row.orderId}</p>}
                       {review && <p className="mt-1 text-muted-foreground">Confidence {Math.round(review.matchConfidence * 100)}% · {review.state.replaceAll("_", " ")}</p>}
                     </div>

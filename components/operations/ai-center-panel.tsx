@@ -57,10 +57,10 @@ export function AiCenterPanel({ data, provider }: { data: OperatingData; provide
   }
 
   return (
-    <section aria-label="AI Center actions" className="overflow-hidden rounded-3xl border border-red-950/45 bg-zinc-950/60 shadow-xl shadow-black/20 backdrop-blur">
-      <div className="grid gap-5 border-b border-red-950/45 p-5 lg:grid-cols-[1fr_280px]">
+    <section aria-label="AI Center actions" className="overflow-hidden rounded-3xl border border-sky-950/45 bg-zinc-950/60 shadow-xl shadow-black/20 backdrop-blur">
+      <div className="grid gap-5 border-b border-sky-950/45 p-5 lg:grid-cols-[1fr_280px]">
         <div>
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-red-300">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-sky-200">
             <Bot size={15} />
             Ask Faust
           </div>
@@ -69,8 +69,8 @@ export function AiCenterPanel({ data, provider }: { data: OperatingData; provide
             Faust checks inventory, orders, finance, purchasing, listings, fulfillment, analytics, and automations before answering. Risky actions become approval requests instead of silent mutations.
           </p>
         </div>
-        <div className="rounded-2xl border border-red-500/25 bg-red-500/10 p-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-red-300">Provider</p>
+        <div className="rounded-2xl border border-sky-400/25 bg-sky-400/10 p-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-sky-200">Provider</p>
           <p className="mt-2 font-medium">{providerLabel(provider)}</p>
           <p className="mt-2 text-xs leading-5 text-muted-foreground">
             {provider === "openai" ? "OpenAI rewrites grounded Faust evidence when configured." : "No-provider mode uses deterministic Faust rules only."}
@@ -82,36 +82,36 @@ export function AiCenterPanel({ data, provider }: { data: OperatingData; provide
         <label className="block text-sm font-medium">
           Question
           <textarea
-            className="mt-2 min-h-24 w-full resize-none rounded-2xl border border-red-950/45 bg-black/35 px-4 py-3 text-sm font-normal leading-6 transition focus:border-red-500/60"
+            className="mt-2 min-h-24 w-full resize-none rounded-2xl border border-sky-950/45 bg-black/35 px-4 py-3 text-sm font-normal leading-6 transition focus:border-sky-400/60"
             value={question}
             onChange={(event) => setQuestion(event.target.value)}
           />
         </label>
         <div className="mt-4 flex flex-wrap gap-2">
-          <button disabled={busy || !question.trim()} className="inline-flex items-center gap-2 rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-red-950/30 transition hover:bg-red-500 disabled:opacity-50" onClick={() => run({ action: "ask-question", question, saveQuestion: true, provider }, "Grounded answer saved and shown below.")}>
+          <button disabled={busy || !question.trim()} className="inline-flex items-center gap-2 rounded-full bg-sky-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-sky-950/30 transition hover:bg-sky-400 disabled:opacity-50" onClick={() => run({ action: "ask-question", question, saveQuestion: true, provider }, "Grounded answer saved and shown below.")}>
             <Send size={15} />
             Ask question
           </button>
-          <button disabled={busy} className="inline-flex items-center gap-2 rounded-full border border-red-950/60 bg-zinc-950/50 px-4 py-2 text-sm transition hover:border-red-500/50 disabled:opacity-50" onClick={() => run({ action: "daily-brief", provider }, "Daily brief generated from current Faust records.")}>
+          <button disabled={busy} className="inline-flex items-center gap-2 rounded-full border border-sky-950/60 bg-zinc-950/50 px-4 py-2 text-sm transition hover:border-sky-400/50 disabled:opacity-50" onClick={() => run({ action: "daily-brief", provider }, "Daily brief generated from current Faust records.")}>
             <FileText size={15} />
             Generate daily brief
           </button>
-          <button disabled={busy || !variantId} className="inline-flex items-center gap-2 rounded-full border border-red-950/60 bg-zinc-950/50 px-4 py-2 text-sm transition hover:border-red-500/50 disabled:opacity-50" onClick={() => run({ action: "run-scenario", name: "Buy 300 units", prompt: "What happens if I buy 300 units of this SKU?", units: 300, variantId, priceChangePercent: 8, reserveCash: 150 }, "300-unit scenario created.")}>
+          <button disabled={busy || !variantId} className="inline-flex items-center gap-2 rounded-full border border-sky-950/60 bg-zinc-950/50 px-4 py-2 text-sm transition hover:border-sky-400/50 disabled:opacity-50" onClick={() => run({ action: "run-scenario", name: "Buy 300 units", prompt: "What happens if I buy 300 units of this SKU?", units: 300, variantId, priceChangePercent: 8, reserveCash: 150 }, "300-unit scenario created.")}>
             <Sparkles size={15} />
             300-unit scenario
           </button>
-          <button disabled={busy || !latestRecommendationId} className="rounded-full border border-red-950/60 bg-zinc-950/50 px-4 py-2 text-sm transition hover:border-red-500/50 disabled:opacity-50" onClick={() => run({ action: "save-recommendation", recommendationId: latestRecommendationId }, "Top recommendation saved.")}>Save top recommendation</button>
-          <button disabled={busy || !latestRecommendationId} className="rounded-full border border-red-950/60 bg-zinc-950/50 px-4 py-2 text-sm transition hover:border-red-500/50 disabled:opacity-50" onClick={() => run({ action: "request-approval", recommendationId: latestRecommendationId, reason: "Owner approval required before AI-suggested operating action." }, "Approval request created.")}>Send for approval</button>
+          <button disabled={busy || !latestRecommendationId} className="rounded-full border border-sky-950/60 bg-zinc-950/50 px-4 py-2 text-sm transition hover:border-sky-400/50 disabled:opacity-50" onClick={() => run({ action: "save-recommendation", recommendationId: latestRecommendationId }, "Top recommendation saved.")}>Save top recommendation</button>
+          <button disabled={busy || !latestRecommendationId} className="rounded-full border border-sky-950/60 bg-zinc-950/50 px-4 py-2 text-sm transition hover:border-sky-400/50 disabled:opacity-50" onClick={() => run({ action: "request-approval", recommendationId: latestRecommendationId, reason: "Owner approval required before AI-suggested operating action." }, "Approval request created.")}>Send for approval</button>
         </div>
 
-        <div role="status" className="mt-4 flex items-center gap-2 rounded-2xl border border-red-950/45 bg-black/35 px-4 py-3 text-sm text-red-300">
+        <div role="status" className="mt-4 flex items-center gap-2 rounded-2xl border border-sky-950/45 bg-black/35 px-4 py-3 text-sm text-sky-200">
           <CheckCircle2 size={15} />
           {status}
         </div>
 
         {latestAnswer && (
-          <div className="mt-4 rounded-2xl border border-red-950/45 bg-black/35 p-4 text-sm">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-red-300">Latest answer</p>
+          <div className="mt-4 rounded-2xl border border-sky-950/45 bg-black/35 p-4 text-sm">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-sky-200">Latest answer</p>
             <p className="whitespace-pre-wrap leading-6 text-muted-foreground">{latestAnswer}</p>
           </div>
         )}
@@ -120,7 +120,7 @@ export function AiCenterPanel({ data, provider }: { data: OperatingData; provide
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Try asking</p>
           <div className="mt-2 flex flex-wrap gap-2">
             {prompts.map((prompt) => (
-              <button key={prompt} className="rounded-full border border-red-950/50 bg-zinc-950/40 px-3 py-1.5 text-xs text-muted-foreground transition hover:border-red-500/60 hover:text-red-200" onClick={() => setQuestion(prompt)}>
+              <button key={prompt} className="rounded-full border border-sky-950/50 bg-zinc-950/40 px-3 py-1.5 text-xs text-muted-foreground transition hover:border-sky-400/60 hover:text-sky-100" onClick={() => setQuestion(prompt)}>
                 {prompt}
               </button>
             ))}
