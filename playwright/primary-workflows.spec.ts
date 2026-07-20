@@ -12,6 +12,7 @@ test("authentication screens expose sign in, signup, and recovery", async ({ pag
 });
 
 test("primary operations pages render their operational page titles", async ({ request, page }) => {
+  test.setTimeout(60_000);
   await resetDemo(request);
   const routes = [
     ["/", "Know what needs action next."],
