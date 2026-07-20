@@ -41,7 +41,7 @@ export function UpdatePasswordForm() {
           <img
             alt="Faust Snow Leopard"
             src="/brand/faust-snow-leopard.png"
-            className="h-24 w-44 object-contain"
+            className="h-32 w-56 object-contain"
             onError={(event) => { event.currentTarget.style.display = "none"; }}
           />
           <p className="mt-1 text-xs font-medium uppercase tracking-[0.2em] text-[#c8d2e6]">Faust OS recovery</p>

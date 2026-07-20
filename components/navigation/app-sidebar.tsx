@@ -20,7 +20,7 @@ export function AppSidebar() {
           <img
             alt="Faust Snow Leopard"
             src="/brand/faust-snow-leopard.png"
-            className="h-20 w-36 object-contain"
+            className="h-[6.5rem] w-48 object-contain"
           />
           <div className="mt-1">
             <h1 className="font-heading text-xl font-bold tracking-tight">Faust OS</h1>

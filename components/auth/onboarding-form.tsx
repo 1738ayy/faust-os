@@ -36,7 +36,7 @@ export function OnboardingForm() {
           <img
             alt="Faust Snow Leopard"
             src="/brand/faust-snow-leopard.png"
-            className="h-28 w-48 object-contain"
+            className="h-36 w-64 object-contain"
           />
           <p className="mt-1 text-xs font-medium uppercase tracking-[0.2em] text-[#c8d2e6]">Faust OS / onboarding</p>
           <h1 className="mt-3 text-2xl font-semibold">Create your business workspace</h1>
