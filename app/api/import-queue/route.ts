@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getOperatingData } from "@/services/operating-system/repository";
+import { activeVariants } from "@/lib/product-state";
 import { parseSuperbuyProduct } from "@/lib/validation/superbuy-product";
 
 export async function GET() {
@@ -10,7 +11,7 @@ export async function GET() {
     .map((artifact) => {
       const product = parseSuperbuyProduct(artifact.metadata.product);
       const existingProduct = data.products.find((entry) => entry.sourceUrl === product.superbuyUrl);
-      const convertedVariants = existingProduct ? data.variants.filter((variant) => variant.productId === existingProduct.id).length : 0;
+      const convertedVariants = existingProduct ? activeVariants(data).filter((variant) => variant.productId === existingProduct.id).length : 0;
       return {
         id: artifact.id,
         title: product.title,

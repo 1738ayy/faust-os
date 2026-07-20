@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { OperatingData } from "@/domain/business";
+import { activeVariants } from "@/lib/product-state";
 
 const button = "rounded-full border border-slate-700/60 bg-zinc-950/50 px-3 py-1.5 text-xs font-medium transition hover:border-slate-400/50 hover:text-white disabled:opacity-50";
 const input = "faust-field faust-focus mt-1 w-full px-3 py-2 text-sm";
@@ -10,7 +11,7 @@ export function ListingsActionsPanel({ data }: { data: OperatingData }) {
   const router = useRouter();
   const [busy, setBusy] = useState("");
   const [message, setMessage] = useState("");
-  const variant = data.variants[0];
+  const variant = activeVariants(data)[0];
   const draft = data.channelListingDrafts?.[0];
   const manualDraft = data.channelListingDrafts?.find((entry) => entry.publishMode !== "adapter") || draft;
   const publishedDraft = data.channelListingDrafts?.find((entry) => entry.status === "published") || draft;

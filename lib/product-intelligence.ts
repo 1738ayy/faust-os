@@ -1,5 +1,6 @@
 import type { Marketplace, OperatingData, Product, Supplier, Variant } from "@/domain/business";
 import type { MarketplacePresence } from "@/lib/product-experience";
+import { activeVariants } from "./product-state";
 import type { ProductReadiness } from "@/lib/product-readiness";
 
 export type ProductDnaTag =
@@ -210,7 +211,7 @@ function buildRelationships(data: OperatingData, product: Product, variant: Vari
       variantIdsByMarketplace.set(listing.marketplace, set);
     }
   }
-  return data.variants
+  return activeVariants(data)
     .filter((entry) => entry.id !== variant.id)
     .map((entry) => {
       const relatedProduct = data.products.find((candidate) => candidate.id === entry.productId);

@@ -2,6 +2,7 @@ import type { Activity, Marketplace, OperatingData, Product, Variant } from "@/d
 import { availableUnits, money, orderProfit } from "@/lib/business-calculations";
 import { buildProductIntelligence, type ProductIntelligence } from "@/lib/product-intelligence";
 import { getProductReadiness } from "@/lib/product-readiness";
+import { activeVariants, isActiveProduct, isActiveVariant } from "./product-state";
 
 export type MarketplacePresence = {
   marketplace: Exclude<Marketplace, "Manual">;
@@ -70,8 +71,7 @@ export type ProductExperience = {
 const marketplaceOrder: Exclude<Marketplace, "Manual">[] = ["Depop", "eBay", "Etsy", "Mercari", "Poshmark"];
 
 export function buildProductExperiences(data: OperatingData): ProductExperience[] {
-  return data.variants
-    .filter((variant) => variant.active)
+  return activeVariants(data)
     .map((variant) => {
       const product = data.products.find((entry) => entry.id === variant.productId);
       if (!product) return null;
@@ -81,6 +81,7 @@ export function buildProductExperiences(data: OperatingData): ProductExperience[
 }
 
 export function buildProductExperience(data: OperatingData, product: Product, variant: Variant): ProductExperience {
+  if (!isActiveProduct(product) || !isActiveVariant(data, variant)) throw new Error("Product is not active in the catalog.");
   const balances = data.balances.filter((balance) => balance.variantId === variant.id);
   const drafts = data.channelListingDrafts?.filter((draft) => draft.variantId === variant.id) || [];
   const listings = data.listings.filter((listing) => listing.variantId === variant.id);

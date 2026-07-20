@@ -7,6 +7,7 @@ import { getOpportunities } from "@/services/opportunities/local-opportunity-sto
 import { suppliersRepository } from "@/services/suppliers/repository";
 import { ordersRepository } from "@/services/orders/repository";
 import { parcelsRepository } from "@/services/parcels/repository";
+import { activeVariants } from "@/lib/product-state";
 
 type SearchResult = {
   label: string;
@@ -24,7 +25,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
     parcelsRepository.all(),
   ]);
 
-  const productMatches: SearchResult[] = operatingData.variants
+  const productMatches: SearchResult[] = activeVariants(operatingData)
     .filter((variant) => {
       const product = operatingData.products.find((item) => item.id === variant.productId);
       const supplier = product ? operatingData.suppliers.find((item) => item.id === product.supplierId) : undefined;

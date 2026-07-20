@@ -1,6 +1,7 @@
 import type { AnalyticsReportRun, AnalyticsSavedReport, Marketplace, OperatingData, Order } from "@/domain/business";
 import { availableUnits, inventoryValue, orderProfit, reorderSuggestion } from "./business-calculations";
 import { buildFinanceModel } from "./finance";
+import { activeBalances, activeVariants, findActiveVariantBySku } from "./product-state";
 
 const round = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
 const sum = <T>(items: T[], selector: (item: T) => number) => round(items.reduce((total, item) => total + selector(item), 0));
@@ -25,12 +26,12 @@ function orderMatches(order: Order, data: OperatingData, filters: AnalyticsFilte
   if (!inDateRange(order.orderedAt, filters)) return false;
   if (filters.marketplace && filters.marketplace !== "all" && order.marketplace !== filters.marketplace) return false;
   if (filters.sku && filters.sku !== "all") {
-    const variant = data.variants.find((item) => item.sku === filters.sku);
+    const variant = findActiveVariantBySku(data, filters.sku);
     if (!variant || !order.items.some((item) => item.variantId === variant.id)) return false;
   }
   if (filters.supplierId && filters.supplierId !== "all") {
     const productIds = data.products.filter((product) => product.supplierId === filters.supplierId).map((product) => product.id);
-    const variantIds = data.variants.filter((variant) => productIds.includes(variant.productId)).map((variant) => variant.id);
+    const variantIds = activeVariants(data).filter((variant) => productIds.includes(variant.productId)).map((variant) => variant.id);
     if (!order.items.some((item) => variantIds.includes(item.variantId))) return false;
   }
   return true;
@@ -39,7 +40,7 @@ function orderMatches(order: Order, data: OperatingData, filters: AnalyticsFilte
 function filteredData(data: OperatingData, filters: AnalyticsFilters) {
   const orders = data.orders.filter((order) => orderMatches(order, data, filters));
   const variantIds = new Set(orders.flatMap((order) => order.items.map((item) => item.variantId)));
-  const variants = filters.sku && filters.sku !== "all" ? data.variants.filter((variant) => variant.sku === filters.sku) : data.variants.filter((variant) => !variantIds.size || variantIds.has(variant.id));
+  const variants = filters.sku && filters.sku !== "all" ? activeVariants(data).filter((variant) => variant.sku === filters.sku) : activeVariants(data).filter((variant) => !variantIds.size || variantIds.has(variant.id));
   return { orders, variants };
 }
 
@@ -69,7 +70,7 @@ export function buildAnalyticsModel(data: OperatingData, filters: AnalyticsFilte
     unitsSold,
     averageOrderValue: scoped.orders.length ? round(finance.overview.netSales / scoped.orders.length) : 0,
     deployableCash: finance.overview.deployableCash,
-    inventoryValue: inventoryValue(data.balances, data.variants),
+    inventoryValue: inventoryValue(activeBalances(data), activeVariants(data)),
     pendingPayouts: finance.overview.pendingPayouts,
     purchaseCommitments: finance.overview.committedPurchaseSpending,
     taxReserve: finance.overview.taxReserve,
@@ -77,7 +78,7 @@ export function buildAnalyticsModel(data: OperatingData, filters: AnalyticsFilte
     sourceRecordCount: data.orders.length + data.transactions.length + data.balances.length + data.purchaseOrders.length + (data.fulfillmentShipments || []).length,
   };
 
-  const productAnalytics = data.variants.map((variant) => {
+  const productAnalytics = activeVariants(data).map((variant) => {
     const orders = scoped.orders.filter((order) => order.items.some((item) => item.variantId === variant.id));
     const lines = orders.flatMap((order) => order.items.filter((item) => item.variantId === variant.id).map((item) => ({ order, item })));
     const revenue = sum(lines, ({ item }) => item.unitSellingPrice * item.quantity - item.discountAllocation);
@@ -147,7 +148,7 @@ export function buildAnalyticsModel(data: OperatingData, filters: AnalyticsFilte
     const claims = (data.supplierClaims || []).filter((claim) => claim.supplierId === supplier.id);
     const priceHistory = (data.supplierPriceHistory || []).filter((price) => price.supplierId === supplier.id);
     const supplierProductIds = data.products.filter((product) => product.supplierId === supplier.id).map((product) => product.id);
-    const supplierVariantIds = data.variants.filter((variant) => supplierProductIds.includes(variant.productId)).map((variant) => variant.id);
+    const supplierVariantIds = activeVariants(data).filter((variant) => supplierProductIds.includes(variant.productId)).map((variant) => variant.id);
     const marginContribution = sum(reconciliations, (order) => sum(order.lineLevel.filter((line) => supplierVariantIds.some((id) => data.orders.find((source) => source.id === order.orderId)?.items.some((item) => item.id === line.itemId && item.variantId === id))), (line) => line.contributionProfit));
     const averageUnitCost = average(priceHistory.map((price) => price.unitCostUsd));
     return {
@@ -178,14 +179,14 @@ export function buildAnalyticsModel(data: OperatingData, filters: AnalyticsFilte
   };
 
   const inventoryAnalytics = {
-    carryingValue: inventoryValue(data.balances, data.variants),
+    carryingValue: inventoryValue(activeBalances(data), activeVariants(data)),
     lowStock: productAnalytics.filter((item) => item.stockoutRisk).length,
     deadStock: productAnalytics.filter((item) => item.deadStock).length,
     incomingInventory: sum(data.balances, (balance) => balance.incoming || 0),
     lotAging: (data.inventoryLots || []).map((lot) => ({ lotId: lot.id, sku: lot.sku, ageDays: daysBetween(lot.receivedAt, new Date().toISOString()), remainingValue: round(lot.quantityRemaining * lot.unitLandedCostUsd), capitalUtilization: lot.quantityReceived ? round((lot.quantityReceived - lot.quantityRemaining) / lot.quantityReceived * 100) : 0, sourceHref: `/inventory?lot=${lot.id}` })),
-    capitalTiedUp: sum(data.inventoryLots || [], (lot) => lot.quantityRemaining * lot.unitLandedCostUsd) || inventoryValue(data.balances, data.variants),
-    safetyStock: sum(data.variants, (variant) => Math.ceil((variant.reorderQuantity || 1) / 2)),
-    reorderPointUnits: sum(data.variants, (variant) => variant.reorderPoint),
+    capitalTiedUp: sum((data.inventoryLots || []).filter((lot) => activeVariants(data).some((variant) => variant.id === lot.variantId)), (lot) => lot.quantityRemaining * lot.unitLandedCostUsd) || inventoryValue(activeBalances(data), activeVariants(data)),
+    safetyStock: sum(activeVariants(data), (variant) => Math.ceil((variant.reorderQuantity || 1) / 2)),
+    reorderPointUnits: sum(activeVariants(data), (variant) => variant.reorderPoint),
   };
 
   const fulfillmentAnalytics = buildFulfillmentAnalytics(data, scoped.orders);

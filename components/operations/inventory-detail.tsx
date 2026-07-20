@@ -1,5 +1,6 @@
 import type { OperatingData } from "@/domain/business";
 import { availableUnits } from "@/lib/business-calculations";
+import { activeVariants } from "@/lib/product-state";
 
 export function InventoryDetail({ data }: { data: OperatingData }) {
   const inventoryActivity = data.activity.filter((event) => event.entityType === "inventory_balance").slice(0, 12);
@@ -15,7 +16,7 @@ export function InventoryDetail({ data }: { data: OperatingData }) {
       </div>
 
       <div className="divide-y divide-slate-700/35">
-        {data.variants.map((variant) => {
+        {activeVariants(data).map((variant) => {
           const balances = data.balances.filter((balance) => balance.variantId === variant.id);
           const product = data.products.find((entry) => entry.id === variant.productId);
           const supplier = data.suppliers.find((entry) => entry.id === product?.supplierId);

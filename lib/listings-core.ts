@@ -1,5 +1,6 @@
 import type { ChannelListingDraft, DurableJob, Listing, ListingReviewItem, ListingSyncJob, ListingTemplate, Marketplace, OperatingData, PhysicalSkuMapping, TransactionalOutboxEvent } from "@/domain/business";
 import { availableUnits } from "./business-calculations";
+import { isActiveVariant } from "./product-state";
 import { getMarketplaceAdapter } from "../services/adapters/marketplace";
 
 const now = () => new Date().toISOString();
@@ -103,7 +104,7 @@ export function createFiveChannelDrafts(data: OperatingData, input: CreateCrossL
   seedMarketplaceAccountsAndTemplates(data);
   if (input.idempotencyKey && data.channelListingDrafts!.some((draft) => draft.idempotencyKey === input.idempotencyKey)) return data;
   const variant = data.variants.find((entry) => entry.id === input.variantId);
-  if (!variant) throw new Error("Variant not found for cross-listing.");
+  if (!variant || !isActiveVariant(data, variant)) throw new Error("Active variant not found for cross-listing.");
   const product = data.products.find((entry) => entry.id === variant.productId);
   const balance = data.balances.find((entry) => entry.variantId === variant.id);
   const quantity = Math.max(balance ? availableUnits(balance) : 0, 0);

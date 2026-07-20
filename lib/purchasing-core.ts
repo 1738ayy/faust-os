@@ -1,5 +1,6 @@
 import type { OperatingData, PurchaseApproval, PurchaseOrder, PurchasePayment, ReceivingSession, SupplierClaim, SupplierContact, SupplierScorecard } from "@/domain/business";
 import { availableUnits } from "./business-calculations";
+import { activeVariants, isActiveVariant } from "./product-state";
 import { receiveWholesalePurchaseBatch } from "./wholesale-core";
 
 const now = () => new Date().toISOString();
@@ -67,7 +68,8 @@ export function create1688PurchaseOrder(data: OperatingData, input: Create1688Pu
   if (!input.items.length) throw new Error("Purchase order needs at least one item.");
   const poId = id();
   const items = input.items.map((item) => {
-    if (!data.variants.some((variant) => variant.id === item.variantId)) throw new Error("Purchase item variant not found.");
+    const variant = data.variants.find((entry) => entry.id === item.variantId);
+    if (!variant || !isActiveVariant(data, variant)) throw new Error("Purchase item active variant not found.");
     return { id: id(), variantId: item.variantId, expectedQuantity: item.expectedQuantity, receivedQuantity: 0, unitCost: round(item.unitCost * input.exchangeRate) };
   });
   const subtotalUsd = round(input.items.reduce((sum, item) => sum + item.expectedQuantity * item.unitCost * input.exchangeRate, 0));
@@ -146,7 +148,7 @@ export function receivePurchaseParcelToLots(data: OperatingData, input: ReceiveP
 
 export function generateReorderRecommendations(data: OperatingData) {
   ensurePurchasingCollections(data);
-  for (const variant of data.variants) {
+  for (const variant of activeVariants(data)) {
     const balance = data.balances.find((entry) => entry.variantId === variant.id);
     const available = balance ? availableUnits(balance) : 0;
     const incoming = balance?.incoming || 0;

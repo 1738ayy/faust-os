@@ -2,6 +2,7 @@ import type { AiApprovalProposal, AiConversation, AiDailyBrief, AiEvidenceLink, 
 import { availableUnits, money, orderProfit, reorderSuggestion } from "./business-calculations";
 import { buildAnalyticsModel } from "./analytics";
 import { buildFinanceModel } from "./finance";
+import { activeVariants } from "./product-state";
 
 const now = () => new Date().toISOString();
 const id = () => crypto.randomUUID();
@@ -195,7 +196,7 @@ export function buildAiOperatingContext(data: OperatingData) {
   ensureAiCollections(data);
   const finance = buildFinanceModel(data);
   const analytics = buildAnalyticsModel(data);
-  const reorders = data.variants.map((variant) => {
+  const reorders = activeVariants(data).map((variant) => {
     const balance = data.balances.find((entry) => entry.variantId === variant.id);
     return { variant, balance, available: balance ? availableUnits(balance) : 0, suggested: reorderSuggestion(balance, variant), inventoryValue: (balance?.onHand || 0) * variant.landedUnitCost };
   }).filter((entry) => entry.suggested > 0 || entry.inventoryValue > 0);
@@ -267,7 +268,21 @@ function answerForQuestion(data: OperatingData, question: string) {
   const ctx = buildAiOperatingContext(data);
   const evidenceLinks: AiEvidenceLink[] = [];
   let answer = "";
-  if (!data.products.length && (q.includes("product") || q.includes("sku") || q.includes("catalog"))) {
+  const activeProductVariants = activeVariants(data);
+  const activeProductIds = new Set(activeProductVariants.map((variant) => variant.productId));
+  const archivedProducts = data.products.filter((product) => !activeProductIds.has(product.id) && ["paused", "cancelled"].includes(product.status));
+  const mentionedProduct = data.products.find((product) => q.includes(product.title.toLowerCase()) || product.title.toLowerCase().split(/\s+/).filter((word) => word.length > 4).some((word) => q.includes(word)));
+  if ((q.includes("how many") || q.includes("count")) && (q.includes("active product") || q.includes("active sku") || q.includes("available for listing"))) {
+    evidenceLinks.push(evidence(data, "inventory", "active-product-state", "Active product state", "/catalog", `${activeProductVariants.length} active SKU variant(s), ${archivedProducts.length} archived product(s).`));
+    answer = `You have ${activeProductVariants.length} active product SKU${activeProductVariants.length === 1 ? "" : "s"} available for operational workflows. Archived or deleted products are excluded from that active total.`;
+  } else if (q.includes("archived") && (q.includes("product") || q.includes("sku"))) {
+    evidenceLinks.push(evidence(data, "inventory", "archived-product-state", "Archived product state", "/catalog", `${archivedProducts.length} archived product record(s).`));
+    answer = archivedProducts.length ? `Archived products: ${archivedProducts.map((product) => product.title).join(", ")}.` : "No archived products are currently preserved in Faust.";
+  } else if (mentionedProduct && q.includes("active")) {
+    const active = activeProductIds.has(mentionedProduct.id);
+    evidenceLinks.push(evidence(data, "inventory", mentionedProduct.id, mentionedProduct.title, "/catalog", `${mentionedProduct.title} status is ${mentionedProduct.status}; active SKU present: ${active}.`));
+    answer = `${mentionedProduct.title} is ${active ? "active and available in operational workflows" : "not active in operational workflows"}.`;
+  } else if (!activeProductVariants.length && (q.includes("product") || q.includes("sku") || q.includes("catalog"))) {
     answer = "You currently have no products in Faust. Import your first item from the browser extension or sourcing workspace, then Faust can analyze pricing, inventory, listings, and reorder decisions from your real records.";
   } else if (!data.orders.length && (q.includes("revenue") || q.includes("sales") || q.includes("orders") || q.includes("margin") || q.includes("profit"))) {
     answer = "You have no recorded orders or revenue yet. Once marketplace orders are imported, Faust will calculate sales, fees, COGS, profit, margin, and cash impact from those records.";
@@ -366,7 +381,7 @@ export function generateAiDailyBrief(data: OperatingData, provider: AiProviderKe
 export function runAiScenario(data: OperatingData, input: Extract<AiCenterActionInput, { action: "run-scenario" }>) {
   ensureAiCollections(data);
   const finance = buildFinanceModel(data).overview;
-  const variant = data.variants.find((entry) => entry.id === input.variantId) || data.variants[0];
+  const variant = activeVariants(data).find((entry) => entry.id === input.variantId) || activeVariants(data)[0];
   const units = Number(input.units || 100);
   const priceChangePercent = Number(input.priceChangePercent || 0);
   const unitCost = variant?.landedUnitCost || 0;

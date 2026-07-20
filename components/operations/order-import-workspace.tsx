@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { Marketplace, OperatingData } from "@/domain/business";
+import { activeVariants } from "@/lib/product-state";
 
 type Preview = {
   batchId: string;
@@ -19,6 +20,7 @@ const primaryButton = "rounded-full bg-[#56627f] px-4 py-2 text-sm font-semibold
 
 export function OrderImportWorkspace({ data }: { data: OperatingData }) {
   const router = useRouter();
+  const firstActiveVariant = activeVariants(data)[0];
   const [marketplace, setMarketplace] = useState<Marketplace>("Manual");
   const [preview, setPreview] = useState<Preview>();
   const [activeBatchId, setActiveBatchId] = useState(data.orderImportBatches?.[0]?.id || "");
@@ -173,7 +175,7 @@ export function OrderImportWorkspace({ data }: { data: OperatingData }) {
                     </div>
                     {review && (
                       <div className="flex flex-wrap gap-2">
-                        {data.variants[0] && <button className={smallButton} onClick={() => resolve(review.id, "link_variant", data.variants[0].id)}>Link variant</button>}
+                        {firstActiveVariant && <button className={smallButton} onClick={() => resolve(review.id, "link_variant", firstActiveVariant.id)}>Link variant</button>}
                         <button className={smallButton} onClick={() => resolve(review.id, "create_variant")}>Create product/variant</button>
                         <button className={smallButton} onClick={() => resolve(review.id, "non_inventory")}>Non-inventory</button>
                         <button className={smallButton} onClick={() => resolve(review.id, "ignore")}>Ignore row</button>

@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Bot, CheckCircle2, FileText, Send, Sparkles } from "lucide-react";
 import type { AiProviderKey, OperatingData } from "@/domain/business";
+import { activeVariants } from "@/lib/product-state";
 
 const prompts = [
   "What should I reorder today?",
@@ -31,7 +32,7 @@ export function AiCenterPanel({ data, provider }: { data: OperatingData; provide
   const [status, setStatus] = useState("Ready. Faust will answer only from saved business records.");
   const [latestAnswer, setLatestAnswer] = useState("");
   const [busy, setBusy] = useState(false);
-  const variantId = data.variants[0]?.id;
+  const variantId = activeVariants(data)[0]?.id;
   const latestRecommendationId = useMemo(() => firstRecommendationId(data), [data]);
 
   async function run(payload: Record<string, unknown>, success: string) {

@@ -16,6 +16,7 @@ import { OperationButton } from "@/components/operations/operation-button";
 import { PurchasingActionsPanel } from "@/components/operations/purchasing-actions-panel";
 import type { ReturnTypeSnapshot } from "@/components/operations/types";
 import { availableUnits, money, orderProfit } from "@/lib/business-calculations";
+import { activeVariants } from "@/lib/product-state";
 import { getProductReadiness, readinessLabel } from "@/lib/product-readiness";
 
 type ModuleName = "inventory" | "orders" | "listings" | "sourcing" | "purchasing" | "shipping" | "finance" | "suppliers" | "customers" | "analytics" | "automations" | "ai" | "tasks";
@@ -67,7 +68,7 @@ function ModuleRecommendation({ module, snapshot }: { module: ModuleName; snapsh
 
 function buildModuleRecommendation(module: ModuleName, snapshot: ReturnTypeSnapshot): FaustRecommendation | null {
   const { data, metrics, reorders } = snapshot;
-  const firstVariant = data.variants[0];
+  const firstVariant = activeVariants(data)[0];
   const firstProduct = firstVariant ? data.products.find((product) => product.id === firstVariant.productId) : undefined;
   const readiness = firstVariant ? getProductReadiness(data, firstVariant, firstProduct) : undefined;
   const orderQueue = data.orders.filter((order) => ["paid", "confirmed", "reserved", "ready_to_pack", "packed", "ready_to_ship"].includes(order.status));
@@ -103,7 +104,7 @@ function DecisionSummary({ module, snapshot }: { module: ModuleName; snapshot: R
     inventory: [["Available stock", String(metrics.availableUnits), "ready to sell"], ["Incoming", String(metrics.incoming), "units inbound"], ["Reorder alerts", String(reorders.length), "need review"]],
     orders: [["Needs processing", String(ordersNeedingWork), "orders"], ["Revenue", money(metrics.revenue), "recorded"], ["Average order", money(metrics.averageOrderValue), "AOV"]],
     listings: [["Draft issues", String(listingIssues), "need review"], ["Live listings", String(data.listings.filter((listing) => listing.status === "active").length), "active"], ["Marketplaces", String(new Set(data.listings.map((listing) => listing.marketplace)).size), "connected"]],
-    sourcing: [["Products", String(data.products.length), "in Faust"], ["Source items", String(data.products.filter((product) => product.sourceUrl).length), "imported"], ["Inventory value", money(metrics.inventoryValue), "basis"]],
+    sourcing: [["Products", String(activeVariants(data).length), "in Faust"], ["Source items", String(data.products.filter((product) => product.sourceUrl && activeVariants(data).some((variant) => variant.productId === product.id)).length), "imported"], ["Inventory value", money(metrics.inventoryValue), "basis"]],
     purchasing: [["Reorder candidates", String(reorders.length), "ready"], ["Open POs", String(data.purchaseOrders.filter((po) => po.status !== "received").length), "plans"], ["Incoming", String(metrics.incoming), "units"]],
     shipping: [["Ready to ship", String(metrics.readyToShip), "orders"], ["Exceptions", String(data.notices.filter((notice) => notice.category === "shipping" && !notice.resolved).length), "open"], ["Orders waiting", String(ordersNeedingWork), "work queue"]],
     finance: [["Cash", money(metrics.cash), "cleared"], ["Pending payouts", money(pendingPayouts), "expected"], ["Profit", money(metrics.netProfit), "contribution"]],
@@ -147,7 +148,7 @@ function Content({ module, snapshot }: { module: ModuleName; snapshot: ReturnTyp
 
 function InventoryTable({ snapshot }: { snapshot: ReturnTypeSnapshot }) {
   const { data } = snapshot;
-  return <DataTable headers={["SKU", "Location", "On hand", "Reserved", "Available", "Incoming", "Cost"]}>{data.variants.map((variant) => { const balance = data.balances.find((x) => x.variantId === variant.id); const location = data.locations.find((x) => x.id === balance?.locationId); return <tr key={variant.id}><TableCell primary={variant.sku} secondary={variant.title} /><td className="px-5 py-3">{location?.label || "Unassigned"}</td><td className="px-5 py-3">{balance?.onHand || 0}</td><td className="px-5 py-3">{balance?.reserved || 0}</td><td className="px-5 py-3">{balance ? availableUnits(balance) : 0}</td><td className="px-5 py-3">{balance?.incoming || 0}</td><td className="px-5 py-3">{money(variant.landedUnitCost)}</td></tr>; })}</DataTable>;
+  return <DataTable headers={["SKU", "Location", "On hand", "Reserved", "Available", "Incoming", "Cost"]}>{activeVariants(data).map((variant) => { const balance = data.balances.find((x) => x.variantId === variant.id); const location = data.locations.find((x) => x.id === balance?.locationId); return <tr key={variant.id}><TableCell primary={variant.sku} secondary={variant.title} /><td className="px-5 py-3">{location?.label || "Unassigned"}</td><td className="px-5 py-3">{balance?.onHand || 0}</td><td className="px-5 py-3">{balance?.reserved || 0}</td><td className="px-5 py-3">{balance ? availableUnits(balance) : 0}</td><td className="px-5 py-3">{balance?.incoming || 0}</td><td className="px-5 py-3">{money(variant.landedUnitCost)}</td></tr>; })}</DataTable>;
 }
 
 function OrdersTable({ snapshot }: { snapshot: ReturnTypeSnapshot }) {
@@ -220,7 +221,7 @@ function PurchasingWorkspace({ snapshot }: { snapshot: ReturnTypeSnapshot }) {
     </section>
     <section className="grid gap-5 xl:grid-cols-3">
       <DataCard title="Supplier claims"><div className="space-y-3">{claims.length ? claims.map((claim) => <div className="faust-card p-3" key={claim.id}><div className="flex justify-between gap-3"><b>{formatStatus(claim.type)}</b><StatusBadge value={claim.status} tone={statusTone(claim.status)} /></div><p className="mt-1 text-sm text-muted-foreground">{claim.quantity || 0} units · {claim.detail}</p></div>) : <p className="text-sm text-muted-foreground">No shortage, overage, or damage claims are open.</p>}</div></DataCard>
-      <DataCard title="Reorder planning"><div className="space-y-3">{recommendations.length ? recommendations.map((item) => { const variant = data.variants.find((entry) => entry.id === item.variantId); return <div className="faust-card p-3" key={item.id}><div className="flex justify-between gap-3"><b>{variant?.sku || "Unknown SKU"}</b><StatusBadge value={item.status} tone={statusTone(item.status)} /></div><p className="mt-1 text-sm text-muted-foreground">{item.recommendedQuantity} suggested · {money(item.estimatedCostUsd)} estimated · {item.available} available / {item.incoming} incoming</p></div>; }) : <p className="text-sm text-muted-foreground">Current stock and incoming units are above reorder thresholds.</p>}</div></DataCard>
+      <DataCard title="Reorder planning"><div className="space-y-3">{recommendations.length ? recommendations.filter((item) => activeVariants(data).some((variant) => variant.id === item.variantId)).map((item) => { const variant = activeVariants(data).find((entry) => entry.id === item.variantId); return <div className="faust-card p-3" key={item.id}><div className="flex justify-between gap-3"><b>{variant?.sku || "Unknown SKU"}</b><StatusBadge value={item.status} tone={statusTone(item.status)} /></div><p className="mt-1 text-sm text-muted-foreground">{item.recommendedQuantity} suggested · {money(item.estimatedCostUsd)} estimated · {item.available} available / {item.incoming} incoming</p></div>; }) : <p className="text-sm text-muted-foreground">Current stock and incoming units are above reorder thresholds.</p>}</div></DataCard>
       <DataCard title="Freight consolidation"><div className="space-y-3">{(data.freightConsolidations || []).map((item) => <div className="faust-card p-3" key={item.id}><div className="flex justify-between gap-3"><b>{item.supplierId ? data.suppliers.find((supplier) => supplier.id === item.supplierId)?.name || "Supplier freight" : "Multi-supplier freight"}</b><StatusBadge value={item.status} tone={statusTone(item.status)} /></div><p className="mt-1 text-sm text-muted-foreground">Domestic {money(item.domesticFreightUsd)} · International {money(item.internationalFreightUsd)} · Duties {money(item.dutiesUsd)}</p></div>)}</div></DataCard>
     </section>
   </div>;
@@ -236,7 +237,7 @@ function SuppliersWorkspace({ snapshot }: { snapshot: ReturnTypeSnapshot }) {
     })}</DataTable>
     <section className="grid gap-5 xl:grid-cols-2">
       <DataCard title="Contacts and communication history"><div className="space-y-3">{(data.supplierContacts || []).map((contact) => <div className="faust-card p-3" key={contact.id}><b>{contact.name}</b><p className="text-sm text-muted-foreground">{contact.role || "Contact"} · {contact.channel} · {contact.handle || "No handle"}</p></div>)}{(data.supplierCommunications || []).map((message) => <div className="faust-card p-3" key={message.id}><StatusBadge value={message.direction} /><p className="mt-1 text-sm">{message.subject}</p><p className="mt-1 text-xs text-muted-foreground">{message.channel} · {new Date(message.occurredAt).toLocaleString()}</p></div>)}</div></DataCard>
-      <DataCard title="Price and performance comparison"><div className="space-y-3">{(data.supplierPriceHistory || []).map((price) => { const variant = data.variants.find((entry) => entry.id === price.variantId); return <div className="faust-card p-3" key={price.id}><b>{variant?.sku || "Unknown SKU"}</b><p className="text-sm text-muted-foreground">{price.currency} {price.unitCostOriginal.toFixed(2)} · {money(price.unitCostUsd)} landed basis · MOQ {price.minimumOrderQuantity || 1}</p></div>; })}</div></DataCard>
+      <DataCard title="Price and performance comparison"><div className="space-y-3">{(data.supplierPriceHistory || []).filter((price) => activeVariants(data).some((variant) => variant.id === price.variantId)).map((price) => { const variant = activeVariants(data).find((entry) => entry.id === price.variantId); return <div className="faust-card p-3" key={price.id}><b>{variant?.sku || "Unknown SKU"}</b><p className="text-sm text-muted-foreground">{price.currency} {price.unitCostOriginal.toFixed(2)} · {money(price.unitCostUsd)} landed basis · MOQ {price.minimumOrderQuantity || 1}</p></div>; })}</div></DataCard>
     </section>
   </div>;
 }

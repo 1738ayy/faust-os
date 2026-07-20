@@ -1,5 +1,6 @@
 import type { Budget, Expense, Forecast, FinanceCategory, FinancialAccount, OperatingData, Order, Payout, PayoutReconciliation, ReinvestmentAllocation, TaxReserveMovement, Transaction } from "@/domain/business";
 import { inventoryValue, orderProfit } from "./business-calculations";
+import { activeBalances, activeInventoryValue, activeVariants } from "./product-state";
 
 const now = () => new Date().toISOString();
 const monthKey = (date = new Date()) => date.toISOString().slice(0, 7);
@@ -168,7 +169,7 @@ function normalizeForecasts(data: OperatingData, reconciliations: ReturnType<typ
   if (data.forecasts?.length) return data.forecasts;
   const revenue = sum(reconciliations, (entry) => entry.netSale);
   const contributionProfit = sum(reconciliations, (entry) => entry.contributionProfit);
-  const reorderCosts = sum(data.variants, (variant) => {
+  const reorderCosts = sum(activeVariants(data), (variant) => {
     const balance = data.balances.find((entry) => entry.variantId === variant.id);
     const available = balance ? Math.max(0, balance.onHand - balance.reserved - balance.damaged - balance.quarantined) : 0;
     return available <= variant.reorderPoint ? variant.reorderQuantity * variant.landedUnitCost : 0;
@@ -199,5 +200,5 @@ function buildFinanceOverview(data: OperatingData, ledger: FinanceLedgerEntry[],
     { label: "Tax reserve", amount: -taxReserveAmount, sourceType: "tax_reserve", sourceIds: taxReserve.map((entry) => entry.id) },
     { label: "Minimum operating buffer", amount: -operatingBuffer, sourceType: "budgets", sourceIds: budgets.map((entry) => entry.id) },
   ];
-  return { grossSales, netSales, cogs, grossProfit, contributionProfit, operatingExpenses, operatingProfit, margin: netSales ? round(contributionProfit / netSales * 100) : 0, cash, pendingPayouts, committedPurchaseSpending, taxReserve: taxReserveAmount, operatingBuffer, unpaidObligations, deployableCash, deployableComponents, inventoryValue: inventoryValue(data.balances, data.variants) };
+  return { grossSales, netSales, cogs, grossProfit, contributionProfit, operatingExpenses, operatingProfit, margin: netSales ? round(contributionProfit / netSales * 100) : 0, cash, pendingPayouts, committedPurchaseSpending, taxReserve: taxReserveAmount, operatingBuffer, unpaidObligations, deployableCash, deployableComponents, inventoryValue: inventoryValue(activeBalances(data), activeVariants(data)) || activeInventoryValue(data) };
 }

@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { OperatingData } from "@/domain/business";
+import { activeVariants } from "@/lib/product-state";
 
 const button = "rounded-full border border-slate-700/60 bg-zinc-950/50 px-3 py-1.5 text-xs font-medium transition hover:border-slate-400/50 hover:text-white disabled:opacity-50";
 
@@ -10,7 +11,7 @@ export function PurchasingActionsPanel({ data }: { data: OperatingData }) {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState("");
   const supplier = data.suppliers[0];
-  const variant = data.variants[0];
+  const variant = activeVariants(data)[0];
   const po = data.purchaseOrders[0];
   const receivablePo = data.purchaseOrders.find((entry) => entry.items.some((item) => item.receivedQuantity < item.expectedQuantity)) || po;
 

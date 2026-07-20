@@ -15,7 +15,7 @@ test("primary operations pages render their operational page titles", async ({ r
   await resetDemo(request);
   const routes = [
     ["/", "Know what needs action next."],
-    ["/inventory", "Stock, locations, and receiving"],
+    ["/inventory", "Inventory"],
     ["/orders", "Orders"],
     ["/purchasing", "Purchasing & inbound"],
     ["/shipping", "Warehouse fulfillment center"],
@@ -73,7 +73,7 @@ test("automations create, test, enable, run, approve, retry, duplicate, archive,
   await expect(automationMain.getByRole("heading", { name: "Rule builder, run logs, retries, and failures", exact: true })).toBeVisible();
   const builder = page.getByRole("region", { name: "Automation builder" });
   await expect(builder).toBeVisible();
-  for (const label of ["Create rule", "Install template", "Test rule", "Enable rule", "Trigger run", "Trigger real event", "Worker tick", "Pause schedule", "Resume schedule", "Duplicate rule", "Archive rule"]) await expect(builder.getByRole("button", { name: label, exact: true })).toBeVisible();
+  for (const label of ["Create rule", "Install template", "Test rule", "Enable rule", "Run now", "Send event", "Process tasks", "Pause schedule", "Resume schedule", "Duplicate rule", "Archive rule"]) await expect(builder.getByRole("button", { name: label, exact: true })).toBeVisible();
   await expect(automationMain.getByRole("heading", { name: "Rules", level: 2, exact: true })).toBeVisible();
   await expect(automationMain.getByRole("heading", { name: "Active Runs", level: 2, exact: true })).toBeVisible();
   await expect(automationMain.getByRole("heading", { name: "Run steps", level: 2, exact: true })).toBeVisible();
@@ -89,10 +89,10 @@ test("automations create, test, enable, run, approve, retry, duplicate, archive,
 
 test("AI Center answers with evidence, generates briefs, scenarios, approvals, and history", async ({ request, page }) => {
   await resetDemo(request);
-  const ask = await request.post("/api/ai-center/actions", { data: { action: "ask-question", question: "What should I reorder today?", saveQuestion: true, provider: "deterministic" } });
+  const ask = await request.post("/api/ai-center/actions", { data: { action: "ask-question", question: "Is Vintage wash heavyweight hoodie active?", saveQuestion: true, provider: "deterministic" } });
   expect(ask.ok(), await ask.text()).toBeTruthy();
   let state = (await ask.json()).data;
-  expect(state.aiMessages.some((entry: { role: string; content: string; evidenceIds: string[] }) => entry.role === "assistant" && entry.content.includes("FST-HOOD-001") && entry.evidenceIds.length > 0)).toBeTruthy();
+  expect(state.aiMessages.some((entry: { role: string; content: string; evidenceIds: string[] }) => entry.role === "assistant" && entry.content.includes("Vintage wash heavyweight hoodie") && entry.content.includes("active") && entry.evidenceIds.length > 0)).toBeTruthy();
   expect(state.aiToolCalls.some((entry: { toolName: string }) => entry.toolName === "ai.internal_records.query")).toBeTruthy();
   const brief = await request.post("/api/ai-center/actions", { data: { action: "daily-brief", provider: "deterministic" } });
   expect(brief.ok(), await brief.text()).toBeTruthy();
@@ -123,7 +123,7 @@ test("AI Center answers with evidence, generates briefs, scenarios, approvals, a
   await expect(aiMain.getByRole("link", { name: "FST-HOOD-001", exact: true })).toBeVisible();
   await expect(aiMain.getByText("Buy 300 units", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Ask question", exact: true }).click();
-  await expect(page.getByRole("status")).toContainText("Grounded answer saved.");
+  await expect(page.getByRole("status")).toContainText(/Grounded answer saved/);
 });
 
 test("browser extension API scans, analyzes, imports, confirms, syncs, and reports failures", async ({ request }) => {
@@ -170,6 +170,95 @@ test("browser extension API scans, analyzes, imports, confirms, syncs, and repor
   expect(state.data.listingReviewItems.some((entry: { detail: string }) => entry.detail === "Selector changed in controlled test")).toBeTruthy();
   expect(state.data.extensionArtifacts.length).toBeGreaterThanOrEqual(2);
   expect(state.data.extensionActionAudits.some((entry: { action: string }) => entry.action === "report-error")).toBeTruthy();
+});
+
+test("product lifecycle stays synchronized across active views, archive, restore, and hard delete", async ({ request, page }) => {
+  await resetDemo(request);
+  const unique = crypto.randomUUID().slice(0, 8);
+  const title = `D6 Sync Hoodie ${unique}`;
+  const sourceUrl = `https://detail.1688.com/offer/d6-${unique}.html`;
+  const product = { source: "1688", importedAt: new Date().toISOString(), title, superbuyUrl: sourceUrl, supplier: "D6 Sync Factory", storeName: "D6 Sync Factory", images: ["https://img.example.test/d6.jpg"], variants: [{ id: "d6-l", name: "Black / L", options: ["Black", "L"], price: 120 }], price: 120, domesticShipping: 10, minimumOrderQuantity: 2, weight: "600g", sellerRating: 4.8, salesCount: 640, pageTimestamp: new Date().toISOString() };
+
+  const registration = await request.post("/api/extension/register", { data: { deviceName: "D6 lifecycle extension", browser: "Chromium", environment: "local", version: "1.1.0-phase2", permissions: ["storage", "tabs"], idempotencyKey: crypto.randomUUID() } });
+  expect(registration.ok(), await registration.text()).toBeTruthy();
+  const registered = await registration.json();
+  const authHeaders = () => ({ "X-Faust-Device-Id": registered.actionResult.deviceId, "X-Faust-Extension-Token": registered.actionResult.token, "X-Faust-Nonce": crypto.randomUUID() });
+
+  const imported = await request.post("/api/extension/import", { headers: authHeaders(), data: { product, assumptions: { rmbUsdRate: 0.14, targetSalePriceUsd: 72, quantity: 2 }, approved: true, idempotencyKey: crypto.randomUUID() } });
+  expect(imported.ok(), await imported.text()).toBeTruthy();
+  let state = (await imported.json()).data;
+  const variant = state.variants.find((entry: { productId: string; sku: string }) => state.products.find((item: { id: string; title: string }) => item.id === entry.productId && item.title === title));
+  expect(variant).toBeTruthy();
+  const draft = state.channelListingDrafts.find((entry: { variantId: string; marketplace: string }) => entry.variantId === variant.id && entry.marketplace === "Depop");
+  expect(draft).toBeTruthy();
+
+  const confirm = await request.post("/api/extension/confirm", { headers: authHeaders(), data: { draftId: draft.id, externalListingId: `D6-DEPOP-${unique}`, externalUrl: `https://www.depop.com/products/d6-${unique}`, finalTitle: title, finalPrice: 72 } });
+  expect(confirm.ok(), await confirm.text()).toBeTruthy();
+  state = (await confirm.json()).data;
+  expect(state.products.find((entry: { title: string }) => entry.title === title).status).toBe("draft");
+
+  await page.goto("/catalog");
+  let appMain = page.getByTestId("app-main");
+  await expect(appMain.getByText(title, { exact: true })).toBeVisible();
+  await page.goto(`/search?q=${encodeURIComponent(title)}`);
+  appMain = page.getByTestId("app-main");
+  await expect(appMain.getByRole("link", { name: new RegExp(title) })).toBeVisible();
+  await page.goto("/inventory");
+  appMain = page.getByTestId("app-main");
+  await expect(appMain.getByRole("heading", { name: variant.sku, exact: true })).toBeVisible();
+  await page.goto("/listings");
+  appMain = page.getByTestId("app-main");
+  await expect(appMain.getByRole("cell", { name: variant.sku, exact: true })).toHaveCount(5);
+  await page.goto("/analytics");
+  appMain = page.getByTestId("app-main");
+  await expect(appMain.getByRole("link", { name: variant.sku, exact: true })).toBeVisible();
+
+  let ask = await request.post("/api/ai-center/actions", { data: { action: "ask-question", question: "How many active products do I have?", provider: "deterministic" } });
+  expect(ask.ok(), await ask.text()).toBeTruthy();
+  state = (await ask.json()).data;
+  expect(state.aiMessages.at(-1).content).toContain("active product SKU");
+
+  const archived = await request.post("/api/products/actions", { data: { action: "delete", variantId: variant.id } });
+  expect(archived.ok(), await archived.text()).toBeTruthy();
+  state = (await archived.json()).data;
+  expect(state.products.find((entry: { title: string }) => entry.title === title).status).toBe("paused");
+  expect(state.variants.find((entry: { id: string }) => entry.id === variant.id).active).toBeFalsy();
+
+  for (const route of ["/catalog", `/search?q=${encodeURIComponent(title)}`, "/inventory", "/listings", "/analytics"] as const) {
+    await page.goto(route);
+    await expect(page.getByTestId("app-main").getByText(title, { exact: true })).toHaveCount(0);
+    await expect(page.getByTestId("app-main").getByText(variant.sku, { exact: true })).toHaveCount(0);
+  }
+  ask = await request.post("/api/ai-center/actions", { data: { action: "ask-question", question: "Show my archived products.", provider: "deterministic" } });
+  expect(ask.ok(), await ask.text()).toBeTruthy();
+  state = (await ask.json()).data;
+  expect(state.aiMessages.at(-1).content).toContain(title);
+
+  const restored = await request.post("/api/products/actions", { data: { action: "restore", variantId: variant.id } });
+  expect(restored.ok(), await restored.text()).toBeTruthy();
+  state = (await restored.json()).data;
+  expect(state.products.filter((entry: { title: string }) => entry.title === title)).toHaveLength(1);
+  expect(state.variants.find((entry: { id: string }) => entry.id === variant.id).active).toBeTruthy();
+  await page.goto("/catalog");
+  await expect(page.getByTestId("app-main").getByText(title, { exact: true })).toBeVisible();
+  await page.reload();
+  await expect(page.getByTestId("app-main").getByText(title, { exact: true })).toBeVisible();
+
+  const duplicate = await request.post("/api/products/actions", { data: { action: "duplicate", variantId: variant.id } });
+  expect(duplicate.ok(), await duplicate.text()).toBeTruthy();
+  state = (await duplicate.json()).data;
+  const duplicateVariant = state.variants.find((entry: { sku: string }) => entry.sku.startsWith(`${variant.sku}-COPY`));
+  const duplicateProduct = state.products.find((entry: { id: string }) => entry.id === duplicateVariant.productId);
+  expect(duplicateProduct.title).toBe(`${title} copy`);
+  const hardDeleted = await request.post("/api/products/actions", { data: { action: "delete", variantId: duplicateVariant.id } });
+  expect(hardDeleted.ok(), await hardDeleted.text()).toBeTruthy();
+  state = (await hardDeleted.json()).data;
+  expect(state.variants.some((entry: { id: string }) => entry.id === duplicateVariant.id)).toBeFalsy();
+  expect(state.products.some((entry: { id: string }) => entry.id === duplicateProduct.id)).toBeFalsy();
+  await page.goto("/catalog");
+  await expect(page.getByTestId("app-main").getByText(`${title} copy`, { exact: true })).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByTestId("app-main").getByText(`${title} copy`, { exact: true })).toHaveCount(0);
 });
 
 test("production health API reports migration, storage, worker, extension, and provider readiness", async ({ request }) => {
@@ -237,7 +326,7 @@ test("fulfillment center browser flow drives real API actions", async ({ request
   await page.getByRole("button", { name: "Select best rate" }).click();
   await expect(page.getByRole("status")).toContainText("Rate selected.");
   await expect(labelWorkflow.getByText(/USPS Mock - Ground Advantage - postage/i)).toBeVisible();
-  await page.getByRole("button", { name: "Generate mock label" }).click();
+  await page.getByRole("button", { name: "Generate test label" }).click();
   await expect(page.getByRole("status")).toContainText("Label generated.");
   await page.getByRole("button", { name: "Print/reprint" }).click();
   await expect(page.getByRole("status")).toContainText("Label print recorded.");
@@ -267,7 +356,7 @@ test("fulfillment center browser flow drives real API actions", async ({ request
 
 test("local source-to-sale fixture can be loaded without external credentials", async ({ request, page }) => {
   await resetDemo(request);
-  await page.goto("/orders"); const appMain = page.getByTestId("app-main"); await expect(appMain.getByRole("heading", { name: "FO-1042 - Depop", exact: true })).toBeVisible();
+  await page.goto("/orders"); const appMain = page.getByTestId("app-main"); await expect(appMain.getByRole("row", { name: /FO-1042 Depop Jordan Reed/i })).toBeVisible();
   await page.goto("/purchasing"); await expect(page.getByText("DEMO-17TRACK-1042")).toBeVisible();
 });
 
@@ -410,7 +499,7 @@ test("analytics decision engine supports filtering, drilldowns, and CSV export",
   await expect(productAnalytics.getByRole("link", { name: "FST-HOOD-001", exact: true })).toBeVisible();
   const inventoryValueCard = analyticsMain.locator("article").filter({ has: page.getByText("Inventory value", { exact: true }) });
   await expect(inventoryValueCard).toBeVisible();
-  await expect(inventoryValueCard.getByRole("link", { name: /drill through/i })).toBeVisible();
+  await expect(inventoryValueCard.getByRole("link", { name: /open source records/i })).toBeVisible();
   const reportBuilder = page.getByRole("region", { name: "Analytics report builder" });
   await expect(reportBuilder).toBeVisible();
   for (const label of ["Create saved report", "Save active filters", "Duplicate report", "Record export run"]) {
