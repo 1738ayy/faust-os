@@ -9,7 +9,7 @@ const separator = " · ";
 
 const Header = ({ eyebrow, title, description }: { eyebrow: string; title: string; description: string }) => (
   <header>
-    <p className="text-sm font-medium text-sky-200">{eyebrow}</p>
+    <p className="text-sm font-medium text-[#c8d2e6]">{eyebrow}</p>
     <h1 data-testid="page-title" className="mt-2 text-3xl font-semibold md:text-4xl">{title}</h1>
     <p className="mt-3 max-w-4xl text-sm leading-6 text-muted-foreground">{description}</p>
   </header>
@@ -17,16 +17,16 @@ const Header = ({ eyebrow, title, description }: { eyebrow: string; title: strin
 
 const Panel = ({ title, children }: { title: string; children: React.ReactNode }) => (
   <section className="faust-surface overflow-hidden">
-    <h2 className="border-b border-sky-950/45 px-5 py-4 font-semibold">{title}</h2>
+    <h2 className="border-b border-slate-700/45 px-5 py-4 font-semibold">{title}</h2>
     {children}
   </section>
 );
 
 const Metric = ({ label, value, href }: { label: string; value: string; href?: string }) => (
-  <article className="faust-card p-5 transition hover:border-sky-400/35">
+  <article className="faust-card p-5 transition hover:border-slate-400/35">
     <p className="text-sm text-muted-foreground">{label}</p>
     <p className="mt-3 font-heading text-2xl font-semibold tabular-nums">{value}</p>
-    {href && <Link className="mt-3 inline-block text-xs font-medium text-sky-200 hover:text-sky-100" href={href}>Open source records →</Link>}
+    {href && <Link className="mt-3 inline-block text-xs font-medium text-[#c8d2e6] hover:text-[#edf3ff]" href={href}>Open source records →</Link>}
   </article>
 );
 
@@ -35,12 +35,12 @@ const DecisionCallout = ({ analytics }: { analytics: AnalyticsModel }) => {
   const topProduct = [...analytics.products].sort((a, b) => b.profit - a.profit)[0];
   const title = topProduct ? `Start with ${topProduct.sku}: it is the strongest profit signal.` : "Start with executive health before changing filters.";
   const detail = topProduct ? `${topProduct.sku} shows ${money(topProduct.profit)} profit and ${topProduct.margin.toFixed(1)}% margin. Then compare channel and supplier performance underneath.` : `${money(executive.revenue)} revenue, ${money(executive.operatingProfit)} operating profit, and ${money(executive.deployableCash)} deployable cash are the current decision anchors.`;
-  return <section className="rounded-3xl border border-sky-950/45 bg-zinc-950/55 p-5 shadow-lg shadow-black/20 backdrop-blur"><p className="text-xs font-medium uppercase tracking-[0.16em] text-sky-200">Faust recommendation</p><h2 className="mt-2 text-xl font-semibold">{title}</h2><p className="mt-2 max-w-4xl text-sm leading-6 text-muted-foreground">{detail}</p></section>;
+  return <section className="rounded-3xl border border-slate-700/45 bg-zinc-950/55 p-5 shadow-lg shadow-black/20 backdrop-blur"><p className="text-xs font-medium uppercase tracking-[0.16em] text-[#c8d2e6]">Faust recommendation</p><h2 className="mt-2 text-xl font-semibold">{title}</h2><p className="mt-2 max-w-4xl text-sm leading-6 text-muted-foreground">{detail}</p></section>;
 };
 
 const Row = ({ label, value, href }: { label: string; value: React.ReactNode; href?: string }) => (
-  <div className="flex justify-between gap-4 border-b border-sky-950/35 px-5 py-3 text-sm last:border-0">
-    <span className="text-muted-foreground">{href ? <Link className="text-sky-200 hover:text-sky-100" href={href}>{label}</Link> : label}</span>
+  <div className="flex justify-between gap-4 border-b border-slate-700/35 px-5 py-3 text-sm last:border-0">
+    <span className="text-muted-foreground">{href ? <Link className="text-[#c8d2e6] hover:text-[#edf3ff]" href={href}>{label}</Link> : label}</span>
     <span className="text-right">{value}</span>
   </div>
 );
@@ -86,8 +86,8 @@ function ReportFilters({ analytics, filters }: { analytics: AnalyticsModel; filt
         <label className="text-sm text-muted-foreground">To<input className="faust-field faust-focus mt-1 w-full p-2" type="date" name="to" defaultValue={filters.to} /></label>
         <label className="text-sm text-muted-foreground">Marketplace<select className="faust-field faust-focus mt-1 w-full p-2" name="marketplace" defaultValue={filters.marketplace || "all"}><option value="all">All marketplaces</option>{analytics.channels.map((channel) => <option key={channel.marketplace} value={channel.marketplace}>{channel.marketplace}</option>)}</select></label>
         <label className="text-sm text-muted-foreground">SKU<select className="faust-field faust-focus mt-1 w-full p-2" name="sku" defaultValue={filters.sku || "all"}><option value="all">All SKUs</option>{analytics.products.map((product) => <option key={product.variantId} value={product.sku}>{product.sku}</option>)}</select></label>
-        <button className="self-end rounded-full bg-sky-500 px-3 py-2 text-sm font-semibold text-white shadow-lg shadow-sky-950/30 transition hover:bg-sky-400">Apply filters</button>
-        <Link className="self-end rounded-full border border-sky-950/60 bg-zinc-950/50 px-3 py-2 text-center text-sm transition hover:border-sky-400/50" href={`/api/exports/analytics?${new URLSearchParams(Object.entries(filters).filter(([, value]) => Boolean(value)) as [string, string][]).toString()}`}>Export CSV</Link>
+        <button className="self-end rounded-full bg-[#56627f] px-3 py-2 text-sm font-semibold text-white shadow-lg shadow-slate-950/30 transition hover:bg-[#66708d]">Apply filters</button>
+        <Link className="self-end rounded-full border border-slate-700/60 bg-zinc-950/50 px-3 py-2 text-center text-sm transition hover:border-slate-400/50" href={`/api/exports/analytics?${new URLSearchParams(Object.entries(filters).filter(([, value]) => Boolean(value)) as [string, string][]).toString()}`}>Export CSV</Link>
       </form>
     </Panel>
   );
@@ -125,15 +125,15 @@ function ProductAnalytics({ analytics }: { analytics: AnalyticsModel }) {
             <tr>{["SKU", "Revenue", "Profit", "Margin", "Sell-through", "Days to sell", "Turnover", "Lot drilldown", "Risk"].map((header) => <th className="px-5 py-3" key={header}>{header}</th>)}</tr>
           </thead>
           <tbody>{analytics.products.map((product) => (
-            <tr className="border-t border-sky-950/35" key={product.variantId}>
-              <td className="px-5 py-3"><Link className="text-sky-200 hover:text-sky-100" href={product.sourceHref}>{product.sku}</Link><p className="text-xs text-muted-foreground">{product.title}</p></td>
+            <tr className="border-t border-slate-700/35" key={product.variantId}>
+              <td className="px-5 py-3"><Link className="text-[#c8d2e6] hover:text-[#edf3ff]" href={product.sourceHref}>{product.sku}</Link><p className="text-xs text-muted-foreground">{product.title}</p></td>
               <td className="px-5 py-3">{money(product.revenue)}</td>
               <td className="px-5 py-3">{money(product.profit)}</td>
               <td className="px-5 py-3"><Percent value={product.margin} /></td>
               <td className="px-5 py-3"><Percent value={product.sellThrough} /></td>
               <td className="px-5 py-3">{product.daysToSell}</td>
               <td className="px-5 py-3">{product.inventoryTurnover}</td>
-              <td className="px-5 py-3"><Link className="text-sky-200 hover:text-sky-100" href={product.lotHref}>Lot profitability</Link><p className="text-xs text-muted-foreground">{product.lotProfitability.map((lot) => `${lot.capitalUtilization}% utilized`).join(separator) || "No lots"}</p></td>
+              <td className="px-5 py-3"><Link className="text-[#c8d2e6] hover:text-[#edf3ff]" href={product.lotHref}>Lot profitability</Link><p className="text-xs text-muted-foreground">{product.lotProfitability.map((lot) => `${lot.capitalUtilization}% utilized`).join(separator) || "No lots"}</p></td>
               <td className="px-5 py-3">{[product.deadStock && "dead stock", product.overstock && "overstock", product.stockoutRisk && "stockout risk", product.reorderQuantity > 0 && `reorder ${product.reorderQuantity}`].filter(Boolean).join(separator) || "healthy"}</td>
             </tr>
           ))}</tbody>

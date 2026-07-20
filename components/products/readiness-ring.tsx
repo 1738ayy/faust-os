@@ -1,11 +1,11 @@
 import { readinessLabel, readinessTone, type ProductReadiness } from "@/lib/product-readiness";
 
 const toneClasses = {
-  red: "from-sky-700 to-sky-950 text-sky-50 shadow-sky-950/40",
-  orange: "from-orange-500 to-sky-800 text-orange-50 shadow-orange-950/30",
+  red: "from-[#465170] to-slate-950 text-[#f6f8ff] shadow-slate-950/40",
+  orange: "from-orange-500 to-slate-800 text-orange-50 shadow-orange-950/30",
   yellow: "from-yellow-300 to-orange-600 text-yellow-50 shadow-yellow-950/25",
-  green: "from-emerald-300 to-sky-500 text-emerald-50 shadow-emerald-950/25",
-  blue: "from-sky-300 to-sky-500 text-sky-50 shadow-sky-950/25",
+  green: "from-emerald-300 to-[#56627f] text-emerald-50 shadow-emerald-950/25",
+  blue: "from-[#8f9bb8] to-[#56627f] text-[#f6f8ff] shadow-slate-950/25",
 };
 
 export function ReadinessRing({ readiness, size = "md" }: { readiness: ProductReadiness; size?: "sm" | "md" | "lg" }) {

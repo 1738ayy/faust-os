@@ -41,7 +41,7 @@ export function PageHeader({ eyebrow, title, description, action }: { eyebrow?: 
   return (
     <header className="flex flex-wrap items-end justify-between gap-4">
       <div>
-        {eyebrow && <p className="text-xs font-medium uppercase tracking-[0.2em] text-sky-200">{eyebrow}</p>}
+        {eyebrow && <p className="text-xs font-medium uppercase tracking-[0.2em] text-[#c8d2e6]">{eyebrow}</p>}
         <h1 data-testid="page-title" className="mt-3 text-3xl font-semibold tracking-tight md:text-4xl">{title}</h1>
         {description && <p className="mt-3 max-w-3xl text-sm leading-6 text-muted-foreground">{description}</p>}
       </div>
@@ -51,24 +51,24 @@ export function PageHeader({ eyebrow, title, description, action }: { eyebrow?: 
 }
 
 export function PrimaryButton({ href, children, className }: { href?: string; children: ReactNode; className?: string }) {
-  const classes = cn("faust-action focus-visible:ring-3 focus-visible:ring-sky-300/30", className);
+  const classes = cn("faust-action focus-visible:ring-3 focus-visible:ring-[#8f9bb8]/30", className);
   return href ? <Link href={href} className={classes}>{children}</Link> : <button className={classes}>{children}</button>;
 }
 
 export function SecondaryButton({ href, children, className }: { href?: string; children: ReactNode; className?: string }) {
-  const classes = cn("faust-secondary-action focus-visible:ring-3 focus-visible:ring-sky-300/25", className);
+  const classes = cn("faust-secondary-action focus-visible:ring-3 focus-visible:ring-[#8f9bb8]/25", className);
   return href ? <Link href={href} className={classes}>{children}</Link> : <button className={classes}>{children}</button>;
 }
 
 export function DangerButton({ children, className }: { children: ReactNode; className?: string }) {
-  return <button className={cn("inline-flex items-center justify-center gap-2 rounded-full border border-sky-400/40 bg-sky-400/10 px-4 py-2 text-sm font-semibold text-sky-100 transition hover:bg-sky-400/20 focus-visible:ring-3 focus-visible:ring-sky-300/25", className)}>{children}</button>;
+  return <button className={cn("inline-flex items-center justify-center gap-2 rounded-full border border-slate-400/40 bg-[#66708d]/10 px-4 py-2 text-sm font-semibold text-[#edf3ff] transition hover:bg-[#66708d]/20 focus-visible:ring-3 focus-visible:ring-[#8f9bb8]/25", className)}>{children}</button>;
 }
 
 export function DataCard({ title, description, children, className, icon: Icon }: { title?: string; description?: string; children: ReactNode; className?: string; icon?: ComponentType<{ className?: string }> }) {
   return (
     <section className={cn("faust-surface overflow-hidden p-5", className)}>
       {(title || description || Icon) && <div className="mb-4 flex items-start gap-3">
-        {Icon && <Icon className="mt-1 h-5 w-5 text-sky-200" />}
+        {Icon && <Icon className="mt-1 h-5 w-5 text-[#c8d2e6]" />}
         <div>
           {title && <h2 className="text-lg font-semibold">{title}</h2>}
           {description && <p className="mt-1 text-sm leading-6 text-muted-foreground">{description}</p>}
@@ -92,8 +92,8 @@ export function MetricCard({ label, value, detail, href }: { label: string; valu
 
 export function EmptyState({ title, description, action }: { title: string; description: string; action?: { label: string; href: string } }) {
   return (
-    <div className="mx-auto rounded-3xl border border-dashed border-sky-400/35 bg-zinc-950/60 p-10 text-center shadow-2xl shadow-black/25 backdrop-blur">
-      <PackageOpen className="mx-auto h-9 w-9 text-sky-200" />
+    <div className="mx-auto rounded-3xl border border-dashed border-slate-400/35 bg-zinc-950/60 p-10 text-center shadow-2xl shadow-black/25 backdrop-blur">
+      <PackageOpen className="mx-auto h-9 w-9 text-[#c8d2e6]" />
       <h2 className="mt-4 text-xl font-semibold">{title}</h2>
       <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-muted-foreground">{description}</p>
       {action && <div className="mt-7"><PrimaryButton href={action.href}>{action.label}</PrimaryButton></div>}
@@ -102,26 +102,26 @@ export function EmptyState({ title, description, action }: { title: string; desc
 }
 
 export function LoadingState({ label = "Loading Faust workspace..." }: { label?: string }) {
-  return <div className="faust-surface flex items-center gap-3 p-5 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin text-sky-200" />{label}</div>;
+  return <div className="faust-surface flex items-center gap-3 p-5 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin text-[#c8d2e6]" />{label}</div>;
 }
 
 export function ErrorState({ title = "Something needs attention", description }: { title?: string; description: string }) {
-  return <div className="faust-surface flex gap-3 border-sky-400/30 p-5 text-sm"><TriangleAlert className="mt-0.5 h-5 w-5 text-sky-200" /><div><h2 className="font-semibold">{title}</h2><p className="mt-1 text-muted-foreground">{description}</p></div></div>;
+  return <div className="faust-surface flex gap-3 border-slate-400/30 p-5 text-sm"><TriangleAlert className="mt-0.5 h-5 w-5 text-[#c8d2e6]" /><div><h2 className="font-semibold">{title}</h2><p className="mt-1 text-muted-foreground">{description}</p></div></div>;
 }
 
 export function StatusBadge({ value, tone = "neutral" }: { value?: string; tone?: "neutral" | "success" | "warning" | "danger" | "info" }) {
   const toneClasses = {
-    neutral: "border-sky-950/45 bg-black/35 text-zinc-200",
-    success: "border-sky-400/25 bg-sky-400/10 text-sky-50",
+    neutral: "border-slate-700/45 bg-black/35 text-zinc-200",
+    success: "border-slate-400/25 bg-[#66708d]/10 text-[#f6f8ff]",
     warning: "border-amber-500/25 bg-amber-500/10 text-amber-200",
-    danger: "border-sky-400/30 bg-sky-400/10 text-sky-100",
-    info: "border-sky-400/25 bg-sky-400/10 text-sky-50",
+    danger: "border-slate-400/30 bg-[#66708d]/10 text-[#edf3ff]",
+    info: "border-slate-400/25 bg-[#66708d]/10 text-[#f6f8ff]",
   }[tone];
   return <span className={cn("inline-flex rounded-full border px-2.5 py-1 text-xs font-medium capitalize", toneClasses)}>{formatStatus(value)}</span>;
 }
 
 export function MarketplaceBadge({ marketplace }: { marketplace: string }) {
-  return <span className="inline-flex rounded-full border border-sky-400/25 bg-sky-400/10 px-2.5 py-1 text-xs font-medium text-sky-50">{marketplace}</span>;
+  return <span className="inline-flex rounded-full border border-slate-400/25 bg-[#66708d]/10 px-2.5 py-1 text-xs font-medium text-[#f6f8ff]">{marketplace}</span>;
 }
 
 export function ConfidenceBadge({ value }: { value: number }) {
@@ -133,10 +133,10 @@ export function DataTable({ headers, children, minWidth = 720 }: { headers: stri
   return (
     <div className="faust-surface overflow-x-auto p-0">
       <table className="w-full text-left text-sm" style={{ minWidth }}>
-        <thead className="border-b border-sky-950/45 bg-black/20 text-xs text-muted-foreground">
+        <thead className="border-b border-slate-700/45 bg-black/20 text-xs text-muted-foreground">
           <tr>{headers.map((header) => <th className="px-5 py-3 font-medium" key={header}>{header}</th>)}</tr>
         </thead>
-        <tbody className="divide-y divide-sky-950/30">{children}</tbody>
+        <tbody className="divide-y divide-slate-700/30">{children}</tbody>
       </table>
     </div>
   );
@@ -147,5 +147,5 @@ export function TableCell({ primary, secondary }: { primary: ReactNode; secondar
 }
 
 export function ActivityTimeline({ items }: { items: { id: string; title: string; detail?: string; at?: string }[] }) {
-  return <div className="space-y-3">{items.map((item) => <div className="relative pl-5" key={item.id}><span className="absolute left-0 top-1.5 h-2 w-2 rounded-full bg-sky-300 shadow-[0_0_16px_rgba(186,230,253,.55)]" /><p className="text-sm font-medium">{item.title}</p>{item.detail && <p className="mt-1 text-xs leading-5 text-muted-foreground">{item.detail}</p>}{item.at && <p className="mt-1 text-xs text-muted-foreground">{item.at}</p>}</div>)}</div>;
+  return <div className="space-y-3">{items.map((item) => <div className="relative pl-5" key={item.id}><span className="absolute left-0 top-1.5 h-2 w-2 rounded-full bg-[#8f9bb8] shadow-[0_0_16px_rgba(154,167,194,.55)]" /><p className="text-sm font-medium">{item.title}</p>{item.detail && <p className="mt-1 text-xs leading-5 text-muted-foreground">{item.detail}</p>}{item.at && <p className="mt-1 text-xs text-muted-foreground">{item.at}</p>}</div>)}</div>;
 }

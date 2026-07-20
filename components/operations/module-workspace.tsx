@@ -171,7 +171,7 @@ function ShippingTable({ snapshot }: { snapshot: ReturnTypeSnapshot }) {
 
 function FinanceTable({ snapshot }: { snapshot: ReturnTypeSnapshot }) {
   const { data } = snapshot;
-  return <DataTable headers={["Date", "Description", "Category", "Amount", "Status"]}>{data.transactions.map((item) => <tr key={item.id}><td className="px-5 py-3">{new Date(item.occurredAt).toLocaleDateString()}</td><TableCell primary={item.description} secondary={formatStatus(item.type)} /><td className="px-5 py-3">{item.category}</td><td className={`px-5 py-3 ${item.amount >= 0 ? "text-emerald-300" : "text-sky-200"}`}>{money(item.amount)}</td><td className="px-5 py-3"><StatusBadge value={item.status} tone={statusTone(item.status)} /></td></tr>)}</DataTable>;
+  return <DataTable headers={["Date", "Description", "Category", "Amount", "Status"]}>{data.transactions.map((item) => <tr key={item.id}><td className="px-5 py-3">{new Date(item.occurredAt).toLocaleDateString()}</td><TableCell primary={item.description} secondary={formatStatus(item.type)} /><td className="px-5 py-3">{item.category}</td><td className={`px-5 py-3 ${item.amount >= 0 ? "text-emerald-300" : "text-[#c8d2e6]"}`}>{money(item.amount)}</td><td className="px-5 py-3"><StatusBadge value={item.status} tone={statusTone(item.status)} /></td></tr>)}</DataTable>;
 }
 
 function CustomersTable({ snapshot }: { snapshot: ReturnTypeSnapshot }) {

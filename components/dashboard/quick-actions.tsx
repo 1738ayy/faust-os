@@ -10,5 +10,5 @@ const actions = [
 ];
 
 export function QuickActions() {
-  return <div className="faust-surface p-6"><h2 className="text-lg font-semibold">Quick Actions</h2><p className="mt-1 text-sm text-muted-foreground">Jump into your most common tasks.</p><div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">{actions.map(({ title, href, icon: Icon }) => <Link key={title} href={href} className="faust-card flex flex-col items-center justify-center p-6 text-center transition hover:-translate-y-0.5 hover:border-sky-400/35"><Icon className="mb-3 h-8 w-8 text-sky-200" /><span className="text-sm font-medium">{title}</span></Link>)}</div></div>;
+  return <div className="faust-surface p-6"><h2 className="text-lg font-semibold">Quick Actions</h2><p className="mt-1 text-sm text-muted-foreground">Jump into your most common tasks.</p><div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">{actions.map(({ title, href, icon: Icon }) => <Link key={title} href={href} className="faust-card flex flex-col items-center justify-center p-6 text-center transition hover:-translate-y-0.5 hover:border-slate-400/35"><Icon className="mb-3 h-8 w-8 text-[#c8d2e6]" /><span className="text-sm font-medium">{title}</span></Link>)}</div></div>;
 }

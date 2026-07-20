@@ -13,10 +13,10 @@ export function OrderDetail({ data }: { data: OperatingData }) {
 
         return (
           <article className="faust-surface overflow-hidden" key={order.id}>
-            <div className="border-b border-sky-950/45 p-5">
+            <div className="border-b border-slate-700/45 p-5">
               <div className="flex flex-wrap justify-between gap-4">
                 <div>
-                  <p className="text-sm font-medium text-sky-100">{order.marketplace}</p>
+                  <p className="text-sm font-medium text-[#edf3ff]">{order.marketplace}</p>
                   <h2 className="mt-2 text-2xl font-semibold">{order.number} · {customer?.name || "Unmatched customer"}</h2>
                   <p className="mt-2 text-sm text-muted-foreground">{customer?.email || "No customer email on file"}</p>
                 </div>
@@ -40,7 +40,7 @@ export function OrderDetail({ data }: { data: OperatingData }) {
                 <b>Profit breakdown</b>
                 <p className="mt-2 text-muted-foreground">Gross {money(profit.grossSales)} · discounts {money(profit.discounts)} · refunds {money(profit.refunds)}</p>
                 <p className="mt-1 text-muted-foreground">COGS {money(profit.cogs)} · fees {money(profit.fees)} · shipping {money(profit.sellerShipping)}</p>
-                <p className="mt-3 text-lg font-semibold text-sky-50">Contribution {money(profit.contributionProfit)}</p>
+                <p className="mt-3 text-lg font-semibold text-[#f6f8ff]">Contribution {money(profit.contributionProfit)}</p>
               </div>
               <div className="faust-card p-4 text-sm">
                 <b>Shipment</b>
@@ -51,7 +51,7 @@ export function OrderDetail({ data }: { data: OperatingData }) {
               </div>
             </div>
 
-            <div className="grid gap-4 border-t border-sky-950/45 p-5 text-xs md:grid-cols-4">
+            <div className="grid gap-4 border-t border-slate-700/45 p-5 text-xs md:grid-cols-4">
               <div>
                 <b>Status timeline</b>
                 {(order.statusEvents || []).map((event) => <p className="mt-2 leading-5 text-muted-foreground" key={event.id}>{event.fromStatus || "Created"} to {event.toStatus} · {event.detail || ""} · {new Date(event.createdAt).toLocaleString()}</p>)}
@@ -75,7 +75,7 @@ export function OrderDetail({ data }: { data: OperatingData }) {
               </div>
             </div>
 
-            <div className="border-t border-sky-950/45 p-5 text-xs text-muted-foreground">
+            <div className="border-t border-slate-700/45 p-5 text-xs text-muted-foreground">
               <b className="text-foreground">Notes and tags:</b> {order.notes || "None"} {order.tags?.length ? `· Tags: ${order.tags.join(", ")}` : ""}
             </div>
           </article>

@@ -37,7 +37,7 @@ export function TopNavigation() {
   const title = titles[pathname] || "Faust OS";
 
   return (
-    <header className="sticky top-0 z-20 flex min-h-16 items-center justify-between gap-4 border-b border-sky-950/50 bg-black/60 px-4 backdrop-blur-xl sm:px-6">
+    <header className="sticky top-0 z-20 flex min-h-16 items-center justify-between gap-4 border-b border-slate-700/50 bg-black/60 px-4 backdrop-blur-xl sm:px-6">
       <div className="flex min-w-0 items-center gap-3">
         <SidebarTrigger />
         <div className="min-w-0">
@@ -48,11 +48,11 @@ export function TopNavigation() {
         </div>
       </div>
       <div className="flex items-center gap-2">
-        <Link href="/search" className="hidden items-center gap-2 rounded-full border border-sky-950/60 bg-zinc-950/50 px-3 py-2 text-xs text-zinc-400 transition hover:border-sky-400/50 hover:text-white md:flex">
+        <Link href="/search" className="hidden items-center gap-2 rounded-full border border-slate-700/60 bg-zinc-950/50 px-3 py-2 text-xs text-zinc-400 transition hover:border-slate-400/50 hover:text-white md:flex">
           <Search size={14} />
           Search
         </Link>
-        <Link href="/tasks" aria-label="Open notifications" className="rounded-full border border-sky-950/60 bg-zinc-950/50 p-2 text-zinc-300 transition hover:border-sky-400/50 hover:text-white">
+        <Link href="/tasks" aria-label="Open notifications" className="rounded-full border border-slate-700/60 bg-zinc-950/50 p-2 text-zinc-300 transition hover:border-slate-400/50 hover:text-white">
           <Bell size={15} />
         </Link>
         <Link href="/sourcing" className="faust-action px-3 py-2 text-xs">

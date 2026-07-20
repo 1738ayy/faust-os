@@ -29,16 +29,16 @@ function SourceDataReview() {
   const missing = checks.filter(([, value]) => !value || value === "0");
 
   return (
-    <section className="rounded-3xl border border-sky-950/45 bg-zinc-950/60 p-5 shadow-lg shadow-black/20 backdrop-blur">
+    <section className="rounded-3xl border border-slate-700/45 bg-zinc-950/60 p-5 shadow-lg shadow-black/20 backdrop-blur">
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-200">Source data review</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#c8d2e6]">Source data review</p>
           <h2 className="mt-2 text-xl font-semibold">Captured product facts</h2>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
             Review this before saving. Faust should not pretend a source scan is clean if Superbuy/1688 gave us modal text, missing weight, weak supplier data, or no usable variant rows.
           </p>
         </div>
-        <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${missing.length ? "border-amber-500/25 bg-amber-400/10 text-amber-200" : "border-sky-400/25 bg-sky-400/10 text-sky-50"}`}>
+        <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${missing.length ? "border-amber-500/25 bg-amber-400/10 text-amber-200" : "border-slate-400/25 bg-[#66708d]/10 text-[#f6f8ff]"}`}>
           {missing.length ? `${missing.length} field${missing.length === 1 ? "" : "s"} need review` : "Ready to analyze"}
         </span>
       </div>
@@ -53,7 +53,7 @@ function SourceDataReview() {
       <div className="mt-4 grid gap-3 lg:grid-cols-3">
         <div className="faust-card p-4">
           <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Original source</p>
-          <a className="mt-2 block truncate text-sm font-medium text-sky-100" href={product.sourcing.original1688Url || product.sourcing.superbuyUrl}>{source.original1688Url || source.superbuyUrl}</a>
+          <a className="mt-2 block truncate text-sm font-medium text-[#edf3ff]" href={product.sourcing.original1688Url || product.sourcing.superbuyUrl}>{source.original1688Url || source.superbuyUrl}</a>
         </div>
         <div className="faust-card p-4">
           <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Stock / MOQ</p>
@@ -71,7 +71,7 @@ function SourceDataReview() {
 export function OpportunityWorkspace() {
   const { opportunity } = useOpportunity();
   return <div className="space-y-8"><AnalyzerHeader />
-    {!opportunity ? <div className="rounded-3xl border border-dashed border-sky-400/35 bg-zinc-950/55 p-12 text-center shadow-xl shadow-black/20 backdrop-blur"><ArrowDownToLine className="mx-auto h-10 w-10 text-sky-200" /><h2 className="mt-5 text-xl font-semibold">Start from Superbuy</h2><p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">Use the Faust Chrome extension on a Superbuy product page, then choose Import Superbuy above to create this opportunity.</p></div> : <>
+    {!opportunity ? <div className="rounded-3xl border border-dashed border-slate-400/35 bg-zinc-950/55 p-12 text-center shadow-xl shadow-black/20 backdrop-blur"><ArrowDownToLine className="mx-auto h-10 w-10 text-[#c8d2e6]" /><h2 className="mt-5 text-xl font-semibold">Start from Superbuy</h2><p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">Use the Faust Chrome extension on a Superbuy product page, then choose Import Superbuy above to create this opportunity.</p></div> : <>
       <SourceDataReview />
       <div className="grid gap-8 lg:grid-cols-2"><ProductInformation /><ProductPreview /></div>
       <MarketplaceSelector />

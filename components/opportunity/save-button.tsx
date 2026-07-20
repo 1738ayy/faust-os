@@ -28,5 +28,5 @@ export function SaveButton() {
     }
   }
 
-  return <button onClick={handleSave} disabled={!opportunity || saving} className="flex items-center justify-center gap-2 rounded-full bg-sky-500 px-6 py-3 font-medium text-white shadow-lg shadow-sky-950/30 transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-60"><PackagePlus className="h-5 w-5" />{saving ? "Creating product…" : "Create Product"}</button>;
+  return <button onClick={handleSave} disabled={!opportunity || saving} className="flex items-center justify-center gap-2 rounded-full bg-[#56627f] px-6 py-3 font-medium text-white shadow-lg shadow-slate-950/30 transition hover:bg-[#66708d] disabled:cursor-not-allowed disabled:opacity-60"><PackagePlus className="h-5 w-5" />{saving ? "Creating product…" : "Create Product"}</button>;
 }

@@ -19,20 +19,28 @@
   "background": { "service_worker": "background.js", "type": "module" },
   "icons": {
     "16": "assets/faust-logo-16.png",
+    "20": "assets/faust-logo-20.png",
+    "24": "assets/faust-logo-24.png",
     "32": "assets/faust-logo-32.png",
     "48": "assets/faust-logo-48.png",
+    "64": "assets/faust-logo-64.png",
     "96": "assets/faust-logo-96.png",
-    "128": "assets/faust-logo-128.png"
+    "128": "assets/faust-logo-128.png",
+    "256": "assets/faust-logo-256.png"
   },
   "action": {
     "default_popup": "popup.html",
     "default_title": "Faust Commerce Bridge",
     "default_icon": {
       "16": "assets/faust-logo-16.png",
+      "20": "assets/faust-logo-20.png",
+      "24": "assets/faust-logo-24.png",
       "32": "assets/faust-logo-32.png",
       "48": "assets/faust-logo-48.png",
+      "64": "assets/faust-logo-64.png",
       "96": "assets/faust-logo-96.png",
-      "128": "assets/faust-logo-128.png"
+      "128": "assets/faust-logo-128.png",
+      "256": "assets/faust-logo-256.png"
     }
   },
   "side_panel": { "default_path": "sidepanel.html" },

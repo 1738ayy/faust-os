@@ -56,12 +56,12 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" | "forgot-passw
       <form onSubmit={submit} className="faust-surface w-full max-w-md p-7">
         <div className="flex flex-col items-center text-center">
           <img
-            alt="Faust OS logo"
-            src="/brand/faust-pony.svg"
-            className="h-28 w-28 rounded-[2rem] border border-sky-400/20 object-contain p-1 shadow-2xl shadow-sky-950/40"
+            alt="Faust Snow Leopard"
+            src="/brand/faust-snow-leopard.png"
+            className="h-28 w-48 object-contain"
             onError={(event) => { event.currentTarget.style.display = "none"; }}
           />
-          <p className="mt-4 text-xs font-medium uppercase tracking-[0.2em] text-sky-200">Faust OS</p>
+          <p className="mt-1 text-xs font-medium uppercase tracking-[0.2em] text-[#c8d2e6]">Faust OS</p>
           <h1 className="mt-3 text-2xl font-semibold">{title}</h1>
           <p className="mt-3 text-sm leading-6 text-muted-foreground">Secure, refreshable Supabase session access.</p>
         </div>
@@ -78,13 +78,13 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" | "forgot-passw
           </label>
         )}
 
-        <button disabled={busy} className="mt-6 w-full rounded-full bg-sky-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-sky-950/30 transition hover:bg-sky-400 disabled:opacity-50">
+        <button disabled={busy} className="mt-6 w-full rounded-full bg-[#56627f] px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-slate-950/30 transition hover:bg-[#66708d] disabled:opacity-50">
           {busy ? "Working..." : mode === "sign-in" ? "Sign in" : mode === "sign-up" ? "Create account" : "Send reset email"}
         </button>
 
         {message && <p className="mt-4 text-sm text-muted-foreground">{message}</p>}
 
-        <div className="mt-5 flex justify-between text-xs font-medium text-sky-200">
+        <div className="mt-5 flex justify-between text-xs font-medium text-[#c8d2e6]">
           {mode !== "sign-in" ? <Link href="/sign-in">Sign in</Link> : <Link href="/sign-up">Create account</Link>}
           <Link href="/forgot-password">Reset password</Link>
         </div>

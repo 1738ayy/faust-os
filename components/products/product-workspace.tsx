@@ -14,37 +14,37 @@ export function ProductWorkspace({ item }: { item: ProductExperience }) {
 
   return (
     <div className="space-y-6">
-      <Link href="/catalog" className="inline-flex items-center gap-2 text-sm font-medium text-sky-100 hover:text-sky-50"><ArrowLeft size={15} />Back to Products</Link>
+      <Link href="/catalog" className="inline-flex items-center gap-2 text-sm font-medium text-[#edf3ff] hover:text-[#f6f8ff]"><ArrowLeft size={15} />Back to Products</Link>
 
-      <section className="relative overflow-hidden rounded-[2rem] border border-sky-950/45 bg-zinc-950/60 shadow-2xl shadow-black/30 backdrop-blur">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(125,211,252,.28),transparent_28rem)]" />
+      <section className="relative overflow-hidden rounded-[2rem] border border-slate-700/45 bg-zinc-950/60 shadow-2xl shadow-black/30 backdrop-blur">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(86,98,127,.28),transparent_28rem)]" />
         <div className="relative grid gap-6 p-5 lg:grid-cols-[340px_1fr] lg:p-7">
-          <div className="overflow-hidden rounded-[1.7rem] border border-sky-950/45 bg-black/35">
+          <div className="overflow-hidden rounded-[1.7rem] border border-slate-700/45 bg-black/35">
             <ProductImage src={item.image} alt={item.product.title} className="aspect-square h-full w-full object-cover" fallbackClassName="aspect-square h-full w-full" />
           </div>
           <div className="flex flex-col justify-between gap-6">
             <div className="flex flex-wrap items-start justify-between gap-5">
               <div>
-                <p className="text-xs font-medium uppercase tracking-[0.18em] text-sky-200">{item.variant.sku}</p>
+                <p className="text-xs font-medium uppercase tracking-[0.18em] text-[#c8d2e6]">{item.variant.sku}</p>
                 <h1 data-testid="page-title" className="mt-3 max-w-4xl text-4xl font-semibold tracking-tight md:text-5xl">{item.product.title}</h1>
                 <p className="mt-3 max-w-3xl text-sm leading-6 text-muted-foreground">{item.variant.title} · {item.product.category} · {item.supplierName}</p>
               </div>
               <ReadinessRing readiness={item.readiness} size="lg" />
             </div>
 
-            <div className="rounded-3xl border border-sky-950/45 bg-black/35 p-5">
+            <div className="rounded-3xl border border-slate-700/45 bg-black/35 p-5">
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
-                  <p className="text-sm font-medium text-sky-100">Faust recommendation</p>
+                  <p className="text-sm font-medium text-[#edf3ff]">Faust recommendation</p>
                   <h2 className="mt-2 text-2xl font-semibold">{item.intelligence.recommendation.situation}</h2>
                   <p className="mt-2 text-sm leading-6 text-muted-foreground">{item.intelligence.recommendation.reasoning}</p>
-                  <p className="mt-2 text-sm leading-6 text-sky-50">{item.intelligence.recommendation.expectedOutcome}</p>
+                  <p className="mt-2 text-sm leading-6 text-[#f6f8ff]">{item.intelligence.recommendation.expectedOutcome}</p>
                 </div>
                 <StatusBadge value={`${Math.round(item.intelligence.recommendation.confidence * 100)}% confidence`} />
               </div>
               <div className="mt-5 flex flex-wrap gap-3">
                 <PrimaryButton href="#readiness">{item.ai.nextAction}<ArrowRight size={15} /></PrimaryButton>
-                <Link href="#marketplaces" className="inline-flex items-center justify-center rounded-full border border-sky-950/60 bg-zinc-950/50 px-4 py-2 text-sm font-medium transition hover:border-sky-400/50">Review marketplaces</Link>
+                <Link href="#marketplaces" className="inline-flex items-center justify-center rounded-full border border-slate-700/60 bg-zinc-950/50 px-4 py-2 text-sm font-medium transition hover:border-slate-400/50">Review marketplaces</Link>
               </div>
             </div>
 
@@ -61,19 +61,19 @@ export function ProductWorkspace({ item }: { item: ProductExperience }) {
       <section className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
         <Panel title="Faust Score">
           <div className="grid gap-5 lg:grid-cols-[170px_1fr]">
-            <div className="rounded-[2rem] border border-sky-950/45 bg-sky-950/15 p-5 text-center">
+            <div className="rounded-[2rem] border border-slate-700/45 bg-slate-800/15 p-5 text-center">
               <p className="text-sm text-muted-foreground">Overall product health</p>
-              <p className="mt-3 font-heading text-6xl font-semibold tabular-nums text-sky-50">{item.intelligence.faustScore.score}</p>
-              <p className="mt-2 text-sm font-medium text-sky-100">{item.intelligence.faustScore.label}</p>
+              <p className="mt-3 font-heading text-6xl font-semibold tabular-nums text-[#f6f8ff]">{item.intelligence.faustScore.score}</p>
+              <p className="mt-2 text-sm font-medium text-[#edf3ff]">{item.intelligence.faustScore.label}</p>
             </div>
             <div>
               <p className="text-sm leading-6 text-muted-foreground">{item.intelligence.faustScore.explanation}</p>
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 {item.intelligence.faustScore.components.map((component) => (
-                  <div key={component.label} className="rounded-2xl border border-sky-950/35 bg-black/35 p-3">
+                  <div key={component.label} className="rounded-2xl border border-slate-700/35 bg-black/35 p-3">
                     <div className="flex items-center justify-between gap-3">
                       <b className="text-sm">{component.label}</b>
-                      <span className="font-heading text-lg font-semibold tabular-nums text-sky-50">{component.score}</span>
+                      <span className="font-heading text-lg font-semibold tabular-nums text-[#f6f8ff]">{component.score}</span>
                     </div>
                     <p className="mt-1 text-xs leading-5 text-muted-foreground">{component.detail}</p>
                   </div>
@@ -84,10 +84,10 @@ export function ProductWorkspace({ item }: { item: ProductExperience }) {
         </Panel>
         <Panel title="Product DNA">
           <div className="flex flex-wrap gap-2">
-            {item.intelligence.dna.length ? item.intelligence.dna.map((dna) => <span key={dna.tag} className="rounded-full border border-sky-900/50 bg-sky-950/20 px-3 py-1.5 text-sm text-sky-50">{dna.tag}</span>) : <span className="text-sm text-muted-foreground">Faust needs more product history before DNA tags become reliable.</span>}
+            {item.intelligence.dna.length ? item.intelligence.dna.map((dna) => <span key={dna.tag} className="rounded-full border border-slate-600/50 bg-slate-800/20 px-3 py-1.5 text-sm text-[#f6f8ff]">{dna.tag}</span>) : <span className="text-sm text-muted-foreground">Faust needs more product history before DNA tags become reliable.</span>}
           </div>
           <div className="mt-4 grid gap-3">
-            {item.intelligence.dna.map((dna) => <p key={dna.tag} className="rounded-2xl border border-sky-950/35 bg-black/35 p-3 text-sm text-muted-foreground"><span className="font-medium text-foreground">{dna.tag}:</span> {dna.reason}</p>)}
+            {item.intelligence.dna.map((dna) => <p key={dna.tag} className="rounded-2xl border border-slate-700/35 bg-black/35 p-3 text-sm text-muted-foreground"><span className="font-medium text-foreground">{dna.tag}:</span> {dna.reason}</p>)}
           </div>
         </Panel>
       </section>
@@ -121,9 +121,9 @@ export function ProductWorkspace({ item }: { item: ProductExperience }) {
         <Panel title="Readiness checklist" id="readiness">
           <div className="grid gap-3 sm:grid-cols-2">
             {item.readiness.dimensions.map((dimension) => (
-              <div className="rounded-2xl border border-sky-950/35 bg-black/35 p-3" key={dimension.key}>
+              <div className="rounded-2xl border border-slate-700/35 bg-black/35 p-3" key={dimension.key}>
                 <div className="flex items-center gap-2">
-                  {dimension.ready ? <CheckCircle2 className="h-4 w-4 text-sky-100" /> : <CircleAlert className="h-4 w-4 text-amber-300" />}
+                  {dimension.ready ? <CheckCircle2 className="h-4 w-4 text-[#edf3ff]" /> : <CircleAlert className="h-4 w-4 text-amber-300" />}
                   <b className="text-sm">{dimension.label}</b>
                 </div>
                 <p className="mt-2 text-xs leading-5 text-muted-foreground">{dimension.detail}</p>
@@ -140,7 +140,7 @@ export function ProductWorkspace({ item }: { item: ProductExperience }) {
             <MiniMetric label="Quarantine" value={String(item.inventory.quarantined)} />
             <MiniMetric label="Inventory value" value={money(item.inventory.value)} />
           </div>
-          <div className="mt-4 rounded-2xl border border-sky-950/35 bg-black/35 p-4 text-sm text-muted-foreground">
+          <div className="mt-4 rounded-2xl border border-slate-700/35 bg-black/35 p-4 text-sm text-muted-foreground">
             Supplier: <span className="text-foreground">{item.supplierName}</span> · Lead time {item.purchasing.leadTime} · Reorder point {item.purchasing.reorderPoint} · Suggested reorder {item.purchasing.recommendedReorderQuantity}
           </div>
         </Panel>
@@ -149,7 +149,7 @@ export function ProductWorkspace({ item }: { item: ProductExperience }) {
       <section className="grid gap-6 xl:grid-cols-3">
         <Panel title="Photos">
           <div className="grid grid-cols-4 gap-2">
-            {item.image ? <ProductImage src={item.image} alt="" className="col-span-2 aspect-square rounded-2xl object-cover" fallbackClassName="col-span-2 aspect-square rounded-2xl border border-dashed border-sky-950/45" /> : <div className="col-span-2 grid aspect-square place-items-center rounded-2xl border border-dashed border-sky-950/45 text-muted-foreground"><Camera className="h-7 w-7" /></div>}
+            {item.image ? <ProductImage src={item.image} alt="" className="col-span-2 aspect-square rounded-2xl object-cover" fallbackClassName="col-span-2 aspect-square rounded-2xl border border-dashed border-slate-700/45" /> : <div className="col-span-2 grid aspect-square place-items-center rounded-2xl border border-dashed border-slate-700/45 text-muted-foreground"><Camera className="h-7 w-7" /></div>}
             <PhotoPlaceholder label="Front" />
             <PhotoPlaceholder label="Detail" />
           </div>
@@ -165,7 +165,7 @@ export function ProductWorkspace({ item }: { item: ProductExperience }) {
         <Panel title="Related products">
           <div className="grid gap-3">
             {item.intelligence.relationships.length ? item.intelligence.relationships.map((relationship) => (
-              <Link key={`${relationship.type}-${relationship.href}`} href={relationship.href} className="rounded-2xl border border-sky-950/35 bg-black/35 p-3 transition hover:border-sky-400/45">
+              <Link key={`${relationship.type}-${relationship.href}`} href={relationship.href} className="rounded-2xl border border-slate-700/35 bg-black/35 p-3 transition hover:border-slate-400/45">
                 <p className="text-sm font-medium">{relationship.label}</p>
                 <p className="mt-1 text-xs leading-5 text-muted-foreground">{relationship.detail}</p>
               </Link>
@@ -182,12 +182,12 @@ export function ProductWorkspace({ item }: { item: ProductExperience }) {
       </details>
 
       <Panel title="Advanced">
-        <details className="rounded-2xl border border-sky-950/35 bg-black/35 p-4 text-sm text-muted-foreground">
+        <details className="rounded-2xl border border-slate-700/35 bg-black/35 p-4 text-sm text-muted-foreground">
           <summary className="cursor-pointer font-medium text-foreground">Technical information and diagnostics</summary>
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
             <Row label="Product ID" value={item.product.id} />
             <Row label="Variant ID" value={item.variant.id} />
-            <Row label="Source URL" value={item.product.sourceUrl ? <Link className="text-sky-100" href={item.product.sourceUrl}>Open source</Link> : "Not captured"} />
+            <Row label="Source URL" value={item.product.sourceUrl ? <Link className="text-[#edf3ff]" href={item.product.sourceUrl}>Open source</Link> : "Not captured"} />
             <Row label="Status" value={readinessLabel(item.readiness.status)} />
           </div>
         </details>
@@ -197,11 +197,11 @@ export function ProductWorkspace({ item }: { item: ProductExperience }) {
 }
 
 function HeroMetric({ label, value }: { label: string; value: string }) {
-  return <div className="rounded-3xl border border-sky-950/35 bg-black/35 p-4"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-2 font-heading text-2xl font-semibold tabular-nums">{value}</p></div>;
+  return <div className="rounded-3xl border border-slate-700/35 bg-black/35 p-4"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-2 font-heading text-2xl font-semibold tabular-nums">{value}</p></div>;
 }
 
 function MiniMetric({ label, value }: { label: string; value: string }) {
-  return <div className="rounded-2xl border border-sky-950/35 bg-black/35 p-4"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-2 font-heading text-xl font-semibold tabular-nums">{value}</p></div>;
+  return <div className="rounded-2xl border border-slate-700/35 bg-black/35 p-4"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-2 font-heading text-xl font-semibold tabular-nums">{value}</p></div>;
 }
 
 function Panel({ title, children, id }: { title: string; children: ReactNode; id?: string }) {
@@ -209,13 +209,13 @@ function Panel({ title, children, id }: { title: string; children: ReactNode; id
 }
 
 function Row({ label, value }: { label: string; value: ReactNode }) {
-  return <div className="flex justify-between gap-4 border-b border-sky-950/35 py-3 text-sm last:border-0"><span className="text-muted-foreground">{label}</span><span className="text-right">{value}</span></div>;
+  return <div className="flex justify-between gap-4 border-b border-slate-700/35 py-3 text-sm last:border-0"><span className="text-muted-foreground">{label}</span><span className="text-right">{value}</span></div>;
 }
 
 function HealthSignal({ signal }: { signal: ProductExperience["intelligence"]["health"][number] }) {
-  const tone = signal.status === "strong" ? "text-sky-50" : signal.status === "healthy" ? "text-emerald-200" : signal.status === "watch" ? "text-amber-200" : signal.status === "risk" ? "text-sky-100" : "text-muted-foreground";
+  const tone = signal.status === "strong" ? "text-[#f6f8ff]" : signal.status === "healthy" ? "text-emerald-200" : signal.status === "watch" ? "text-amber-200" : signal.status === "risk" ? "text-[#edf3ff]" : "text-muted-foreground";
   return (
-    <div className="rounded-2xl border border-sky-950/35 bg-black/35 p-4">
+    <div className="rounded-2xl border border-slate-700/35 bg-black/35 p-4">
       <div className="flex items-start justify-between gap-3">
         <p className="text-sm font-medium">{signal.label}</p>
         <span className={`text-xs capitalize ${tone}`}>{signal.status}</span>
@@ -227,10 +227,10 @@ function HealthSignal({ signal }: { signal: ProductExperience["intelligence"]["h
 }
 
 function MarketplaceRow({ marketplace }: { marketplace: ProductExperience["marketplaces"][number] }) {
-  const tone = marketplace.status === "live" ? "text-sky-50" : marketplace.status === "rejected" || marketplace.status === "out_of_stock" ? "text-amber-200" : "text-muted-foreground";
-  return <div className="flex items-center justify-between gap-3 rounded-2xl border border-sky-950/35 bg-black/35 p-3"><MarketplaceBadge marketplace={marketplace.marketplace} /><span className={`text-sm capitalize ${tone}`}>{marketplace.status.replaceAll("_", " ")}</span></div>;
+  const tone = marketplace.status === "live" ? "text-[#f6f8ff]" : marketplace.status === "rejected" || marketplace.status === "out_of_stock" ? "text-amber-200" : "text-muted-foreground";
+  return <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-700/35 bg-black/35 p-3"><MarketplaceBadge marketplace={marketplace.marketplace} /><span className={`text-sm capitalize ${tone}`}>{marketplace.status.replaceAll("_", " ")}</span></div>;
 }
 
 function PhotoPlaceholder({ label }: { label: string }) {
-  return <div className="grid aspect-square place-items-center rounded-2xl border border-dashed border-sky-950/45 text-xs text-muted-foreground">{label}</div>;
+  return <div className="grid aspect-square place-items-center rounded-2xl border border-dashed border-slate-700/45 text-xs text-muted-foreground">{label}</div>;
 }

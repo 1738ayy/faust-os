@@ -43,8 +43,8 @@ export function BusinessSettingsForm({ settings }: { settings: BusinessSettings 
       </label>
       <label className="text-sm font-medium">Warehouse name<input value={value.warehouseName} onChange={(event) => setValue({ ...value, warehouseName: event.target.value })} className={field} placeholder="Home warehouse" /></label>
       <label className="text-sm font-medium">Target margin (%)<input type="number" min="0" max="100" value={value.targetMargin} onChange={(event) => setValue({ ...value, targetMargin: Number(event.target.value) || 0 })} className={field} /></label>
-      <button disabled={saving} className="rounded-full bg-sky-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-sky-950/30 transition hover:bg-sky-400 disabled:opacity-60 sm:col-span-2 sm:w-fit">{saving ? "Saving..." : "Save settings"}</button>
-      {message && <p className="text-sm text-sky-100 sm:col-span-2">{message}</p>}
+      <button disabled={saving} className="rounded-full bg-[#56627f] px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-slate-950/30 transition hover:bg-[#66708d] disabled:opacity-60 sm:col-span-2 sm:w-fit">{saving ? "Saving..." : "Save settings"}</button>
+      {message && <p className="text-sm text-[#edf3ff] sm:col-span-2">{message}</p>}
     </form>
   );
 }

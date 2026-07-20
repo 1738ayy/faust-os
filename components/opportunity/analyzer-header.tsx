@@ -72,38 +72,38 @@ export function AnalyzerHeader() {
   }, [importLatest]);
 
   return (
-    <div className="rounded-3xl border border-sky-950/45 bg-zinc-950/60 p-6 shadow-xl shadow-black/20 backdrop-blur">
+    <div className="rounded-3xl border border-slate-700/45 bg-zinc-950/60 p-6 shadow-xl shadow-black/20 backdrop-blur">
       <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-200">Opportunity Analyzer</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#c8d2e6]">Opportunity Analyzer</p>
           <h1 className="mt-2 text-3xl font-semibold">Review the buy before it becomes inventory.</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
             Import the latest Superbuy/1688 scan, verify the captured fields, adjust landed costs, and compare marketplace economics before saving anything to Faust.
           </p>
         </div>
-        <button onClick={() => void importLatest()} disabled={importing} className="flex items-center justify-center gap-2 rounded-full bg-sky-500 px-5 py-3 font-semibold text-white shadow-lg shadow-sky-950/30 transition hover:bg-sky-400 disabled:cursor-wait disabled:opacity-60">
+        <button onClick={() => void importLatest()} disabled={importing} className="flex items-center justify-center gap-2 rounded-full bg-[#56627f] px-5 py-3 font-semibold text-white shadow-lg shadow-slate-950/30 transition hover:bg-[#66708d] disabled:cursor-wait disabled:opacity-60">
           <Download className="h-5 w-5" />
           {importing ? "Loading import..." : "Import latest scan"}
         </button>
       </div>
-      <div className="mt-6 rounded-2xl border border-sky-950/35 bg-black/25 p-4">
+      <div className="mt-6 rounded-2xl border border-slate-700/35 bg-black/25 p-4">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-200">Import Queue</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#c8d2e6]">Import Queue</p>
             <h2 className="mt-1 text-lg font-semibold">Products waiting for review</h2>
           </div>
-          <span className="rounded-full border border-sky-400/20 bg-sky-400/10 px-3 py-1 text-xs text-sky-50">{queue.length} scan{queue.length === 1 ? "" : "s"}</span>
+          <span className="rounded-full border border-slate-400/20 bg-[#66708d]/10 px-3 py-1 text-xs text-[#f6f8ff]">{queue.length} scan{queue.length === 1 ? "" : "s"}</span>
         </div>
         {queue.length ? (
           <div className="mt-4 grid gap-3 lg:grid-cols-3">
             {queue.slice(0, 6).map((item) => (
-              <div key={item.id} className="rounded-2xl border border-sky-950/35 bg-zinc-950/55 p-3">
+              <div key={item.id} className="rounded-2xl border border-slate-700/35 bg-zinc-950/55 p-3">
                 <div className="flex gap-3">
-                  {item.image ? <img src={item.image} alt="" className="h-14 w-14 rounded-xl object-cover" /> : <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-black/35"><Sparkles className="h-5 w-5 text-sky-200" /></div>}
+                  {item.image ? <img src={item.image} alt="" className="h-14 w-14 rounded-xl object-cover" /> : <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-black/35"><Sparkles className="h-5 w-5 text-[#c8d2e6]" /></div>}
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold">{item.title}</p>
                     <p className="mt-1 truncate text-xs text-muted-foreground">{item.supplier}</p>
-                    <p className="mt-1 text-xs text-sky-100">{item.status === "product_created" ? `Created · ${item.convertedVariants} SKU variant(s)` : "Ready for analysis"}</p>
+                    <p className="mt-1 text-xs text-[#edf3ff]">{item.status === "product_created" ? `Created · ${item.convertedVariants} SKU variant(s)` : "Ready for analysis"}</p>
                   </div>
                 </div>
               </div>

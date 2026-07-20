@@ -20,7 +20,7 @@ export function ExtensionConnections({ data }: { data: OperatingData }) {
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <div>
           <h3 className="font-semibold">Browsers</h3>
-          <div className="mt-3 divide-y divide-sky-950/35 rounded-2xl border border-sky-950/45 bg-black/20">
+          <div className="mt-3 divide-y divide-slate-700/35 rounded-2xl border border-slate-700/45 bg-black/20">
             {summary.devices?.map((device) => (
               <div className="p-4 text-sm" key={device.id}>
                 <div className="flex items-center justify-between gap-4"><span className="font-medium">{device.name}</span><StatusBadge value={device.status} tone={device.status === "active" ? "success" : "danger"} /></div>
@@ -34,7 +34,7 @@ export function ExtensionConnections({ data }: { data: OperatingData }) {
 
         <div>
           <h3 className="font-semibold">Marketplace connection health</h3>
-          <div className="mt-3 divide-y divide-sky-950/35 rounded-2xl border border-sky-950/45 bg-black/20">
+          <div className="mt-3 divide-y divide-slate-700/35 rounded-2xl border border-slate-700/45 bg-black/20">
             {summary.adapters.map((adapter) => (
               <div className="p-4 text-sm" key={adapter.marketplace}>
                 <div className="flex items-center justify-between gap-4"><span className="font-medium">{adapter.marketplace}</span><StatusBadge value={adapter.status} tone={adapter.status === "healthy" ? "success" : "warning"} /></div>
@@ -46,7 +46,7 @@ export function ExtensionConnections({ data }: { data: OperatingData }) {
 
         <div>
           <h3 className="font-semibold">Recent extension actions</h3>
-          <div className="mt-3 divide-y divide-sky-950/35 rounded-2xl border border-sky-950/45 bg-black/20">
+          <div className="mt-3 divide-y divide-slate-700/35 rounded-2xl border border-slate-700/45 bg-black/20">
             {summary.actions?.slice(0, 6).map((action) => (
               <div className="p-4 text-sm" key={action.id}>
                 <div className="flex items-center justify-between gap-4"><span className="font-medium">{action.action}</span><StatusBadge value={action.status} /></div>
@@ -60,7 +60,7 @@ export function ExtensionConnections({ data }: { data: OperatingData }) {
 
         <div>
           <h3 className="font-semibold">Saved error evidence</h3>
-          <div className="mt-3 divide-y divide-sky-950/35 rounded-2xl border border-sky-950/45 bg-black/20">
+          <div className="mt-3 divide-y divide-slate-700/35 rounded-2xl border border-slate-700/45 bg-black/20">
             {summary.artifacts?.slice(0, 6).map((artifact) => (
               <div className="p-4 text-sm" key={artifact.id}>
                 <div className="flex items-center justify-between gap-4"><span className="font-medium">{artifact.type}</span><span>{artifact.marketplace || "source"}</span></div>

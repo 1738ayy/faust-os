@@ -76,9 +76,9 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
             <div className="space-y-4">
               {groups.map((group) => (
                 <section key={group.label} className="faust-surface overflow-hidden">
-                  <div className="border-b border-sky-950/45 px-5 py-3 text-sm font-medium text-muted-foreground">{group.label}</div>
+                  <div className="border-b border-slate-700/45 px-5 py-3 text-sm font-medium text-muted-foreground">{group.label}</div>
                   {group.values.map((value) => (
-                    <Link key={`${value.href}-${value.label}`} href={value.href} className="block border-b border-sky-950/35 px-5 py-4 text-sm transition last:border-0 hover:bg-sky-950/15">
+                    <Link key={`${value.href}-${value.label}`} href={value.href} className="block border-b border-slate-700/35 px-5 py-4 text-sm transition last:border-0 hover:bg-slate-800/15">
                       {value.label}
                     </Link>
                   ))}

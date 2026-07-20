@@ -27,5 +27,5 @@ export function OperationButton({ action, id, status, children, className = "" }
     }
   }
 
-  return <span className="inline-flex flex-col items-end gap-1"><button onClick={run} disabled={busy} className={`rounded-full border border-sky-950/60 bg-zinc-950/60 px-3 py-1.5 text-xs font-medium transition hover:border-sky-400/60 hover:text-sky-100 disabled:opacity-50 ${className}`}>{busy ? "Working..." : children}</button>{error && <span className="text-xs text-sky-300">{error}</span>}</span>;
+  return <span className="inline-flex flex-col items-end gap-1"><button onClick={run} disabled={busy} className={`rounded-full border border-slate-700/60 bg-zinc-950/60 px-3 py-1.5 text-xs font-medium transition hover:border-slate-400/60 hover:text-[#edf3ff] disabled:opacity-50 ${className}`}>{busy ? "Working..." : children}</button>{error && <span className="text-xs text-[#d8e0f2]">{error}</span>}</span>;
 }

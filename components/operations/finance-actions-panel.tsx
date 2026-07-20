@@ -5,7 +5,7 @@ import type { OperatingData } from "@/domain/business";
 import { buildFinanceModel } from "@/lib/finance";
 
 const input = "faust-field faust-focus mt-1 w-full px-3 py-2 text-sm";
-const button = "rounded-full border border-sky-950/60 bg-zinc-950/50 px-3 py-1.5 text-xs font-medium transition hover:border-sky-400/50 hover:text-white disabled:opacity-50";
+const button = "rounded-full border border-slate-700/60 bg-zinc-950/50 px-3 py-1.5 text-xs font-medium transition hover:border-slate-400/50 hover:text-white disabled:opacity-50";
 
 function idempotencyKey() {
   return crypto.randomUUID();
@@ -47,7 +47,7 @@ export function FinanceActionsPanel({ data }: { data: OperatingData }) {
   }
 
   return <section aria-label="Finance workflows" className="faust-surface overflow-hidden">
-    <h2 className="border-b border-sky-950/45 px-5 py-4 font-semibold">Finance Workflows</h2>
+    <h2 className="border-b border-slate-700/45 px-5 py-4 font-semibold">Finance Workflows</h2>
     <div className="grid gap-5 p-5 lg:grid-cols-2">
       <form className="faust-card p-4" onSubmit={(event) => { event.preventDefault(); void submit(event.currentTarget); }}>
         <h3 className="font-semibold">Expenses</h3>
@@ -94,6 +94,6 @@ export function FinanceActionsPanel({ data }: { data: OperatingData }) {
         <div className="mt-3 flex flex-wrap gap-2"><button className={button} onClick={() => run("configure-forecast", { scenario: "expected", revenueMultiplier: 1.08, expenseMultiplier: 1.02, assumption: "Edited scenario from Finance workflow" })}>Configure forecast</button></div>
       </div>
     </div>
-    {message && <p role="status" className="border-t border-sky-950/45 px-5 py-3 text-sm text-sky-100">{message}</p>}
+    {message && <p role="status" className="border-t border-slate-700/45 px-5 py-3 text-sm text-[#edf3ff]">{message}</p>}
   </section>;
 }

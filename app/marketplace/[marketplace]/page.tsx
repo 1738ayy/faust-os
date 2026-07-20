@@ -21,7 +21,7 @@ export default async function MarketplacePage({ params }: { params: Promise<{ ma
         ) : (
           <section className="faust-surface overflow-hidden">
             {listings.map((listing) => (
-              <div key={listing.id} className="flex items-center justify-between gap-4 border-b border-sky-950/35 px-6 py-5 last:border-0">
+              <div key={listing.id} className="flex items-center justify-between gap-4 border-b border-slate-700/35 px-6 py-5 last:border-0">
                 <div>
                   <p className="font-medium">{listing.product.name}</p>
                   <div className="mt-2"><StatusBadge value={listing.listing.status} /></div>

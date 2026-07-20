@@ -8,9 +8,9 @@ export function FinancialResults() {
   const { opportunity, analysis, updateSalePrice } = useOpportunity();
   if (!opportunity || !analysis) return null;
   const cards = [
-    ["Net profit", `$${analysis.netProfit.toFixed(2)}`, DollarSign, "text-sky-100"],
-    ["Profit margin", `${analysis.margin.toFixed(1)}%`, Percent, "text-sky-200"],
-    ["Return on capital", `${analysis.roi.toFixed(1)}%`, TrendingUp, "text-sky-100"],
+    ["Net profit", `$${analysis.netProfit.toFixed(2)}`, DollarSign, "text-[#edf3ff]"],
+    ["Profit margin", `${analysis.margin.toFixed(1)}%`, Percent, "text-[#c8d2e6]"],
+    ["Return on capital", `${analysis.roi.toFixed(1)}%`, TrendingUp, "text-[#edf3ff]"],
     ["Break-even price", `$${analysis.breakEvenPrice.toFixed(2)}`, Target, "text-amber-400"],
   ] as const;
 
