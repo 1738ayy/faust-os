@@ -73,21 +73,28 @@ export async function deleteCatalogProduct(variantId: string) {
  const data = await read(); const variant = data.variants.find((entry) => entry.id === variantId); if (!variant) throw new Error("Product variant not found.");
  const product = data.products.find((entry) => entry.id === variant.productId); if (!product) throw new Error("Product not found.");
  const hasOrderHistory = data.orders.some((order) => order.items.some((item) => item.variantId === variant.id));
- if (hasOrderHistory) {
-  variant.active = false; product.status = "paused"; product.updatedAt = now();
-  activity(data, "Product hidden from catalog", "product", product.id, `${product.title} has order history, so Faust hid it instead of deleting history.`);
-  return write(data);
+ variant.active = false;
+ product.status = "paused";
+ product.updatedAt = now();
+ for (const listing of data.listings.filter((entry) => entry.variantId === variant.id)) {
+  listing.status = "paused";
+  listing.quantity = 0;
  }
- data.variants = data.variants.filter((entry) => entry.id !== variant.id);
- data.balances = data.balances.filter((entry) => entry.variantId !== variant.id);
- data.stockMovements = data.stockMovements.filter((entry) => entry.variantId !== variant.id);
- data.listings = data.listings.filter((entry) => entry.variantId !== variant.id);
- data.channelListingDrafts = data.channelListingDrafts?.filter((entry) => entry.variantId !== variant.id);
- data.inventoryLots = data.inventoryLots?.filter((entry) => entry.variantId !== variant.id);
- data.physicalSkuMappings = data.physicalSkuMappings?.filter((entry) => entry.variantId !== variant.id);
- data.inventoryRiskLocks = data.inventoryRiskLocks?.filter((entry) => entry.variantId !== variant.id);
- if (!data.variants.some((entry) => entry.productId === product.id)) data.products = data.products.filter((entry) => entry.id !== product.id);
- activity(data, "Product deleted", "product", product.id, `${product.title} was removed from the catalog.`);
+ for (const draft of data.channelListingDrafts?.filter((entry) => entry.variantId === variant.id) || []) {
+  draft.status = "paused";
+  draft.quantity = 0;
+  draft.updatedAt = now();
+ }
+ for (const mapping of data.physicalSkuMappings?.filter((entry) => entry.variantId === variant.id) || []) {
+  mapping.status = "archived";
+  mapping.updatedAt = now();
+ }
+ for (const lock of data.inventoryRiskLocks?.filter((entry) => entry.variantId === variant.id && entry.status === "active") || []) {
+  lock.status = "released";
+  lock.releasedAt = now();
+  lock.notes = lock.notes ? `${lock.notes} Product removed from catalog.` : "Product removed from catalog.";
+ }
+ activity(data, hasOrderHistory ? "Product hidden from catalog" : "Product removed from catalog", "product", product.id, hasOrderHistory ? `${product.title} has order history, so Faust hid it instead of deleting history.` : `${product.title} was removed from the catalog.`);
  return write(data);
 }
 /** Converts a reviewed sourcing opportunity into connected catalog, stock, and listing-draft records. */
