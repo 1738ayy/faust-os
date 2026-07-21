@@ -2,6 +2,7 @@ import type { SuperbuyProduct, SuperbuyVariant } from "./superbuy-product";
 
 export type Product = {
   id: string;
+  sku?: string;
   name: string;
   category?: string;
   subcategory?: string;

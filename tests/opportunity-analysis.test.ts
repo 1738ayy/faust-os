@@ -51,3 +51,14 @@ test("marketplace fee profiles calculate Depop Boost and marketplace-specific se
   assert.ok(ebayAnalysis.feeEstimates.some((fee) => fee.label === "Final Value Fee"));
   assert.notEqual(ebayAnalysis.totalSellingCosts, boostedAnalysis.totalSellingCosts);
 });
+
+test("opportunity builder suggests an editable SKU and preserves analyzer images", () => {
+  const opportunity = buildOpportunity({ ...product(), storeName: "Nanxi Clothing Co", category: "T-shirt", title: "Cross border wing pattern tee", images: ["https://example.test/cover.jpg", "data:image/png;base64,abc"] }, { marketplaceId: "depop" });
+
+  assert.match(opportunity.product.sku || "", /^FST-T-SHIRT-NANXI-CLOTH/);
+  opportunity.product.sku = "RH-TEE-BLK-M";
+  opportunity.product.media.images = ["data:image/png;base64,cropped-cover", "https://example.test/detail.jpg"];
+
+  assert.equal(opportunity.product.sku, "RH-TEE-BLK-M");
+  assert.deepEqual(opportunity.product.media.images, ["data:image/png;base64,cropped-cover", "https://example.test/detail.jpg"]);
+});

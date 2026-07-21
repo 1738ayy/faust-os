@@ -1,11 +1,45 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
 import { useOpportunity } from "./opportunity-provider";
+
+const SKU_PATTERN = /^[A-Za-z0-9_-]+$/;
 
 export function ProductInformation() {
   const { opportunity, updateProduct, updateSupplier, updateSourceFact } = useOpportunity();
-  if (!opportunity) return null;
-  const product = opportunity.product;
+  const [skuStatus, setSkuStatus] = useState<"idle" | "available" | "duplicate">("idle");
+  const product = opportunity?.product;
+  const sku = product?.sku || "";
+  const skuMessage = useMemo(() => {
+    if (!sku.trim()) return "SKU is required before creating the product.";
+    if (!SKU_PATTERN.test(sku.trim())) return "Use letters, numbers, hyphens, or underscores.";
+    if (skuStatus === "duplicate") return "SKU already exists. Choose another SKU.";
+    if (skuStatus === "available") return "SKU available.";
+    return "You can replace Faust's suggested SKU with your own.";
+  }, [sku, skuStatus]);
+
+  useEffect(() => {
+    if (!opportunity) return;
+    const trimmed = sku.trim();
+    if (!trimmed || !SKU_PATTERN.test(trimmed)) {
+      return;
+    }
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      try {
+        const response = await fetch(`/api/products/actions?sku=${encodeURIComponent(trimmed)}`, { signal: controller.signal });
+        const data = await response.json() as { available?: boolean };
+        setSkuStatus(data.available ? "available" : "duplicate");
+      } catch {
+        if (!controller.signal.aborted) setSkuStatus("idle");
+      }
+    }, 250);
+    return () => {
+      controller.abort();
+      window.clearTimeout(timer);
+    };
+  }, [opportunity, sku]);
+  if (!opportunity || !product) return null;
   const numberValue = (value: string) => {
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : undefined;
@@ -19,6 +53,11 @@ export function ProductInformation() {
         <label className="block text-sm font-medium lg:col-span-2">
           Product name
           <input value={product.name ?? ""} onChange={(event) => updateProduct("name", event.target.value)} className="faust-field faust-focus mt-2 w-full p-3 font-normal" />
+        </label>
+        <label className="block text-sm font-medium">
+          SKU
+          <input value={sku} onChange={(event) => updateProduct("sku", event.target.value)} className="faust-field faust-focus mt-2 w-full p-3 font-normal" />
+          <span className={`mt-2 block text-xs ${skuStatus === "duplicate" || !sku.trim() || !SKU_PATTERN.test(sku.trim()) ? "text-amber-200" : skuStatus === "available" ? "text-[#c8d2e6]" : "text-muted-foreground"}`}>{skuMessage}</span>
         </label>
         <label className="block text-sm font-medium">
           Category

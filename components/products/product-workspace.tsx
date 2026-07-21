@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { useRef, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, Camera, CheckCircle2, CircleAlert, Edit3, MoveLeft, MoveRight, Save, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle2, CircleAlert, Edit3, Save, X } from "lucide-react";
 import { toast } from "sonner";
 import { ActivityTimeline, MarketplaceBadge, PrimaryButton, StatusBadge } from "@/components/faust/design-system";
 import { ProductImage } from "@/components/products/product-image";
+import { ProductImageManager } from "@/components/products/product-image-manager";
 import { ReadinessRing } from "@/components/products/readiness-ring";
 import type { ProductExperience } from "@/lib/product-experience";
 import { money } from "@/lib/business-calculations";
@@ -157,12 +158,7 @@ export function ProductWorkspace({ item }: { item: ProductExperience }) {
 
       <section className="grid gap-6 xl:grid-cols-3">
         <Panel title="Photos">
-          <div className="grid grid-cols-4 gap-2">
-            {item.image ? <ProductImage src={item.image} alt="" className="col-span-2 aspect-square rounded-2xl object-cover" fallbackClassName="col-span-2 aspect-square rounded-2xl border border-dashed border-slate-700/45" /> : <div className="col-span-2 grid aspect-square place-items-center rounded-2xl border border-dashed border-slate-700/45 text-muted-foreground"><Camera className="h-7 w-7" /></div>}
-            <PhotoPlaceholder label="Front" />
-            <PhotoPlaceholder label="Detail" />
-          </div>
-          <p className="mt-4 text-sm text-muted-foreground">Upload, crop, reorder, and mark image purpose comes next; source images stay preserved separately.</p>
+          <PersistentProductImages item={item} />
         </Panel>
         <Panel title="Analytics">
           <Row label="Units sold" value={item.analytics.unitsSold} />
@@ -222,26 +218,6 @@ function ProductEditDrawer({ item, onClose }: { item: ProductExperience; onClose
   });
   const [busy, startTransition] = useTransition();
   const router = useRouter();
-  const fileRef = useRef<HTMLInputElement | null>(null);
-
-  function moveImage(from: number, to: number) {
-    if (to < 0 || to >= draft.images.length) return;
-    const images = [...draft.images];
-    const [image] = images.splice(from, 1);
-    images.splice(to, 0, image);
-    setDraft({ ...draft, images });
-  }
-
-  async function upload(files: FileList | null) {
-    if (!files?.length) return;
-    const encoded = await Promise.all(Array.from(files).slice(0, Math.max(0, 12 - draft.images.length)).map((file) => new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result));
-      reader.onerror = () => reject(reader.error);
-      reader.readAsDataURL(file);
-    })));
-    setDraft({ ...draft, images: [...draft.images, ...encoded].slice(0, 12) });
-  }
 
   function save() {
     startTransition(async () => {
@@ -279,22 +255,15 @@ function ProductEditDrawer({ item, onClose }: { item: ProductExperience; onClose
             <label className="text-sm font-medium sm:col-span-2">Notes<textarea rows={3} value={draft.notes} onChange={(event) => setDraft({ ...draft, notes: event.target.value })} className="faust-field faust-focus mt-2 w-full resize-none p-3" /></label>
           </section>
           <section>
-            <div className="flex items-center justify-between gap-3"><h3 className="text-lg font-semibold">Photos</h3><button type="button" className="faust-secondary-action" onClick={() => fileRef.current?.click()}>Upload photos</button></div>
-            <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" multiple className="sr-only" onChange={(event) => void upload(event.target.files)} />
-            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {draft.images.map((image, index) => (
-                <div key={`${image}-${index}`} className="relative aspect-square overflow-hidden rounded-2xl border border-slate-700/45 bg-black/35">
-                  <ProductImage src={image} alt="" className="h-full w-full object-cover" fallbackClassName="h-full w-full" />
-                  {index === 0 ? <span className="absolute left-2 top-2 rounded-full bg-black/70 px-2 py-1 text-[11px] font-semibold">Cover</span> : null}
-                  <button type="button" aria-label="Remove image" onClick={() => setDraft({ ...draft, images: draft.images.filter((_, imageIndex) => imageIndex !== index) })} className="absolute right-2 top-2 rounded-full bg-black/70 p-1.5"><X size={14} /></button>
-                  <div className="absolute inset-x-2 bottom-2 flex justify-between">
-                    <button type="button" aria-label="Move image left" disabled={index === 0} onClick={() => moveImage(index, index - 1)} className="rounded-full bg-black/70 p-1.5 disabled:opacity-40"><MoveLeft size={14} /></button>
-                    <button type="button" aria-label="Move image right" disabled={index === draft.images.length - 1} onClick={() => moveImage(index, index + 1)} className="rounded-full bg-black/70 p-1.5 disabled:opacity-40"><MoveRight size={14} /></button>
-                  </div>
-                </div>
-              ))}
-              {draft.images.length < 12 ? <button type="button" onClick={() => fileRef.current?.click()} className="grid aspect-square place-items-center rounded-2xl border border-dashed border-slate-700/60 text-sm text-muted-foreground"><Camera size={24} />Add photo</button> : null}
-            </div>
+            <ProductImageManager
+              title="Photos"
+              description="These are the permanent product photos. First image is the catalog cover."
+              productName={draft.title}
+              images={draft.images}
+              onChange={(images) => setDraft({ ...draft, images })}
+              storageKey={`product-editor-${item.product.id}`}
+              compact
+            />
           </section>
         </div>
         <div className="flex justify-end gap-3 border-t border-slate-700/45 p-5">
@@ -302,6 +271,45 @@ function ProductEditDrawer({ item, onClose }: { item: ProductExperience; onClose
           <button type="button" disabled={busy} className="faust-action inline-flex items-center gap-2" onClick={save}><Save size={16} />{busy ? "Saving..." : "Save Product"}</button>
         </div>
       </aside>
+    </div>
+  );
+}
+
+function PersistentProductImages({ item }: { item: ProductExperience }) {
+  const [images, setImages] = useState((item.product.images?.length ? item.product.images : item.image ? [item.image] : []).slice(0, 12));
+  const [busy, startTransition] = useTransition();
+  const router = useRouter();
+
+  function saveImages(nextImages: string[]) {
+    setImages(nextImages);
+    startTransition(async () => {
+      try {
+        const response = await fetch("/api/products/actions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "update", variantId: item.variant.id, images: nextImages }),
+        });
+        const data = await response.json();
+        if (!response.ok || data.ok === false) throw new Error(data.message || "Product photos could not be saved.");
+        router.refresh();
+      } catch (error) {
+        toast.error("Could not save photos", { description: error instanceof Error ? error.message : "Try again." });
+      }
+    });
+  }
+
+  return (
+    <div className={busy ? "opacity-80 transition" : ""}>
+      <ProductImageManager
+        title="Product photos"
+        description="This is the permanent product image library. First image is the cover shown in Products and listing drafts."
+        productName={item.product.title}
+        images={images}
+        onChange={saveImages}
+        storageKey={`product-${item.product.id}`}
+        compact
+      />
+      {busy ? <p className="mt-3 text-xs text-muted-foreground">Saving photo changes…</p> : null}
     </div>
   );
 }
@@ -339,8 +347,4 @@ function HealthSignal({ signal }: { signal: ProductExperience["intelligence"]["h
 function MarketplaceRow({ marketplace }: { marketplace: ProductExperience["marketplaces"][number] }) {
   const tone = marketplace.status === "live" ? "text-[#f6f8ff]" : marketplace.status === "rejected" || marketplace.status === "out_of_stock" ? "text-amber-200" : "text-muted-foreground";
   return <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-700/35 bg-black/35 p-3"><MarketplaceBadge marketplace={marketplace.marketplace} /><span className={`text-sm capitalize ${tone}`}>{marketplace.status.replaceAll("_", " ")}</span></div>;
-}
-
-function PhotoPlaceholder({ label }: { label: string }) {
-  return <div className="grid aspect-square place-items-center rounded-2xl border border-dashed border-slate-700/45 text-xs text-muted-foreground">{label}</div>;
 }

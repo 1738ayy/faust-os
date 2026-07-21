@@ -80,6 +80,15 @@ function nextCopySku(data: OperatingData, sku: string) {
  while (data.variants.some((entry) => entry.sku.toLowerCase() === candidate.toLowerCase())) candidate = `${base}-${count++}`;
  return candidate;
 }
+function validSku(sku: string) {
+ return /^[A-Za-z0-9_-]+$/.test(sku);
+}
+function assertUniqueSku(data: OperatingData, requested: string, exceptVariantId?: string) {
+ const base = requested.trim();
+ if (!base || !validSku(base)) throw new Error("SKU can only use letters, numbers, hyphens, and underscores.");
+ if (data.variants.some((entry) => entry.id !== exceptVariantId && entry.sku.toLowerCase() === base.toLowerCase())) throw new Error("Another product already uses that SKU.");
+ return base;
+}
 function nextCopyTitle(data: OperatingData, title: string) {
  const base = `${title} copy`; let candidate = base, count = 2;
  while (data.products.some((entry) => entry.title.toLowerCase() === candidate.toLowerCase())) candidate = `${base} ${count++}`;
@@ -101,6 +110,7 @@ export async function updateCatalogProduct(input: { variantId: string; title?: s
  const data = await read(); const variant = data.variants.find((entry) => entry.id === input.variantId); if (!variant) throw new Error("Product variant not found.");
  const product = data.products.find((entry) => entry.id === variant.productId); if (!product) throw new Error("Product not found.");
  const updatedAt = now();
+ const previousSku = variant.sku;
  const images = input.images ? Array.from(new Set(input.images.map((image) => image.trim()).filter(Boolean))).slice(0, 12) : undefined;
  if (input.title !== undefined) product.title = input.title.trim() || product.title;
  if (input.brand !== undefined) product.brand = input.brand.trim() || undefined;
@@ -111,8 +121,7 @@ export async function updateCatalogProduct(input: { variantId: string; title?: s
  if (images) { product.images = images; product.image = images[0]; }
  if (input.sku !== undefined) {
   const sku = input.sku.trim();
-  if (sku && data.variants.some((entry) => entry.id !== variant.id && entry.sku.toLowerCase() === sku.toLowerCase())) throw new Error("Another product already uses that SKU.");
-  if (sku) variant.sku = sku;
+  if (sku) variant.sku = assertUniqueSku(data, sku, variant.id);
  }
  if (input.condition !== undefined) variant.condition = input.condition.trim() || variant.condition;
  if (input.landedUnitCost !== undefined) variant.landedUnitCost = Math.max(0, input.landedUnitCost);
@@ -123,12 +132,19 @@ export async function updateCatalogProduct(input: { variantId: string; title?: s
   if (input.defaultSalePrice !== undefined) listing.price = variant.defaultSalePrice;
  }
  for (const draft of data.channelListingDrafts?.filter((entry) => entry.variantId === variant.id) || []) {
+  draft.physicalSku = variant.sku;
   if (input.title !== undefined) draft.title = product.title;
   if (input.description !== undefined) draft.description = product.description || draft.description;
   if (input.category !== undefined) draft.category = product.category;
   if (input.defaultSalePrice !== undefined) draft.price = variant.defaultSalePrice;
   if (images) draft.imageUrls = images;
   draft.updatedAt = updatedAt;
+ }
+ if (variant.sku !== previousSku) {
+  for (const lot of data.inventoryLots || []) if (lot.variantId === variant.id) { lot.sku = variant.sku; lot.physicalSku = variant.sku; lot.updatedAt = updatedAt; }
+  for (const mapping of data.physicalSkuMappings || []) if (mapping.variantId === variant.id) { mapping.physicalSku = variant.sku; mapping.externalSku ||= variant.sku; mapping.updatedAt = updatedAt; }
+  for (const sync of data.channelSyncStates || []) if (sync.variantId === variant.id) { sync.physicalSku = variant.sku; sync.updatedAt = updatedAt; }
+  for (const pick of data.fulfillmentPickLists || []) for (const item of pick.items) if (item.variantId === variant.id) item.sku = variant.sku;
  }
  activity(data, "Product edited", "product", product.id, `${product.title} product details, pricing, or photos were updated.`);
  return write(data);
@@ -224,7 +240,8 @@ export async function convertOpportunity(opportunity: LegacyOpportunity) {
  const createdAt = now(); const productImages = Array.from(new Set(opportunity.product.media.images.filter(Boolean)));
  product = { id: id(), title: opportunity.product.name, category: opportunity.product.category || "Uncategorized", tags: opportunity.listing.tags || [], supplierId: supplier.id, sourceUrl, image: productImages[0], images: productImages, description: opportunity.product.description, notes: opportunity.notes, status: "draft", createdAt, updatedAt: createdAt }; data.products.push(product);
  const unitCost = Object.values(opportunity.costs).reduce((sum, line) => sum + (line.amount || 0), 0); const sourceVariants = opportunity.product.variants.length ? opportunity.product.variants : [{ id: "default", name: "Default variant", options: [] }];
- const createdVariants = sourceVariants.map((sourceVariant, index) => { const variant = { id: id(), productId: product!.id, sku: `FST-${product!.id.slice(0, 6).toUpperCase()}-${String(index + 1).padStart(2, "0")}`, title: sourceVariant.name || `Variant ${index + 1}`, condition: "New", landedUnitCost: sourceVariant.price ? Math.max(0, unitCost - (opportunity.product.sourcing.sourcePrice || 0) + sourceVariant.price) : unitCost, defaultSalePrice: opportunity.salePrice, weightOz: Number.parseFloat(opportunity.product.shippingWeight || opportunity.product.weight || "") || undefined, reorderPoint: 1, reorderQuantity: Math.max(1, opportunity.product.sourcing.minimumOrderQuantity || 5), active: true }; data.variants.push(variant); const balance: StockBalance = { id: id(), variantId: variant.id, onHand: 0, reserved: 0, incoming: 0, damaged: 0, returned: 0, lost: 0, quarantined: 0 }; data.balances.push(balance); return variant; });
+ const baseSku = opportunity.product.sku?.trim() || `FST-${product.id.slice(0, 6).toUpperCase()}`;
+ const createdVariants = sourceVariants.map((sourceVariant, index) => { const requestedSku = sourceVariants.length === 1 ? baseSku : `${baseSku}-${String(index + 1).padStart(2, "0")}`; const variant = { id: id(), productId: product!.id, sku: assertUniqueSku(data, requestedSku), title: sourceVariant.name || `Variant ${index + 1}`, condition: "New", landedUnitCost: sourceVariant.price ? Math.max(0, unitCost - (opportunity.product.sourcing.sourcePrice || 0) + sourceVariant.price) : unitCost, defaultSalePrice: opportunity.salePrice, weightOz: Number.parseFloat(opportunity.product.shippingWeight || opportunity.product.weight || "") || undefined, reorderPoint: 1, reorderQuantity: Math.max(1, opportunity.product.sourcing.minimumOrderQuantity || 5), active: true }; data.variants.push(variant); const balance: StockBalance = { id: id(), variantId: variant.id, onHand: 0, reserved: 0, incoming: 0, damaged: 0, returned: 0, lost: 0, quarantined: 0 }; data.balances.push(balance); return variant; });
  const marketplace = opportunity.listing.marketplaceId === "depop" ? "Depop" : opportunity.listing.marketplaceId === "ebay" ? "eBay" : opportunity.listing.marketplaceId === "etsy" ? "Etsy" : opportunity.listing.marketplaceId === "mercari" ? "Mercari" : opportunity.listing.marketplaceId === "poshmark" ? "Poshmark" : "Manual";
  for (const variant of createdVariants) {
   data.listings.push({ id: id(), variantId: variant.id, marketplace, title: opportunity.listing.title || product.title, price: opportunity.salePrice, quantity: 0, status: "draft", syncState: "manual", createdAt });

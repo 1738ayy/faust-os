@@ -20,6 +20,24 @@ const COST_LABELS = {
   miscellaneous: "Miscellaneous",
 } as const;
 
+function skuPart(value?: string) {
+  return (value || "")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 12)
+    .toUpperCase();
+}
+
+function suggestedSku(source: SuperbuyProduct) {
+  const category = skuPart(source.category || source.subcategory || "SKU");
+  const supplier = skuPart(source.storeName || source.supplier || "SRC");
+  const title = skuPart(source.title);
+  const suffix = skuPart(source.original1688Url?.match(/offer\/(\d+)/)?.[1] || source.superbuyUrl.match(/offer%2F(\d+)/i)?.[1] || source.superbuyUrl || source.title || crypto.randomUUID()).slice(-6);
+  return ["FST", category, supplier || title || "ITEM", suffix].filter(Boolean).join("-").slice(0, 64);
+}
+
 function buildCosts(productCost = 0, domesticShipping = 0, internationalShipping = 0): Costs {
   return Object.fromEntries(
     Object.entries(COST_LABELS).map(([key, label]) => [
@@ -37,6 +55,7 @@ function buildCosts(productCost = 0, domesticShipping = 0, internationalShipping
 export function buildProduct(source: SuperbuyProduct): Product {
   return {
     id: crypto.randomUUID(),
+    sku: suggestedSku(source),
     name: source.title,
     category: source.category,
     subcategory: source.subcategory,

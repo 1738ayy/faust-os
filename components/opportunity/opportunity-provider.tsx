@@ -16,7 +16,7 @@ type OpportunityContextType = {
   opportunity: Opportunity | null;
   analysis: OpportunityAnalysis | null;
   importSuperbuyProduct: (product: SuperbuyProduct, importQueueItemId?: string) => void;
-  updateProduct: (field: "name" | "category" | "description" | "material" | "dimensions" | "weight" | "packageInfo", value: string) => void;
+  updateProduct: (field: "sku" | "name" | "category" | "description" | "material" | "dimensions" | "weight" | "packageInfo", value: string) => void;
   updateSupplier: (field: "name" | "storeName" | "storeUrl" | "factoryName", value: string) => void;
   updateSourceFact: (field: "sourcePrice" | "stock" | "minimumOrderQuantity", value: number | undefined) => void;
   updateImages: (images: string[]) => void;
@@ -79,7 +79,7 @@ export function OpportunityProvider({ children, settings }: { children: ReactNod
     });
   }
 
-  function updateProduct(field: "name" | "category" | "description" | "material" | "dimensions" | "weight" | "packageInfo", value: string) {
+  function updateProduct(field: "sku" | "name" | "category" | "description" | "material" | "dimensions" | "weight" | "packageInfo", value: string) {
     setOpportunity((current) => current ? touch({
       ...current,
       product: { ...current.product, [field]: value },
