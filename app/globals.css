@@ -295,4 +295,28 @@
     background: oklch(0.24 0.04 262 / 0.24);
     color: white;
   }
+
+  .faust-scrollbar {
+    scrollbar-color: oklch(0.5 0.055 262 / 0.72) oklch(0.13 0.014 255 / 0.7);
+    scrollbar-width: thin;
+  }
+
+  .faust-scrollbar::-webkit-scrollbar {
+    height: 0.7rem;
+  }
+
+  .faust-scrollbar::-webkit-scrollbar-track {
+    border-radius: 9999px;
+    background: oklch(0.13 0.014 255 / 0.7);
+  }
+
+  .faust-scrollbar::-webkit-scrollbar-thumb {
+    border: 2px solid oklch(0.13 0.014 255 / 0.7);
+    border-radius: 9999px;
+    background: oklch(0.5 0.055 262 / 0.72);
+  }
+
+  .faust-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: oklch(0.6 0.055 262 / 0.86);
+  }
 }

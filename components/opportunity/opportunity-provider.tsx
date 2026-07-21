@@ -14,7 +14,7 @@ import type { BusinessSettings } from "@/types/settings";
 type OpportunityContextType = {
   opportunity: Opportunity | null;
   analysis: OpportunityAnalysis | null;
-  importSuperbuyProduct: (product: SuperbuyProduct) => void;
+  importSuperbuyProduct: (product: SuperbuyProduct, importQueueItemId?: string) => void;
   updateProduct: (field: "name" | "category" | "description" | "material" | "dimensions" | "weight" | "packageInfo", value: string) => void;
   updateSupplier: (field: "name" | "storeName" | "storeUrl" | "factoryName", value: string) => void;
   updateSourceFact: (field: "sourcePrice" | "stock" | "minimumOrderQuantity", value: number | undefined) => void;
@@ -37,8 +37,11 @@ export function OpportunityProvider({ children, settings }: { children: ReactNod
   const [opportunity, setOpportunity] = useState<Opportunity | null>(null);
   const analysis = useMemo(() => (opportunity ? analyzeOpportunity(opportunity, { targetMargin: settings?.targetMargin }) : null), [opportunity, settings?.targetMargin]);
 
-  function importSuperbuyProduct(product: SuperbuyProduct) {
-    setOpportunity(buildOpportunity(product, { targetMargin: settings?.targetMargin, marketplaceId: settings?.defaultMarketplace as MarketplaceId | undefined }));
+  function importSuperbuyProduct(product: SuperbuyProduct, importQueueItemId?: string) {
+    setOpportunity({
+      ...buildOpportunity(product, { targetMargin: settings?.targetMargin, marketplaceId: settings?.defaultMarketplace as MarketplaceId | undefined }),
+      importQueueItemId,
+    });
   }
 
   function updateProduct(field: "name" | "category" | "description" | "material" | "dimensions" | "weight" | "packageInfo", value: string) {

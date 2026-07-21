@@ -173,6 +173,89 @@ test("browser extension API scans, analyzes, imports, confirms, syncs, and repor
   expect(state.data.extensionActionAudits.some((entry: { action: string }) => entry.action === "report-error")).toBeTruthy();
 });
 
+test("import queue manages multiple scans, removal, and catalog completion", async ({ request }) => {
+  await resetDemo(request);
+  const products = [1, 2, 3].map((index) => ({
+    source: "1688",
+    importedAt: new Date(Date.now() + index * 1000).toISOString(),
+    title: `Queue Review Product ${index}`,
+    superbuyUrl: `https://detail.1688.com/offer/queue-${index}.html`,
+    supplier: "Queue Factory",
+    storeName: "Queue Factory Store",
+    images: [`https://cbu01.alicdn.com/img/queue-${index}.jpg`],
+    variants: [{ id: `queue-${index}-black`, name: "Black", options: ["Black"], price: 18 + index, stock: 12 }],
+    price: 18 + index,
+    domesticShipping: 2,
+    minimumOrderQuantity: 1,
+    weight: "250g",
+    pageTimestamp: new Date().toISOString(),
+  }));
+  for (const product of products) {
+    const scan = await request.post("/api/extension/scan", { data: { payload: product } });
+    expect(scan.ok(), await scan.text()).toBeTruthy();
+  }
+  let queueResponse = await request.get("/api/import-queue");
+  expect(queueResponse.ok(), await queueResponse.text()).toBeTruthy();
+  let queueState = await queueResponse.json();
+  expect(queueState.counts.active).toBeGreaterThanOrEqual(3);
+  const second = queueState.queue.find((item: { title: string }) => item.title === "Queue Review Product 2");
+  expect(second).toBeTruthy();
+
+  const selected = await request.get(`/api/current-product?id=${second.id}`);
+  expect(selected.ok(), await selected.text()).toBeTruthy();
+  await expect(selected.json()).resolves.toMatchObject({ queueItemId: second.id, product: { title: "Queue Review Product 2" } });
+
+  const remove = await request.post("/api/import-queue", { data: { action: "delete", ids: [second.id] } });
+  expect(remove.ok(), await remove.text()).toBeTruthy();
+  queueState = await remove.json();
+  expect(queueState.queue.some((item: { id: string }) => item.id === second.id)).toBeFalsy();
+
+  const first = queueState.queue.find((item: { title: string }) => item.title === "Queue Review Product 1");
+  expect(first).toBeTruthy();
+  const product = first.product;
+  const time = new Date().toISOString();
+  const opportunity = {
+    id: crypto.randomUUID(),
+    importQueueItemId: first.id,
+    product: {
+      id: crypto.randomUUID(),
+      name: product.title,
+      category: product.category,
+      description: product.description,
+      supplier: { name: product.supplier, storeName: product.storeName, storeUrl: product.supplierStoreUrl },
+      sourcing: { superbuyUrl: product.superbuyUrl, original1688Url: product.original1688Url, sourcePrice: product.price, stock: product.stock, minimumOrderQuantity: product.minimumOrderQuantity },
+      media: { images: product.images },
+      variants: product.variants,
+      source: product,
+    },
+    costs: {
+      product: { key: "product", label: "Product Cost", amount: product.price || 0 },
+      domesticShipping: { key: "domesticShipping", label: "Domestic China Shipping", amount: product.domesticShipping || 0 },
+      internationalShipping: { key: "internationalShipping", label: "International Shipping", amount: product.internationalShipping || 0 },
+      packaging: { key: "packaging", label: "Packaging", amount: 0 },
+      marketplaceFees: { key: "marketplaceFees", label: "Marketplace Fees", amount: 0, calculated: true },
+      paymentProcessing: { key: "paymentProcessing", label: "Payment Processing", amount: 0, calculated: true },
+      advertising: { key: "advertising", label: "Advertising", amount: 0 },
+      taxes: { key: "taxes", label: "Taxes", amount: 0 },
+      storage: { key: "storage", label: "Storage Cost", amount: 0 },
+      warehouse: { key: "warehouse", label: "Warehouse Cost", amount: 0 },
+      returns: { key: "returns", label: "Expected Returns", amount: 0 },
+      miscellaneous: { key: "miscellaneous", label: "Miscellaneous", amount: 0 },
+    },
+    listing: { marketplaceId: "depop", title: product.title, description: product.description || "", category: product.category || "", tags: [], shippingMethod: "", shippingPrice: 0, status: "draft" },
+    salePrice: 45,
+    notes: "Playwright import queue completion.",
+    createdAt: time,
+    updatedAt: time,
+  };
+  const created = await request.post("/api/opportunities", { data: opportunity });
+  expect(created.ok(), await created.text()).toBeTruthy();
+  queueResponse = await request.get("/api/import-queue");
+  queueState = await queueResponse.json();
+  expect(queueState.queue.some((item: { id: string }) => item.id === first.id)).toBeFalsy();
+  expect(queueState.counts.completed).toBeGreaterThanOrEqual(1);
+});
+
 test("product lifecycle stays synchronized across active views, archive, restore, and hard delete", async ({ request, page }) => {
   await resetDemo(request);
   const unique = crypto.randomUUID().slice(0, 8);

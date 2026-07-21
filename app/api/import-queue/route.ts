@@ -1,33 +1,27 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 
-import { getOperatingData } from "@/services/operating-system/repository";
-import { activeVariants } from "@/lib/product-state";
-import { parseSuperbuyProduct } from "@/lib/validation/superbuy-product";
+import { buildImportQueue } from "@/lib/import-queue";
+import { getOperatingData, removeImportQueueItems } from "@/services/operating-system/repository";
+
+const queueActionSchema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("delete"), ids: z.array(z.string().uuid()).min(1) }),
+]);
 
 export async function GET() {
   const data = await getOperatingData();
-  const scans = (data.extensionArtifacts || [])
-    .filter((artifact) => artifact.metadata?.kind === "latest_source_scan" && artifact.metadata.product)
-    .map((artifact) => {
-      const product = parseSuperbuyProduct(artifact.metadata.product);
-      const existingProduct = data.products.find((entry) => entry.sourceUrl === product.superbuyUrl);
-      const convertedVariants = existingProduct ? activeVariants(data).filter((variant) => variant.productId === existingProduct.id).length : 0;
-      return {
-        id: artifact.id,
-        title: product.title,
-        supplier: product.storeName || product.supplier || "Supplier needs review",
-        source: product.source,
-        sourceUrl: product.original1688Url || product.superbuyUrl,
-        image: product.images[0],
-        imageCount: product.images.length,
-        variantCount: product.variants.length,
-        price: product.price,
-        importedAt: product.importedAt || artifact.createdAt,
-        status: existingProduct ? "product_created" : "ready_for_review",
-        productId: existingProduct?.id,
-        convertedVariants,
-      };
-    });
+  const { scans, counts } = buildImportQueue(data);
 
-  return NextResponse.json({ success: true, queue: scans });
+  return NextResponse.json({ success: true, queue: scans, counts });
+}
+
+export async function POST(request: Request) {
+  try {
+    const input = queueActionSchema.parse(await request.json());
+    const data = await removeImportQueueItems(input.ids);
+    const { scans, counts } = buildImportQueue(data);
+    return NextResponse.json({ success: true, queue: scans, counts, removed: input.ids.length });
+  } catch (error) {
+    return NextResponse.json({ success: false, message: error instanceof Error ? error.message : "Import queue action failed." }, { status: 400 });
+  }
 }

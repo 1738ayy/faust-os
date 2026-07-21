@@ -21,6 +21,7 @@ import { createAnalyticsReport, duplicateAnalyticsReport, ensureAnalyticsCollect
 import { approveAutomation, archiveAutomationRule, cancelAutomationRun, createAutomationRule, duplicateAutomationRule, ensureAutomationCollections, expireApprovals, ingestAutomationEvent, installAutomationTemplate, processAutomationWorkerTick, replayDeadLetter, retryAutomation, runAutomationRule, setAutomationEnabled, setSchedulePaused, testAutomationRule, type AutomationMutationInput } from "@/lib/automations";
 import { ensureAiCollections, generateAiRecommendations, mutateAiCenterData, type AiCenterActionInput } from "@/lib/ai-center";
 import { applyExtensionAction, type ExtensionAction } from "@/lib/browser-extension";
+import { markImportQueueItemCompleted, removeImportQueueItems as removeImportQueueItemsFromData } from "@/lib/import-queue";
 
 const file = path.join(process.cwd(), ".faust", "operating-system.json");
 const now = () => new Date().toISOString();
@@ -68,6 +69,12 @@ function activeLabel(shipment: FulfillmentShipment): FulfillmentLabel | undefine
 
 export async function getOperatingData() { return read(); }
 export async function resetOperatingData(mode: "empty" | "development_demo" = "empty") { return write(mode === "development_demo" ? developmentDemo() : empty()); }
+export async function removeImportQueueItems(ids: string[]) {
+ const data = await read();
+ const result = removeImportQueueItemsFromData(data, ids);
+ if (result.removed) activity(data, "Import queue item removed", "extension_scan", ids.join(","), `${result.removed} queued import${result.removed === 1 ? "" : "s"} removed. Catalog products were not affected.`);
+ return write(data);
+}
 function nextCopySku(data: OperatingData, sku: string) {
  const base = `${sku}-COPY`; let candidate = base, count = 2;
  while (data.variants.some((entry) => entry.sku.toLowerCase() === candidate.toLowerCase())) candidate = `${base}-${count++}`;
@@ -160,7 +167,8 @@ export async function restoreCatalogProduct(variantId: string) {
 /** Converts a reviewed sourcing opportunity into connected catalog, stock, and listing-draft records. */
 export async function convertOpportunity(opportunity: LegacyOpportunity) {
  const data = await read(); const sourceUrl = opportunity.product.sourcing.superbuyUrl; let product = data.products.find((entry) => entry.sourceUrl === sourceUrl);
- if (product) return write(data);
+ const queueItemId = "importQueueItemId" in opportunity && typeof opportunity.importQueueItemId === "string" ? opportunity.importQueueItemId : undefined;
+ if (product) { markImportQueueItemCompleted(data, queueItemId, product.id); return write(data); }
  if (data.mode === "empty") data.mode = "local";
  const supplierName = opportunity.product.supplier.storeName || opportunity.product.supplier.name || "Unassigned supplier";
  let supplier = data.suppliers.find((entry) => entry.name.toLowerCase() === supplierName.toLowerCase());
@@ -170,6 +178,7 @@ export async function convertOpportunity(opportunity: LegacyOpportunity) {
  const createdVariants = sourceVariants.map((sourceVariant, index) => { const variant = { id: id(), productId: product!.id, sku: `FST-${product!.id.slice(0, 6).toUpperCase()}-${String(index + 1).padStart(2, "0")}`, title: sourceVariant.name || `Variant ${index + 1}`, condition: "New", landedUnitCost: sourceVariant.price ? Math.max(0, unitCost - (opportunity.product.sourcing.sourcePrice || 0) + sourceVariant.price) : unitCost, defaultSalePrice: opportunity.salePrice, weightOz: Number.parseFloat(opportunity.product.shippingWeight || opportunity.product.weight || "") || undefined, reorderPoint: 1, reorderQuantity: Math.max(1, opportunity.product.sourcing.minimumOrderQuantity || 5), active: true }; data.variants.push(variant); const balance: StockBalance = { id: id(), variantId: variant.id, onHand: 0, reserved: 0, incoming: 0, damaged: 0, returned: 0, lost: 0, quarantined: 0 }; data.balances.push(balance); return variant; });
  const marketplace = opportunity.listing.marketplaceId === "depop" ? "Depop" : opportunity.listing.marketplaceId === "ebay" ? "eBay" : opportunity.listing.marketplaceId === "etsy" ? "Etsy" : opportunity.listing.marketplaceId === "mercari" ? "Mercari" : opportunity.listing.marketplaceId === "poshmark" ? "Poshmark" : "Manual";
  for (const variant of createdVariants) data.listings.push({ id: id(), variantId: variant.id, marketplace, title: opportunity.listing.title || product.title, price: opportunity.salePrice, quantity: 0, status: "draft", syncState: "manual", createdAt });
+ markImportQueueItemCompleted(data, queueItemId, product.id);
  activity(data, "Opportunity converted to product", "product", product.id, `${product.title} is now a catalog product with ${createdVariants.length} SKU variant(s). Create a purchase order before receiving stock.`); return write(data);
 }
 export async function transitionOrder(idValue: string, status: OrderStatus) { if (isProductionAuthEnabled()) return applyOrderTransition(idValue, status); const data = await read(); const order = data.orders.find((entry) => entry.id === idValue); if (!order) throw new Error("Order not found."); const result = advanceOrder(order, data.balances, status); Object.assign(order, result.order); data.balances.splice(0, data.balances.length, ...result.balances); data.stockMovements.unshift(...result.movements.map((movement) => ({ id: id(), createdAt: now(), ...movement }))); activity(data, `Order marked ${status.replaceAll("_", " ")}`, "order", order.id, `${order.number} status updated.`); return write(data); }

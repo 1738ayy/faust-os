@@ -4,6 +4,7 @@ import type { Product } from "./product";
 
 export type Opportunity = {
   id: string;
+  importQueueItemId?: string;
   product: Product;
   costs: Costs;
   listing: MarketplaceListing;
