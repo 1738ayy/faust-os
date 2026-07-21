@@ -21,7 +21,7 @@ import { createAnalyticsReport, duplicateAnalyticsReport, ensureAnalyticsCollect
 import { approveAutomation, archiveAutomationRule, cancelAutomationRun, createAutomationRule, duplicateAutomationRule, ensureAutomationCollections, expireApprovals, ingestAutomationEvent, installAutomationTemplate, processAutomationWorkerTick, replayDeadLetter, retryAutomation, runAutomationRule, setAutomationEnabled, setSchedulePaused, testAutomationRule, type AutomationMutationInput } from "@/lib/automations";
 import { ensureAiCollections, generateAiRecommendations, mutateAiCenterData, type AiCenterActionInput } from "@/lib/ai-center";
 import { applyExtensionAction, type ExtensionAction } from "@/lib/browser-extension";
-import { markImportQueueItemCompleted, removeImportQueueItems as removeImportQueueItemsFromData } from "@/lib/import-queue";
+import { canonicalListingIdentity, markImportQueueItemCompleted, removeImportQueueItems as removeImportQueueItemsFromData } from "@/lib/import-queue";
 
 const file = path.join(process.cwd(), ".faust", "operating-system.json");
 const now = () => new Date().toISOString();
@@ -166,7 +166,19 @@ export async function restoreCatalogProduct(variantId: string) {
 }
 /** Converts a reviewed sourcing opportunity into connected catalog, stock, and listing-draft records. */
 export async function convertOpportunity(opportunity: LegacyOpportunity) {
- const data = await read(); const sourceUrl = opportunity.product.sourcing.superbuyUrl; let product = data.products.find((entry) => entry.sourceUrl === sourceUrl);
+ const data = await read();
+ const sourceUrl = opportunity.product.sourcing.superbuyUrl;
+ const originalSourceUrl = opportunity.product.sourcing.original1688Url;
+ const identity = canonicalListingIdentity(opportunity.product.source);
+ let product = data.products.find((entry) => {
+  if (!entry.sourceUrl) return false;
+  try {
+   const entryIdentity = canonicalListingIdentity({ ...opportunity.product.source, superbuyUrl: entry.sourceUrl, original1688Url: undefined });
+   return entry.sourceUrl === sourceUrl || entry.sourceUrl === originalSourceUrl || entryIdentity.canonicalListingKey === identity.canonicalListingKey;
+  } catch {
+   return entry.sourceUrl === sourceUrl || entry.sourceUrl === originalSourceUrl;
+  }
+ });
  const queueItemId = "importQueueItemId" in opportunity && typeof opportunity.importQueueItemId === "string" ? opportunity.importQueueItemId : undefined;
  if (product) { markImportQueueItemCompleted(data, queueItemId, product.id); return write(data); }
  if (data.mode === "empty") data.mode = "local";

@@ -4,6 +4,7 @@ import { parseSuperbuyProduct } from "./validation/superbuy-product";
 import { createFiveChannelDrafts, seedMarketplaceAccountsAndTemplates, syncDraftQuantity, pauseOrDelistDraft, confirmExternalListing } from "./listings-core";
 import { money } from "./business-calculations";
 import { adapterForMarketplace, adapterHealth, marketplaceAdapters } from "./extension-adapters";
+import { upsertImportQueueScan } from "./import-queue";
 
 const now = () => new Date().toISOString();
 const id = () => crypto.randomUUID();
@@ -263,11 +264,10 @@ export function applyExtensionAction(data: OperatingData, input: ExtensionAction
   if (input.action === "register-device") return registerExtensionDevice(data, input);
   if (input.action === "revoke-device") return revokeExtensionDevice(data, input);
   if (input.action === "scan-intake") {
-    const product = parseSuperbuyProduct(input.payload);
-    const artifact = persistArtifact(data, { type: "log", metadata: { kind: "latest_source_scan", product } }, { type: "log" });
-    audit(data, "Extension product scanned", "extension_scan", artifact?.id || product.superbuyUrl, `${product.title} scanned from ${product.source}.`);
-    actionAudit(data, "scan-intake", "succeeded", `${product.title} captured for Opportunity Analyzer.`, { artifactIds: artifact ? [artifact.id] : [] });
-    return { product, extensionVersion };
+    const result = upsertImportQueueScan(data, input.payload);
+    audit(data, result.duplicate ? "Extension duplicate scan refreshed" : "Extension product scanned", "extension_scan", result.artifact.id, result.duplicate ? `${result.product.title} was already in the Import Queue; Faust refreshed the existing scan.` : `${result.product.title} scanned from ${result.product.source}.`);
+    actionAudit(data, "scan-intake", "succeeded", result.duplicate ? `${result.product.title} is already in the Import Queue.` : `${result.product.title} captured for Opportunity Analyzer.`, { artifactIds: [result.artifact.id] });
+    return { product: result.product, queueItemId: result.artifact.id, duplicate: result.duplicate, existingProductId: result.existingProductId, message: result.duplicate ? "Already in Import Queue" : "Added to Import Queue", extensionVersion };
   }
   if (input.action === "analyze") return analyzeExtensionProduct(input.product, input.assumptions);
   if (input.action === "import-product") { if (!input.approved) throw new Error("Import must be approved from the extension review screen."); return importExtensionProduct(data, input.product, input.assumptions, input.idempotencyKey); }

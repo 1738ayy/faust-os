@@ -33,14 +33,47 @@ function touch(opportunity: Opportunity): Opportunity {
   return { ...opportunity, updatedAt: new Date().toISOString() };
 }
 
+function draftKey(importQueueItemId?: string) {
+  return importQueueItemId ? `faust.importQueueDraft.${importQueueItemId}` : undefined;
+}
+
+function loadDraftImages(importQueueItemId: string | undefined, fallback: string[]) {
+  const key = draftKey(importQueueItemId);
+  if (!key || typeof window === "undefined") return fallback;
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(key) || "{}") as { images?: string[] };
+    return Array.isArray(parsed.images) ? parsed.images.filter((image): image is string => typeof image === "string") : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function saveDraftImages(importQueueItemId: string | undefined, images: string[]) {
+  const key = draftKey(importQueueItemId);
+  if (!key || typeof window === "undefined") return;
+  try {
+    const existing = JSON.parse(window.localStorage.getItem(key) || "{}") as Record<string, unknown>;
+    window.localStorage.setItem(key, JSON.stringify({ ...existing, images, updatedAt: new Date().toISOString() }));
+  } catch {
+    // Draft persistence is a convenience layer; the active Opportunity state remains authoritative in-session.
+  }
+}
+
 export function OpportunityProvider({ children, settings }: { children: ReactNode; settings?: BusinessSettings }) {
   const [opportunity, setOpportunity] = useState<Opportunity | null>(null);
   const analysis = useMemo(() => (opportunity ? analyzeOpportunity(opportunity, { targetMargin: settings?.targetMargin }) : null), [opportunity, settings?.targetMargin]);
 
   function importSuperbuyProduct(product: SuperbuyProduct, importQueueItemId?: string) {
+    const next = buildOpportunity(product, { targetMargin: settings?.targetMargin, marketplaceId: settings?.defaultMarketplace as MarketplaceId | undefined });
+    const images = loadDraftImages(importQueueItemId, next.product.media.images);
     setOpportunity({
-      ...buildOpportunity(product, { targetMargin: settings?.targetMargin, marketplaceId: settings?.defaultMarketplace as MarketplaceId | undefined }),
+      ...next,
       importQueueItemId,
+      product: {
+        ...next.product,
+        media: { ...next.product.media, images },
+        source: { ...next.product.source, images },
+      },
     });
   }
 
@@ -81,14 +114,18 @@ export function OpportunityProvider({ children, settings }: { children: ReactNod
 
   function updateImages(images: string[]) {
     const cleanImages = Array.from(new Set(images.map((image) => image.trim()).filter(Boolean)));
-    setOpportunity((current) => current ? touch({
-      ...current,
-      product: {
-        ...current.product,
-        media: { ...current.product.media, images: cleanImages },
-        source: { ...current.product.source, images: cleanImages },
-      },
-    }) : current);
+    setOpportunity((current) => {
+      if (!current) return current;
+      saveDraftImages(current.importQueueItemId, cleanImages);
+      return touch({
+        ...current,
+        product: {
+          ...current.product,
+          media: { ...current.product.media, images: cleanImages },
+          source: { ...current.product.source, images: cleanImages },
+        },
+      });
+    });
   }
 
   function updateCost(key: CostKey, amount: number) {
