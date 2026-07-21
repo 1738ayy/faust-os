@@ -97,6 +97,42 @@ export async function duplicateCatalogProduct(variantId: string) {
  activity(data, "Product duplicated", "product", product.id, `${sourceProduct.title} was copied as ${product.title}. Stock was not duplicated.`);
  return write(data);
 }
+export async function updateCatalogProduct(input: { variantId: string; title?: string; sku?: string; brand?: string; category?: string; condition?: string; description?: string; notes?: string; landedUnitCost?: number; defaultSalePrice?: number; images?: string[]; sourceUrl?: string }) {
+ const data = await read(); const variant = data.variants.find((entry) => entry.id === input.variantId); if (!variant) throw new Error("Product variant not found.");
+ const product = data.products.find((entry) => entry.id === variant.productId); if (!product) throw new Error("Product not found.");
+ const updatedAt = now();
+ const images = input.images ? Array.from(new Set(input.images.map((image) => image.trim()).filter(Boolean))).slice(0, 12) : undefined;
+ if (input.title !== undefined) product.title = input.title.trim() || product.title;
+ if (input.brand !== undefined) product.brand = input.brand.trim() || undefined;
+ if (input.category !== undefined) product.category = input.category.trim() || product.category;
+ if (input.description !== undefined) product.description = input.description.trim() || undefined;
+ if (input.notes !== undefined) product.notes = input.notes.trim() || undefined;
+ if (input.sourceUrl !== undefined) product.sourceUrl = input.sourceUrl.trim() || product.sourceUrl;
+ if (images) { product.images = images; product.image = images[0]; }
+ if (input.sku !== undefined) {
+  const sku = input.sku.trim();
+  if (sku && data.variants.some((entry) => entry.id !== variant.id && entry.sku.toLowerCase() === sku.toLowerCase())) throw new Error("Another product already uses that SKU.");
+  if (sku) variant.sku = sku;
+ }
+ if (input.condition !== undefined) variant.condition = input.condition.trim() || variant.condition;
+ if (input.landedUnitCost !== undefined) variant.landedUnitCost = Math.max(0, input.landedUnitCost);
+ if (input.defaultSalePrice !== undefined) variant.defaultSalePrice = Math.max(0, input.defaultSalePrice);
+ product.updatedAt = updatedAt;
+ for (const listing of data.listings.filter((entry) => entry.variantId === variant.id)) {
+  if (input.title !== undefined) listing.title = product.title;
+  if (input.defaultSalePrice !== undefined) listing.price = variant.defaultSalePrice;
+ }
+ for (const draft of data.channelListingDrafts?.filter((entry) => entry.variantId === variant.id) || []) {
+  if (input.title !== undefined) draft.title = product.title;
+  if (input.description !== undefined) draft.description = product.description || draft.description;
+  if (input.category !== undefined) draft.category = product.category;
+  if (input.defaultSalePrice !== undefined) draft.price = variant.defaultSalePrice;
+  if (images) draft.imageUrls = images;
+  draft.updatedAt = updatedAt;
+ }
+ activity(data, "Product edited", "product", product.id, `${product.title} product details, pricing, or photos were updated.`);
+ return write(data);
+}
 export async function deleteCatalogProduct(variantId: string) {
  const data = await read(); const variant = data.variants.find((entry) => entry.id === variantId); if (!variant) throw new Error("Product variant not found.");
  const product = data.products.find((entry) => entry.id === variant.productId); if (!product) throw new Error("Product not found.");
@@ -185,11 +221,16 @@ export async function convertOpportunity(opportunity: LegacyOpportunity) {
  const supplierName = opportunity.product.supplier.storeName || opportunity.product.supplier.name || "Unassigned supplier";
  let supplier = data.suppliers.find((entry) => entry.name.toLowerCase() === supplierName.toLowerCase());
  if (!supplier) { supplier = { id: id(), name: supplierName, sourcePlatform: "Superbuy", status: "active", notes: "Created from saved opportunity." }; data.suppliers.push(supplier); }
- const createdAt = now(); product = { id: id(), title: opportunity.product.name, category: opportunity.product.category || "Uncategorized", tags: opportunity.listing.tags || [], supplierId: supplier.id, sourceUrl, image: opportunity.product.media.images[0], status: "draft", createdAt, updatedAt: createdAt }; data.products.push(product);
+ const createdAt = now(); const productImages = Array.from(new Set(opportunity.product.media.images.filter(Boolean)));
+ product = { id: id(), title: opportunity.product.name, category: opportunity.product.category || "Uncategorized", tags: opportunity.listing.tags || [], supplierId: supplier.id, sourceUrl, image: productImages[0], images: productImages, description: opportunity.product.description, notes: opportunity.notes, status: "draft", createdAt, updatedAt: createdAt }; data.products.push(product);
  const unitCost = Object.values(opportunity.costs).reduce((sum, line) => sum + (line.amount || 0), 0); const sourceVariants = opportunity.product.variants.length ? opportunity.product.variants : [{ id: "default", name: "Default variant", options: [] }];
  const createdVariants = sourceVariants.map((sourceVariant, index) => { const variant = { id: id(), productId: product!.id, sku: `FST-${product!.id.slice(0, 6).toUpperCase()}-${String(index + 1).padStart(2, "0")}`, title: sourceVariant.name || `Variant ${index + 1}`, condition: "New", landedUnitCost: sourceVariant.price ? Math.max(0, unitCost - (opportunity.product.sourcing.sourcePrice || 0) + sourceVariant.price) : unitCost, defaultSalePrice: opportunity.salePrice, weightOz: Number.parseFloat(opportunity.product.shippingWeight || opportunity.product.weight || "") || undefined, reorderPoint: 1, reorderQuantity: Math.max(1, opportunity.product.sourcing.minimumOrderQuantity || 5), active: true }; data.variants.push(variant); const balance: StockBalance = { id: id(), variantId: variant.id, onHand: 0, reserved: 0, incoming: 0, damaged: 0, returned: 0, lost: 0, quarantined: 0 }; data.balances.push(balance); return variant; });
  const marketplace = opportunity.listing.marketplaceId === "depop" ? "Depop" : opportunity.listing.marketplaceId === "ebay" ? "eBay" : opportunity.listing.marketplaceId === "etsy" ? "Etsy" : opportunity.listing.marketplaceId === "mercari" ? "Mercari" : opportunity.listing.marketplaceId === "poshmark" ? "Poshmark" : "Manual";
- for (const variant of createdVariants) data.listings.push({ id: id(), variantId: variant.id, marketplace, title: opportunity.listing.title || product.title, price: opportunity.salePrice, quantity: 0, status: "draft", syncState: "manual", createdAt });
+ for (const variant of createdVariants) {
+  data.listings.push({ id: id(), variantId: variant.id, marketplace, title: opportunity.listing.title || product.title, price: opportunity.salePrice, quantity: 0, status: "draft", syncState: "manual", createdAt });
+  data.channelListingDrafts ||= [];
+  data.channelListingDrafts.push({ id: id(), listingId: id(), variantId: variant.id, physicalSku: variant.sku, marketplace: marketplace === "Manual" ? "Depop" : marketplace, title: opportunity.listing.title || product.title, description: opportunity.listing.description || opportunity.product.description || "", price: opportunity.salePrice, category: opportunity.listing.category || product.category, attributes: { condition: variant.condition }, imageUrls: productImages, quantity: 0, status: "draft", validationErrors: productImages.length ? [] : ["Add at least one product image."], publishMode: "extension", syncState: "pending", createdAt, updatedAt: createdAt });
+ }
  markImportQueueItemCompleted(data, queueItemId, product.id);
  activity(data, "Opportunity converted to product", "product", product.id, `${product.title} is now a catalog product with ${createdVariants.length} SKU variant(s). Create a purchase order before receiving stock.`); return write(data);
 }

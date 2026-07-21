@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { deleteCatalogProduct, duplicateCatalogProduct, getOperatingData, restoreCatalogProduct, snapshot } from "@/services/operating-system/repository";
+import { deleteCatalogProduct, duplicateCatalogProduct, getOperatingData, restoreCatalogProduct, snapshot, updateCatalogProduct } from "@/services/operating-system/repository";
 
 const productActionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("duplicate"), variantId: z.string().uuid() }),
   z.object({ action: z.literal("delete"), variantId: z.string().uuid() }),
   z.object({ action: z.literal("restore"), variantId: z.string().uuid() }),
+  z.object({ action: z.literal("update"), variantId: z.string().uuid(), title: z.string().trim().min(1).max(300).optional(), sku: z.string().trim().min(1).max(120).optional(), brand: z.string().trim().max(120).optional(), category: z.string().trim().min(1).max(120).optional(), condition: z.string().trim().max(120).optional(), description: z.string().trim().max(2000).optional(), notes: z.string().trim().max(2000).optional(), sourceUrl: z.string().trim().max(1000).optional(), landedUnitCost: z.coerce.number().nonnegative().optional(), defaultSalePrice: z.coerce.number().nonnegative().optional(), images: z.array(z.string().trim().min(1).max(5000)).max(12).optional() }),
   z.object({ action: z.literal("delete-many"), variantIds: z.array(z.string().uuid()).min(1) }),
 ]);
 
@@ -18,7 +19,9 @@ export async function POST(request: Request) {
         ? await deleteCatalogProduct(body.variantId)
         : body.action === "restore"
           ? await restoreCatalogProduct(body.variantId)
-          : await body.variantIds.reduce(async (previous, variantId) => {
+          : body.action === "update"
+            ? await updateCatalogProduct(body)
+            : await body.variantIds.reduce(async (previous, variantId) => {
               await previous;
               return deleteCatalogProduct(variantId);
             }, Promise.resolve(await getOperatingData()));

@@ -1,7 +1,7 @@
 export type RecordStatus = "draft" | "active" | "paused" | "completed" | "cancelled" | "attention";
 export type OrderStatus = "draft" | "pending_payment" | "paid" | "confirmed" | "reserved" | "ready_to_pack" | "packed" | "label_created" | "ready_to_ship" | "shipped" | "in_transit" | "delivered" | "closed" | "cancelled" | "return_requested" | "return_in_transit" | "returned" | "partially_refunded" | "refunded" | "inventory_reserved" | "label_purchased";
 
-export type Product = { id: string; title: string; brand?: string; category: string; tags: string[]; supplierId?: string; sourceUrl?: string; image?: string; status: RecordStatus; createdAt: string; updatedAt: string };
+export type Product = { id: string; title: string; brand?: string; category: string; tags: string[]; supplierId?: string; sourceUrl?: string; image?: string; images?: string[]; description?: string; notes?: string; status: RecordStatus; createdAt: string; updatedAt: string };
 export type Variant = { id: string; productId: string; sku: string; title: string; condition: string; landedUnitCost: number; defaultSalePrice: number; weightOz?: number; reorderPoint: number; reorderQuantity: number; active: boolean };
 export type Location = { id: string; label: string; warehouse: string; zone?: string; aisle?: string; shelf?: string; bin?: string };
 export type StockBalance = { id: string; variantId: string; locationId?: string; onHand: number; reserved: number; incoming: number; damaged: number; returned: number; lost: number; quarantined: number };

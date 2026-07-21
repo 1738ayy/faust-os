@@ -31,3 +31,23 @@ test("opportunity analysis uses the global target margin for recommended pricing
   assert.ok(highAnalysis.recommendedPrice > lowAnalysis.recommendedPrice);
   assert.equal(highMargin.salePrice, Math.round(highAnalysis.recommendedPrice * 100) / 100);
 });
+
+test("marketplace fee profiles calculate Depop Boost and marketplace-specific selling costs", () => {
+  const boosted = buildOpportunity(product(), { targetMargin: 35, marketplaceId: "depop", depopBoostEnabledByDefault: true, depopBoostRate: 12 });
+  boosted.salePrice = 50;
+  boosted.listing.shippingPrice = 5;
+  const boostedAnalysis = analyzeOpportunity(boosted, { targetMargin: 35 });
+  const unboosted = { ...boosted, feeAssumptions: { ...boosted.feeAssumptions!, overrides: { depop_boost: { enabled: false, rate: 0.12 } } } };
+  const unboostedAnalysis = analyzeOpportunity(unboosted, { targetMargin: 35 });
+  const ebay = buildOpportunity(product(), { targetMargin: 35, marketplaceId: "ebay" });
+  ebay.salePrice = 50;
+  ebay.listing.shippingPrice = 5;
+  const ebayAnalysis = analyzeOpportunity(ebay, { targetMargin: 35 });
+
+  assert.equal(boostedAnalysis.feeProfileVersion, "depop-us-2026-07");
+  assert.ok(boostedAnalysis.feeEstimates.some((fee) => fee.label === "Depop Boost" && fee.enabled && fee.amount === 6));
+  assert.equal(unboostedAnalysis.promotionFees, 0);
+  assert.ok(unboostedAnalysis.netProfit > boostedAnalysis.netProfit);
+  assert.ok(ebayAnalysis.feeEstimates.some((fee) => fee.label === "Final Value Fee"));
+  assert.notEqual(ebayAnalysis.totalSellingCosts, boostedAnalysis.totalSellingCosts);
+});

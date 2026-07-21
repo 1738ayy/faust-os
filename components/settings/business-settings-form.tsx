@@ -43,6 +43,13 @@ export function BusinessSettingsForm({ settings }: { settings: BusinessSettings 
       </label>
       <label className="text-sm font-medium">Warehouse name<input value={value.warehouseName} onChange={(event) => setValue({ ...value, warehouseName: event.target.value })} className={field} placeholder="Home warehouse" /></label>
       <label className="text-sm font-medium">Target margin (%)<input type="number" min="0" max="100" value={value.targetMargin} onChange={(event) => setValue({ ...value, targetMargin: Number(event.target.value) || 0 })} className={field} /></label>
+      <fieldset className="rounded-2xl border border-slate-700/45 bg-black/25 p-4 sm:col-span-2">
+        <legend className="px-2 text-sm font-semibold">Marketplace Fees · Depop</legend>
+        <div className="mt-3 grid gap-4 sm:grid-cols-2">
+          <label className="flex items-center gap-3 text-sm font-medium"><input type="checkbox" checked={value.depopBoostEnabledByDefault ?? true} onChange={(event) => setValue({ ...value, depopBoostEnabledByDefault: event.target.checked })} className="h-4 w-4 accent-[#66708d]" />Use Depop Boost by default</label>
+          <label className="text-sm font-medium">Default Boost rate (%)<input type="number" min="0" max="100" step="0.1" value={value.depopBoostRate ?? 12} onChange={(event) => setValue({ ...value, depopBoostRate: Number(event.target.value) || 0 })} className={field} /></label>
+        </div>
+      </fieldset>
       <button disabled={saving} className="rounded-full bg-[#56627f] px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-slate-950/30 transition hover:bg-[#66708d] disabled:opacity-60 sm:col-span-2 sm:w-fit">{saving ? "Saving..." : "Save settings"}</button>
       {message && <p className="text-sm text-[#edf3ff] sm:col-span-2">{message}</p>}
     </form>

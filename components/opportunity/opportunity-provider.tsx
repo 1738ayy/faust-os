@@ -10,6 +10,7 @@ import type { MarketplaceId } from "@/types/marketplace";
 import type { Opportunity } from "@/types/opportunity";
 import type { SuperbuyProduct } from "@/types/superbuy-product";
 import type { BusinessSettings } from "@/types/settings";
+import { getMarketplaceFeeProfile, type FeeOverride } from "@/lib/marketplace-fee-profiles";
 
 type OpportunityContextType = {
   opportunity: Opportunity | null;
@@ -23,6 +24,8 @@ type OpportunityContextType = {
   updateCostNotes: (key: CostKey, notes: string) => void;
   updateSalePrice: (amount: number) => void;
   updateMarketplace: (marketplaceId: MarketplaceId) => void;
+  updateFeeOverride: (feeKey: string, override: FeeOverride) => void;
+  resetFeeOverride: (feeKey: string) => void;
   updateNotes: (notes: string) => void;
   resetOpportunity: () => void;
 };
@@ -64,7 +67,7 @@ export function OpportunityProvider({ children, settings }: { children: ReactNod
   const analysis = useMemo(() => (opportunity ? analyzeOpportunity(opportunity, { targetMargin: settings?.targetMargin }) : null), [opportunity, settings?.targetMargin]);
 
   function importSuperbuyProduct(product: SuperbuyProduct, importQueueItemId?: string) {
-    const next = buildOpportunity(product, { targetMargin: settings?.targetMargin, marketplaceId: settings?.defaultMarketplace as MarketplaceId | undefined });
+    const next = buildOpportunity(product, { targetMargin: settings?.targetMargin, marketplaceId: settings?.defaultMarketplace as MarketplaceId | undefined, depopBoostEnabledByDefault: settings?.depopBoostEnabledByDefault, depopBoostRate: settings?.depopBoostRate });
     const images = loadDraftImages(importQueueItemId, next.product.media.images);
     setOpportunity({
       ...next,
@@ -148,7 +151,33 @@ export function OpportunityProvider({ children, settings }: { children: ReactNod
     setOpportunity((current) => current ? touch({
       ...current,
       listing: { ...current.listing, marketplaceId },
+      feeAssumptions: { marketplaceId, profileVersion: getMarketplaceFeeProfile(marketplaceId).version },
     }) : current);
+  }
+
+  function updateFeeOverride(feeKey: string, override: FeeOverride) {
+    setOpportunity((current) => {
+      if (!current) return current;
+      const marketplaceId = current.listing.marketplaceId;
+      return touch({
+        ...current,
+        feeAssumptions: {
+          marketplaceId,
+          profileVersion: getMarketplaceFeeProfile(marketplaceId).version,
+          overrides: { ...(current.feeAssumptions?.marketplaceId === marketplaceId ? current.feeAssumptions.overrides : {}), [feeKey]: override },
+        },
+      });
+    });
+  }
+
+  function resetFeeOverride(feeKey: string) {
+    setOpportunity((current) => {
+      if (!current) return current;
+      const marketplaceId = current.listing.marketplaceId;
+      const overrides = { ...(current.feeAssumptions?.marketplaceId === marketplaceId ? current.feeAssumptions.overrides : {}) };
+      delete overrides[feeKey];
+      return touch({ ...current, feeAssumptions: { marketplaceId, profileVersion: getMarketplaceFeeProfile(marketplaceId).version, overrides } });
+    });
   }
 
   function updateNotes(notes: string) {
@@ -168,6 +197,8 @@ export function OpportunityProvider({ children, settings }: { children: ReactNod
       updateCostNotes,
       updateSalePrice,
       updateMarketplace,
+      updateFeeOverride,
+      resetFeeOverride,
       updateNotes,
       resetOpportunity: () => setOpportunity(null),
     }}>

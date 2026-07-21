@@ -150,7 +150,7 @@ export function buildProductExperience(data: OperatingData, product: Product, va
     product,
     variant,
     href: `/catalog/${variant.id}`,
-    image: product.image || drafts.find((draft) => draft.imageUrls.length)?.imageUrls[0],
+    image: product.image || product.images?.[0] || drafts.find((draft) => draft.imageUrls.length)?.imageUrls[0],
     supplierName: supplier?.name || "Supplier not linked",
     supplierDetail: supplier ? `${supplier.sourcePlatform}${supplier.leadDays ? ` · ${supplier.leadDays} day lead time` : ""}` : "Link supplier before purchasing.",
     readiness,

@@ -1,6 +1,11 @@
+"use client";
+
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { ArrowLeft, ArrowRight, Camera, CheckCircle2, CircleAlert } from "lucide-react";
+import { useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { ArrowLeft, ArrowRight, Camera, CheckCircle2, CircleAlert, Edit3, MoveLeft, MoveRight, Save, X } from "lucide-react";
+import { toast } from "sonner";
 import { ActivityTimeline, MarketplaceBadge, PrimaryButton, StatusBadge } from "@/components/faust/design-system";
 import { ProductImage } from "@/components/products/product-image";
 import { ReadinessRing } from "@/components/products/readiness-ring";
@@ -11,6 +16,7 @@ import { readinessLabel } from "@/lib/product-readiness";
 export function ProductWorkspace({ item }: { item: ProductExperience }) {
   const live = item.marketplaces.filter((marketplace) => marketplace.status === "live").length;
   const needsReview = item.marketplaces.filter((marketplace) => marketplace.status === "rejected" || marketplace.status === "out_of_stock").length;
+  const [editing, setEditing] = useState(false);
 
   return (
     <div className="space-y-6">
@@ -29,7 +35,10 @@ export function ProductWorkspace({ item }: { item: ProductExperience }) {
                 <h1 data-testid="page-title" className="mt-3 max-w-4xl text-4xl font-semibold tracking-tight md:text-5xl">{item.product.title}</h1>
                 <p className="mt-3 max-w-3xl text-sm leading-6 text-muted-foreground">{item.variant.title} · {item.product.category} · {item.supplierName}</p>
               </div>
-              <ReadinessRing readiness={item.readiness} size="lg" />
+              <div className="flex items-start gap-3">
+                <button type="button" onClick={() => setEditing(true)} className="inline-flex items-center gap-2 rounded-full border border-slate-700/60 bg-zinc-950/60 px-4 py-2 text-sm font-semibold text-[#f6f8ff] transition hover:border-slate-400/60"><Edit3 size={15} />Edit Product</button>
+                <ReadinessRing readiness={item.readiness} size="lg" />
+              </div>
             </div>
 
             <div className="rounded-3xl border border-slate-700/45 bg-black/35 p-5">
@@ -192,6 +201,107 @@ export function ProductWorkspace({ item }: { item: ProductExperience }) {
           </div>
         </details>
       </Panel>
+      {editing ? <ProductEditDrawer item={item} onClose={() => setEditing(false)} /> : null}
+    </div>
+  );
+}
+
+function ProductEditDrawer({ item, onClose }: { item: ProductExperience; onClose: () => void }) {
+  const [draft, setDraft] = useState({
+    title: item.product.title,
+    sku: item.variant.sku,
+    brand: item.product.brand || "",
+    category: item.product.category,
+    condition: item.variant.condition,
+    description: item.product.description || "",
+    notes: item.product.notes || "",
+    sourceUrl: item.product.sourceUrl || "",
+    landedUnitCost: item.variant.landedUnitCost,
+    defaultSalePrice: item.variant.defaultSalePrice,
+    images: (item.product.images?.length ? item.product.images : item.image ? [item.image] : []).slice(0, 12),
+  });
+  const [busy, startTransition] = useTransition();
+  const router = useRouter();
+  const fileRef = useRef<HTMLInputElement | null>(null);
+
+  function moveImage(from: number, to: number) {
+    if (to < 0 || to >= draft.images.length) return;
+    const images = [...draft.images];
+    const [image] = images.splice(from, 1);
+    images.splice(to, 0, image);
+    setDraft({ ...draft, images });
+  }
+
+  async function upload(files: FileList | null) {
+    if (!files?.length) return;
+    const encoded = await Promise.all(Array.from(files).slice(0, Math.max(0, 12 - draft.images.length)).map((file) => new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    })));
+    setDraft({ ...draft, images: [...draft.images, ...encoded].slice(0, 12) });
+  }
+
+  function save() {
+    startTransition(async () => {
+      try {
+        const response = await fetch("/api/products/actions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "update", variantId: item.variant.id, ...draft }) });
+        const data = await response.json();
+        if (!response.ok || data.ok === false) throw new Error(data.message || "Product could not be saved.");
+        toast.success("Product saved");
+        onClose();
+        router.refresh();
+      } catch (error) {
+        toast.error("Could not save product", { description: error instanceof Error ? error.message : "Try again." });
+      }
+    });
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm">
+      <aside className="ml-auto flex h-full w-full max-w-2xl flex-col border-l border-slate-700/45 bg-[#080b10] shadow-2xl shadow-black/70">
+        <div className="flex items-start justify-between gap-4 border-b border-slate-700/45 p-5">
+          <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#c8d2e6]">Product editor</p><h2 className="mt-2 text-2xl font-semibold">Edit Product</h2><p className="mt-1 text-sm text-muted-foreground">Update the permanent catalog record without leaving the workspace.</p></div>
+          <button type="button" aria-label="Close editor" onClick={onClose} className="rounded-full border border-slate-700/60 p-2 text-[#f6f8ff] transition hover:border-slate-400/60"><X size={18} /></button>
+        </div>
+        <div className="flex-1 space-y-6 overflow-y-auto p-5">
+          <section className="grid gap-4 sm:grid-cols-2">
+            <label className="text-sm font-medium sm:col-span-2">Product name<input value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} className="faust-field faust-focus mt-2 w-full p-3" /></label>
+            <label className="text-sm font-medium">SKU<input value={draft.sku} onChange={(event) => setDraft({ ...draft, sku: event.target.value })} className="faust-field faust-focus mt-2 w-full p-3" /></label>
+            <label className="text-sm font-medium">Brand<input value={draft.brand} onChange={(event) => setDraft({ ...draft, brand: event.target.value })} className="faust-field faust-focus mt-2 w-full p-3" /></label>
+            <label className="text-sm font-medium">Category<input value={draft.category} onChange={(event) => setDraft({ ...draft, category: event.target.value })} className="faust-field faust-focus mt-2 w-full p-3" /></label>
+            <label className="text-sm font-medium">Condition<input value={draft.condition} onChange={(event) => setDraft({ ...draft, condition: event.target.value })} className="faust-field faust-focus mt-2 w-full p-3" /></label>
+            <label className="text-sm font-medium">Cost<input type="number" min="0" step="0.01" value={draft.landedUnitCost} onChange={(event) => setDraft({ ...draft, landedUnitCost: Number(event.target.value) || 0 })} className="faust-field faust-focus mt-2 w-full p-3" /></label>
+            <label className="text-sm font-medium">Target sale price<input type="number" min="0" step="0.01" value={draft.defaultSalePrice} onChange={(event) => setDraft({ ...draft, defaultSalePrice: Number(event.target.value) || 0 })} className="faust-field faust-focus mt-2 w-full p-3" /></label>
+            <label className="text-sm font-medium sm:col-span-2">Source URL<input value={draft.sourceUrl} onChange={(event) => setDraft({ ...draft, sourceUrl: event.target.value })} className="faust-field faust-focus mt-2 w-full p-3" /></label>
+            <label className="text-sm font-medium sm:col-span-2">Description<textarea rows={4} value={draft.description} onChange={(event) => setDraft({ ...draft, description: event.target.value })} className="faust-field faust-focus mt-2 w-full resize-none p-3" /></label>
+            <label className="text-sm font-medium sm:col-span-2">Notes<textarea rows={3} value={draft.notes} onChange={(event) => setDraft({ ...draft, notes: event.target.value })} className="faust-field faust-focus mt-2 w-full resize-none p-3" /></label>
+          </section>
+          <section>
+            <div className="flex items-center justify-between gap-3"><h3 className="text-lg font-semibold">Photos</h3><button type="button" className="faust-secondary-action" onClick={() => fileRef.current?.click()}>Upload photos</button></div>
+            <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" multiple className="sr-only" onChange={(event) => void upload(event.target.files)} />
+            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {draft.images.map((image, index) => (
+                <div key={`${image}-${index}`} className="relative aspect-square overflow-hidden rounded-2xl border border-slate-700/45 bg-black/35">
+                  <ProductImage src={image} alt="" className="h-full w-full object-cover" fallbackClassName="h-full w-full" />
+                  {index === 0 ? <span className="absolute left-2 top-2 rounded-full bg-black/70 px-2 py-1 text-[11px] font-semibold">Cover</span> : null}
+                  <button type="button" aria-label="Remove image" onClick={() => setDraft({ ...draft, images: draft.images.filter((_, imageIndex) => imageIndex !== index) })} className="absolute right-2 top-2 rounded-full bg-black/70 p-1.5"><X size={14} /></button>
+                  <div className="absolute inset-x-2 bottom-2 flex justify-between">
+                    <button type="button" aria-label="Move image left" disabled={index === 0} onClick={() => moveImage(index, index - 1)} className="rounded-full bg-black/70 p-1.5 disabled:opacity-40"><MoveLeft size={14} /></button>
+                    <button type="button" aria-label="Move image right" disabled={index === draft.images.length - 1} onClick={() => moveImage(index, index + 1)} className="rounded-full bg-black/70 p-1.5 disabled:opacity-40"><MoveRight size={14} /></button>
+                  </div>
+                </div>
+              ))}
+              {draft.images.length < 12 ? <button type="button" onClick={() => fileRef.current?.click()} className="grid aspect-square place-items-center rounded-2xl border border-dashed border-slate-700/60 text-sm text-muted-foreground"><Camera size={24} />Add photo</button> : null}
+            </div>
+          </section>
+        </div>
+        <div className="flex justify-end gap-3 border-t border-slate-700/45 p-5">
+          <button type="button" className="faust-secondary-action" onClick={onClose}>Cancel</button>
+          <button type="button" disabled={busy} className="faust-action inline-flex items-center gap-2" onClick={save}><Save size={16} />{busy ? "Saving..." : "Save Product"}</button>
+        </div>
+      </aside>
     </div>
   );
 }

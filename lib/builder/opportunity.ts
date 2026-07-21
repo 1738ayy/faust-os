@@ -3,7 +3,7 @@ import type { Opportunity } from "@/types/opportunity";
 import type { Product } from "@/types/product";
 import type { SuperbuyProduct } from "@/types/superbuy-product";
 import type { MarketplaceId } from "@/types/marketplace";
-import { getMarketplace } from "../marketplaces";
+import { estimateMarketplaceFees, getMarketplaceFeeProfile } from "../marketplace-fee-profiles";
 
 const COST_LABELS = {
   product: "Product Cost",
@@ -12,7 +12,7 @@ const COST_LABELS = {
   packaging: "Packaging",
   marketplaceFees: "Marketplace Fees",
   paymentProcessing: "Payment Processing",
-  advertising: "Advertising",
+  advertising: "Promotion Cost",
   taxes: "Taxes",
   storage: "Storage Cost",
   warehouse: "Warehouse Cost",
@@ -67,15 +67,21 @@ export function buildProduct(source: SuperbuyProduct): Product {
   };
 }
 
-export function buildOpportunity(source: SuperbuyProduct, options: { targetMargin?: number; marketplaceId?: MarketplaceId } = {}): Opportunity {
+export function buildOpportunity(source: SuperbuyProduct, options: { targetMargin?: number; marketplaceId?: MarketplaceId; depopBoostEnabledByDefault?: boolean; depopBoostRate?: number } = {}): Opportunity {
   const now = new Date().toISOString();
   const product = buildProduct(source);
   const marketplaceId = options.marketplaceId || "depop";
-  const marketplace = getMarketplace(marketplaceId);
   const editableCost = (source.price ?? 0) + (source.domesticShipping ?? 0) + (source.internationalShipping ?? 0);
   const targetMargin = Math.max(0, Math.min(95, options.targetMargin ?? 50)) / 100;
-  const feeRate = marketplace.sellingFeeRate + marketplace.paymentFeeRate;
-  const targetPrice = 1 - feeRate - targetMargin > 0 ? editableCost / (1 - feeRate - targetMargin) : editableCost * 3;
+  const feeAssumptions = {
+    marketplaceId,
+    profileVersion: getMarketplaceFeeProfile(marketplaceId).version,
+    overrides: marketplaceId === "depop" ? { depop_boost: { enabled: options.depopBoostEnabledByDefault ?? true, rate: (options.depopBoostRate ?? 12) / 100 } } : undefined,
+  };
+  const fees = estimateMarketplaceFees(marketplaceId, { itemPrice: 0, shippingPrice: 0 }, feeAssumptions);
+  const feeRate = fees.estimates.filter((estimate) => estimate.rate && estimate.enabled).reduce((sum, estimate) => sum + (estimate.rate || 0), 0);
+  const flatFees = fees.estimates.filter((estimate) => !estimate.rate && estimate.enabled).reduce((sum, estimate) => sum + estimate.amount, 0);
+  const targetPrice = 1 - feeRate - targetMargin > 0 ? (editableCost + flatFees) / (1 - feeRate - targetMargin) : editableCost * 3;
 
   return {
     id: crypto.randomUUID(),
@@ -91,6 +97,7 @@ export function buildOpportunity(source: SuperbuyProduct, options: { targetMargi
       shippingPrice: 0,
       status: "draft",
     },
+    feeAssumptions,
     salePrice: Math.round(targetPrice * 100) / 100,
     notes: "",
     createdAt: now,

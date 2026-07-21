@@ -6,7 +6,7 @@ import { isProductionAuthEnabled } from "@/lib/env";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { getActiveBusinessId } from "@/services/business/repository";
 const file = path.join(process.cwd(), ".faust", "settings.json");
-const defaults = (): BusinessSettings => ({ id: "default", currency: "USD", warehouseName: "", targetMargin: 50, defaultMarketplace: "depop", updatedAt: new Date().toISOString() });
+const defaults = (): BusinessSettings => ({ id: "default", currency: "USD", warehouseName: "", targetMargin: 50, defaultMarketplace: "depop", depopBoostEnabledByDefault: true, depopBoostRate: 12, updatedAt: new Date().toISOString() });
 function fromAppearance(currency: string, updatedAt: string, appearance: unknown): BusinessSettings {
   const value = typeof appearance === "object" && appearance ? appearance as Partial<BusinessSettings> : {};
   return { ...defaults(), ...value, id: "default", currency: value.currency || currency || "USD", updatedAt };
