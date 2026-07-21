@@ -1,9 +1,9 @@
 "use client";
-/* eslint-disable @next/next/no-img-element -- auth must render even if Next image optimization rejects a cached logo. */
 
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { FaustLogo } from "@/components/brand/faust-logo";
 import { getPublicEnv } from "@/lib/env";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { authCredentialsSchema, passwordRecoverySchema } from "@/lib/validation/requests";
@@ -55,12 +55,7 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" | "forgot-passw
     <main className="grid min-h-screen place-items-center bg-background p-5">
       <form onSubmit={submit} className="faust-surface w-full max-w-md p-7">
         <div className="flex flex-col items-center text-center">
-          <img
-            alt="Faust Snow Leopard"
-            src="/brand/faust-snow-leopard.png"
-            className="h-36 w-64 object-contain"
-            onError={(event) => { event.currentTarget.style.display = "none"; }}
-          />
+          <FaustLogo className="h-36 w-64" />
           <p className="mt-1 text-xs font-medium uppercase tracking-[0.2em] text-[#c8d2e6]">Faust OS</p>
           <h1 className="mt-3 text-2xl font-semibold">{title}</h1>
           <p className="mt-3 text-sm leading-6 text-muted-foreground">Secure, refreshable Supabase session access.</p>

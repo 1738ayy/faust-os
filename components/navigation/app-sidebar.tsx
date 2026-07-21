@@ -1,5 +1,4 @@
 "use client";
-/* eslint-disable @next/next/no-img-element -- the app shell should render the static SVG brand mark directly. */
 
 import {
   Sidebar,
@@ -11,17 +10,14 @@ import {
 import { NavMain } from "./nav-main";
 import { NavMarketplaces } from "./nav-marketplaces";
 import { SignOutButton } from "@/components/auth/sign-out-button";
+import { FaustLogo } from "@/components/brand/faust-logo";
 
 export function AppSidebar() {
   return (
     <Sidebar variant="inset">
       <SidebarHeader className="border-b border-slate-700/50 bg-black/20 p-5">
         <div className="flex flex-col items-center text-center">
-          <img
-            alt="Faust Snow Leopard"
-            src="/brand/faust-snow-leopard.png"
-            className="h-[6.5rem] w-48 object-contain"
-          />
+          <FaustLogo className="h-[6.5rem] w-48" />
           <div className="mt-1">
             <h1 className="font-heading text-xl font-bold tracking-tight">Faust OS</h1>
             <p className="text-xs text-muted-foreground">

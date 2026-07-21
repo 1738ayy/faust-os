@@ -1,8 +1,8 @@
 "use client";
-/* eslint-disable @next/next/no-img-element -- the brand mark is a static SVG and should not depend on image optimization. */
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { FaustLogo } from "@/components/brand/faust-logo";
 
 export function OnboardingForm() {
   const [name, setName] = useState("");
@@ -33,11 +33,7 @@ export function OnboardingForm() {
     <main className="grid min-h-screen place-items-center bg-background p-5">
       <form onSubmit={submit} className="faust-surface w-full max-w-xl p-7">
         <div className="flex flex-col items-center text-center">
-          <img
-            alt="Faust Snow Leopard"
-            src="/brand/faust-snow-leopard.png"
-            className="h-36 w-64 object-contain"
-          />
+          <FaustLogo className="h-36 w-64" />
           <p className="mt-1 text-xs font-medium uppercase tracking-[0.2em] text-[#c8d2e6]">Faust OS / onboarding</p>
           <h1 className="mt-3 text-2xl font-semibold">Create your business workspace</h1>
           <p className="mt-3 text-sm leading-6 text-muted-foreground">This creates the business boundary used to protect your catalog, orders, finance, and operations data.</p>
