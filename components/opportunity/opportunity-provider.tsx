@@ -72,7 +72,6 @@ export function OpportunityProvider({ children, settings }: { children: ReactNod
       product: {
         ...next.product,
         media: { ...next.product.media, images },
-        source: { ...next.product.source, images },
       },
     });
   }
@@ -120,10 +119,9 @@ export function OpportunityProvider({ children, settings }: { children: ReactNod
       return touch({
         ...current,
         product: {
-          ...current.product,
-          media: { ...current.product.media, images: cleanImages },
-          source: { ...current.product.source, images: cleanImages },
-        },
+        ...current.product,
+        media: { ...current.product.media, images: cleanImages },
+      },
       });
     });
   }
