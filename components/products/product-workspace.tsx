@@ -4,7 +4,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, CheckCircle2, CircleAlert, Edit3, Save, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Atom, CheckCircle2, CircleAlert, Edit3, GitBranch, Save, Sparkles, X } from "lucide-react";
 import { toast } from "sonner";
 import { ActivityTimeline, MarketplaceBadge, PrimaryButton, StatusBadge } from "@/components/faust/design-system";
 import { ProductImage } from "@/components/products/product-image";
@@ -92,15 +92,9 @@ export function ProductWorkspace({ item }: { item: ProductExperience }) {
             </div>
           </div>
         </Panel>
-        <Panel title="Product DNA">
-          <div className="flex flex-wrap gap-2">
-            {item.intelligence.dna.length ? item.intelligence.dna.map((dna) => <span key={dna.tag} className="rounded-full border border-slate-600/50 bg-slate-800/20 px-3 py-1.5 text-sm text-[#f6f8ff]">{dna.tag}</span>) : <span className="text-sm text-muted-foreground">Faust needs more product history before DNA tags become reliable.</span>}
-          </div>
-          <div className="mt-4 grid gap-3">
-            {item.intelligence.dna.map((dna) => <p key={dna.tag} className="rounded-2xl border border-slate-700/35 bg-black/35 p-3 text-sm text-muted-foreground"><span className="font-medium text-foreground">{dna.tag}:</span> {dna.reason}</p>)}
-          </div>
-        </Panel>
       </section>
+
+      <ProductDnaCapsule item={item} />
 
       <Panel title="Business health">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
@@ -177,58 +171,6 @@ export function ProductWorkspace({ item }: { item: ProductExperience }) {
         </div>
       </section>
 
-      <section className="hidden">
-        <Panel title="Readiness checklist">
-          <div className="grid gap-3 sm:grid-cols-2">
-            {item.readiness.dimensions.map((dimension) => (
-              <div className="rounded-2xl border border-slate-700/35 bg-black/35 p-3" key={dimension.key}>
-                <div className="flex items-center gap-2">
-                  {dimension.ready ? <CheckCircle2 className="h-4 w-4 text-[#edf3ff]" /> : <CircleAlert className="h-4 w-4 text-amber-300" />}
-                  <b className="text-sm">{dimension.label}</b>
-                </div>
-                <p className="mt-2 text-xs leading-5 text-muted-foreground">{dimension.detail}</p>
-              </div>
-            ))}
-          </div>
-        </Panel>
-        <Panel title="Inventory and purchasing">
-          <div className="grid gap-3 md:grid-cols-3">
-            <MiniMetric label="On hand" value={String(item.inventory.onHand)} />
-            <MiniMetric label="Incoming" value={String(item.inventory.incoming)} />
-            <MiniMetric label="Reserved" value={String(item.inventory.reserved)} />
-            <MiniMetric label="Damaged" value={String(item.inventory.damaged)} />
-            <MiniMetric label="Quarantine" value={String(item.inventory.quarantined)} />
-            <MiniMetric label="Inventory value" value={money(item.inventory.value)} />
-          </div>
-          <div className="mt-4 rounded-2xl border border-slate-700/35 bg-black/35 p-4 text-sm text-muted-foreground">
-            Supplier: <span className="text-foreground">{item.supplierName}</span> · Lead time {item.purchasing.leadTime} · Reorder point {item.purchasing.reorderPoint} · Suggested reorder {item.purchasing.recommendedReorderQuantity}
-          </div>
-        </Panel>
-      </section>
-
-      <section className="hidden">
-        <Panel title="Analytics">
-          <Row label="Units sold" value={item.analytics.unitsSold} />
-          <Row label="Sell-through" value={`${item.analytics.sellThrough.toFixed(1)}%`} />
-          <Row label="Returns" value={item.analytics.returns} />
-          <Row label="Best marketplace" value={item.analytics.bestMarketplace} />
-          <Row label="Velocity" value={item.analytics.velocityLabel} />
-        </Panel>
-        <Panel title="Related products">
-          <div className="grid gap-3">
-            {item.intelligence.relationships.length ? item.intelligence.relationships.map((relationship) => (
-              <Link key={`${relationship.type}-${relationship.href}`} href={relationship.href} className="rounded-2xl border border-slate-700/35 bg-black/35 p-3 transition hover:border-slate-400/45">
-                <p className="text-sm font-medium">{relationship.label}</p>
-                <p className="mt-1 text-xs leading-5 text-muted-foreground">{relationship.detail}</p>
-              </Link>
-            )) : <p className="text-sm text-muted-foreground">No strong product relationships are proven yet. Shared supplier, category, marketplace, and pricing patterns will appear here as the catalog grows.</p>}
-          </div>
-        </Panel>
-        <Panel title="Photos">
-          <PersistentProductImages item={item} />
-        </Panel>
-      </section>
-
       <details className="faust-surface p-5">
         <summary className="cursor-pointer text-xl font-semibold">Product timeline</summary>
         <div className="mt-4">
@@ -248,6 +190,127 @@ export function ProductWorkspace({ item }: { item: ProductExperience }) {
         </details>
       </Panel>
       {editing ? <ProductEditDrawer item={item} onClose={() => setEditing(false)} /> : null}
+    </div>
+  );
+}
+
+function ProductDnaCapsule({ item }: { item: ProductExperience }) {
+  const dnaTags = item.intelligence.dna.length ? item.intelligence.dna : [{ tag: "Needs attention" as const, reason: "Faust needs more product history before stronger DNA traits become reliable." }];
+  const liveChannels = item.marketplaces.filter((marketplace) => marketplace.status === "live").length;
+  const knowledgeSignals = [
+    item.product.description ? 1 : 0,
+    item.product.images?.length ? 1 : 0,
+    item.analytics.unitsSold ? 1 : 0,
+    liveChannels ? 1 : 0,
+    item.timeline.length > 3 ? 1 : 0,
+    item.supplierName !== "Supplier not linked" ? 1 : 0,
+  ].reduce((sum, value) => sum + value, 0);
+  const growth = knowledgeSignals <= 2 ? "Dormant" : knowledgeSignals <= 4 ? "Awake" : "Evolving";
+  const strongestTrait = dnaTags[0];
+  const marketPosition = item.finance.margin >= 55 ? "Premium margin profile" : item.finance.margin >= 35 ? "Competitive resale profile" : item.finance.revenue ? "Margin needs review" : "Market position still forming";
+  const opportunity = item.inventory.available <= 0 ? "Receive inventory" : item.readiness.score < 80 ? item.readiness.nextAction : liveChannels < 3 ? "Cross-list to more channels" : "Watch pricing and velocity";
+  const memory = item.analytics.unitsSold
+    ? `${item.analytics.unitsSold} unit(s) sold. ${item.analytics.bestMarketplace} is the strongest observed channel.`
+    : item.timeline.length > 2
+      ? "Faust has import, edit, and inventory history, but sales memory is still forming."
+      : "This product is newly captured. Faust will learn more as it is listed, purchased, and sold.";
+  const story = `${item.product.category || "This product"} is currently understood as ${strongestTrait.tag.toLowerCase()} with ${item.finance.margin.toFixed(1)}% projected margin. ${strongestTrait.reason}`;
+  const lifecycle = ["Imported", "Analyzed", liveChannels ? "Published" : "Drafted", item.inventory.incoming ? "Restocking" : item.inventory.available ? "Stocked" : "Waiting", item.analytics.unitsSold ? "First sale" : "No sale yet"];
+
+  return (
+    <section className="relative overflow-hidden rounded-[2.3rem] border border-slate-700/45 bg-[linear-gradient(135deg,rgba(7,10,15,.96),rgba(15,19,28,.9)_48%,rgba(7,10,15,.96))] p-5 shadow-2xl shadow-black/35">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(102,112,141,.25),transparent_28rem),radial-gradient(circle_at_82%_60%,rgba(200,210,230,.08),transparent_18rem)]" />
+      <div className="relative grid gap-6 xl:grid-cols-[1fr_380px_1fr]">
+        <div className="space-y-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#c8d2e6]">Product DNA</p>
+            <h2 className="mt-2 text-3xl font-semibold tracking-tight">Living product archive</h2>
+            <p className="mt-3 text-sm leading-6 text-muted-foreground">
+              Faust&apos;s containment chamber for what the system has learned about this SKU—not another place to repeat product fields.
+            </p>
+          </div>
+          <DnaInsightTile icon={<Sparkles size={16} />} title="Product story" value={story} />
+          <DnaInsightTile icon={<Atom size={16} />} title="Product fingerprint" value={dnaTags.slice(0, 5).map((dna) => dna.tag).join(" · ")} />
+        </div>
+
+        <div className="relative mx-auto grid min-h-[300px] w-full max-w-[380px] place-items-center">
+          <div className="absolute inset-x-8 top-8 h-8 rounded-full border border-slate-500/35 bg-slate-300/10 blur-[1px]" />
+          <div className="dna-capsule relative h-[276px] w-[150px] rounded-[5rem] border border-slate-400/35 bg-[linear-gradient(90deg,rgba(200,210,230,.08),rgba(200,210,230,.22),rgba(40,48,65,.2))] shadow-[0_0_50px_rgba(102,112,141,.22),inset_0_0_30px_rgba(200,210,230,.12)]">
+            <div className="absolute inset-3 rounded-[5rem] border border-slate-200/10 bg-black/30 backdrop-blur-sm" />
+            <div className="absolute left-1/2 top-1/2 h-32 w-20 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(237,243,255,.95),rgba(102,112,141,.58)_36%,transparent_72%)] opacity-80 blur-[1px]" />
+            <div className="dna-helix absolute left-1/2 top-1/2 h-40 w-16 -translate-x-1/2 -translate-y-1/2">
+              {Array.from({ length: 7 }).map((_, index) => <span key={index} style={{ top: `${index * 15}%` }} />)}
+            </div>
+            <div className="absolute inset-x-[-18px] bottom-7 h-5 rounded-full border border-slate-400/25 bg-slate-950/70" />
+          </div>
+          <div className="absolute bottom-2 rounded-full border border-slate-600/45 bg-black/55 px-4 py-2 text-center shadow-lg shadow-black/40">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Knowledge state</p>
+            <p className="font-heading text-xl font-semibold text-[#f6f8ff]">{growth}</p>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <DnaInsightTile icon={<GitBranch size={16} />} title="Market position" value={`${marketPosition}. ${item.analytics.bestMarketplace} is ${item.analytics.unitsSold ? "supported by order history" : "the current best candidate"} for early learning.`} />
+          <DnaInsightTile icon={<ArrowRight size={16} />} title="Highest-value opportunity" value={`${opportunity}. Expected lift: ${item.readiness.score < 80 ? "higher readiness and cleaner publishing" : "stronger distribution signal"}.`} />
+          <DnaInsightTile icon={<Sparkles size={16} />} title="Product memory" value={memory} />
+        </div>
+      </div>
+      <div className="relative mt-5 grid gap-3 border-t border-slate-700/35 pt-5 lg:grid-cols-[1fr_1.1fr]">
+        <div className="flex flex-wrap gap-2">
+          {dnaTags.map((dna) => <span key={dna.tag} className="rounded-full border border-slate-600/45 bg-slate-800/20 px-3 py-1.5 text-xs font-medium text-[#f6f8ff]" title={dna.reason}>{dna.tag}</span>)}
+        </div>
+        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          {lifecycle.map((event, index) => (
+            <span key={`${event}-${index}`} className="inline-flex items-center gap-2">
+              <span className="rounded-full border border-slate-600/40 bg-black/30 px-3 py-1.5 text-[#edf3ff]">{event}</span>
+              {index < lifecycle.length - 1 ? <span className="text-slate-600">→</span> : null}
+            </span>
+          ))}
+        </div>
+      </div>
+      <style jsx>{`
+        .dna-capsule::before {
+          content: "";
+          position: absolute;
+          inset: 14px 28px;
+          border-radius: 999px;
+          background: linear-gradient(90deg, transparent, rgba(255,255,255,.16), transparent);
+          transform: translateX(-24px);
+          animation: capsule-sheen 7s ease-in-out infinite;
+        }
+        .dna-helix span {
+          position: absolute;
+          left: 50%;
+          width: 54px;
+          height: 2px;
+          border-radius: 999px;
+          background: linear-gradient(90deg, transparent, rgba(237,243,255,.9), rgba(102,112,141,.62), transparent);
+          transform: translateX(-50%) rotate(var(--tw-rotate, -16deg));
+          box-shadow: 0 0 16px rgba(200,210,230,.28);
+          animation: helix-breathe 5s ease-in-out infinite;
+        }
+        .dna-helix span:nth-child(even) { --tw-rotate: 16deg; opacity: .72; }
+        @keyframes capsule-sheen {
+          0%, 64%, 100% { opacity: .28; transform: translateX(-24px); }
+          76% { opacity: .68; transform: translateX(28px); }
+        }
+        @keyframes helix-breathe {
+          0%, 100% { opacity: .45; transform: translateX(-50%) rotate(var(--tw-rotate, -16deg)) scaleX(.78); }
+          50% { opacity: .95; transform: translateX(-50%) rotate(var(--tw-rotate, -16deg)) scaleX(1); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .dna-capsule::before, .dna-helix span { animation: none; }
+        }
+      `}</style>
+    </section>
+  );
+}
+
+function DnaInsightTile({ icon, title, value }: { icon: ReactNode; title: string; value: ReactNode }) {
+  return (
+    <div className="rounded-3xl border border-slate-700/35 bg-black/30 p-4 shadow-lg shadow-black/15">
+      <div className="flex items-center gap-2 text-sm font-semibold text-[#edf3ff]">{icon}{title}</div>
+      <p className="mt-2 text-sm leading-6 text-muted-foreground">{value}</p>
     </div>
   );
 }
