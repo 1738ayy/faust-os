@@ -25,7 +25,15 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const body = productActionSchema.parse(await request.json());
+    const parsed = productActionSchema.safeParse(await request.json());
+    if (!parsed.success) {
+      const imageIssue = parsed.error.issues.find((issue) => issue.path[0] === "images");
+      if (imageIssue) {
+        return NextResponse.json({ ok: false, message: "One or more photos still need to upload before saving. Please retry the image upload, then save again." }, { status: 400 });
+      }
+      return NextResponse.json({ ok: false, message: parsed.error.issues[0]?.message || "Product action failed." }, { status: 400 });
+    }
+    const body = parsed.data;
     const data = body.action === "duplicate"
       ? await duplicateCatalogProduct(body.variantId)
       : body.action === "delete"

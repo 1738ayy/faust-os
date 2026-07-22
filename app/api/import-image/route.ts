@@ -1,6 +1,17 @@
 import { NextResponse } from "next/server";
+import { createHash, randomUUID } from "node:crypto";
+import fs from "node:fs/promises";
+import path from "node:path";
 
 const placeholderSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" role="img" aria-label="Image unavailable"><defs><linearGradient id="bg" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#0b1017"/><stop offset="1" stop-color="#1f2b3f"/></linearGradient></defs><rect width="160" height="160" rx="28" fill="url(#bg)"/><path d="M48 96c18-28 28-18 39-36 10 19 25 22 30 44-20 11-47 12-69-8Z" fill="#66708d" opacity=".72"/><circle cx="106" cy="54" r="11" fill="#c8d2e6" opacity=".8"/><text x="80" y="128" text-anchor="middle" fill="#c8d2e6" font-family="Arial, sans-serif" font-size="12" opacity=".84">Image unavailable</text></svg>`;
+const storageRoot = path.join(process.cwd(), ".faust", "image-storage");
+const maxBytes = 8 * 1024 * 1024;
+const contentTypes = new Map([
+  ["image/jpeg", "jpg"],
+  ["image/png", "png"],
+  ["image/webp", "webp"],
+]);
+const extensionTypes = new Map([...contentTypes.entries()].map(([type, extension]) => [extension, type]));
 
 function placeholder() {
   return new NextResponse(placeholderSvg, {
@@ -11,8 +22,36 @@ function placeholder() {
   });
 }
 
+function safeKey(value: string | null) {
+  if (!value || value.includes("..") || path.isAbsolute(value) || !/^[a-z0-9/_-]+\.(jpg|png|webp)$/i.test(value)) return undefined;
+  return value;
+}
+
+async function storedImage(key: string) {
+  const safe = safeKey(key);
+  if (!safe) return placeholder();
+  const filePath = path.join(storageRoot, safe);
+  if (!filePath.startsWith(storageRoot)) return placeholder();
+  try {
+    const body = await fs.readFile(filePath);
+    const extension = path.extname(filePath).slice(1).toLowerCase();
+    return new NextResponse(body, {
+      headers: {
+        "Content-Type": extensionTypes.get(extension) || "application/octet-stream",
+        "Cache-Control": "public, max-age=31536000, immutable",
+      },
+    });
+  } catch {
+    return placeholder();
+  }
+}
+
 export async function GET(request: Request) {
-  const urls = new URL(request.url).searchParams.getAll("url");
+  const search = new URL(request.url).searchParams;
+  const key = search.get("key");
+  if (key) return storedImage(key);
+
+  const urls = search.getAll("url");
   for (const url of urls) {
     let parsed: URL;
     try {
@@ -44,4 +83,32 @@ export async function GET(request: Request) {
     }
   }
   return placeholder();
+}
+
+export async function POST(request: Request) {
+  try {
+    const form = await request.formData();
+    const file = form.get("file");
+    if (!(file instanceof File)) return NextResponse.json({ ok: false, message: "Choose an image before saving." }, { status: 400 });
+    const contentType = file.type || "application/octet-stream";
+    const extension = contentTypes.get(contentType);
+    if (!extension) return NextResponse.json({ ok: false, message: "Use JPG, PNG, or WEBP images." }, { status: 400 });
+    if (file.size > maxBytes) return NextResponse.json({ ok: false, message: "Each image must be 8 MB or smaller." }, { status: 400 });
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const hash = createHash("sha256").update(buffer).digest("hex").slice(0, 24);
+    const key = `product-images/${new Date().toISOString().slice(0, 10)}/${hash}-${randomUUID()}.${extension}`;
+    const destination = path.join(storageRoot, key);
+    await fs.mkdir(path.dirname(destination), { recursive: true });
+    await fs.writeFile(destination, buffer);
+    return NextResponse.json({
+      ok: true,
+      storageKey: key,
+      url: `/api/import-image?key=${encodeURIComponent(key)}`,
+      contentType,
+      size: buffer.length,
+    });
+  } catch (error) {
+    console.error("[faust:image-upload]", error);
+    return NextResponse.json({ ok: false, message: "This image could not be uploaded. Please retry before publishing." }, { status: 500 });
+  }
 }

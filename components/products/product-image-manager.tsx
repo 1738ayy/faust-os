@@ -33,6 +33,7 @@ const defaultCropBox: CropBox = { x: 10, y: 10, width: 80, height: 80 };
 
 export function proxiedProductImage(src: string) {
   if (src.startsWith("data:")) return src;
+  if (src.startsWith("/api/import-image?key=")) return src;
   const params = new URLSearchParams();
   params.set("url", src);
   return `/api/import-image?${params.toString()}`;
@@ -151,12 +152,28 @@ function loadBrowserImage(src: string) {
   });
 }
 
+function canvasBlob(canvas: HTMLCanvasElement) {
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("Image crop could not be prepared for upload.")), "image/jpeg", 0.92);
+  });
+}
+
+async function uploadProductImage(file: Blob, filename: string) {
+  const form = new FormData();
+  form.set("file", file, filename);
+  const response = await fetch("/api/import-image", { method: "POST", body: form });
+  const payload = await response.json() as { ok?: boolean; url?: string; message?: string };
+  if (!response.ok || !payload.ok || !payload.url) throw new Error(payload.message || "This image could not be uploaded. Please retry before publishing.");
+  return payload.url;
+}
+
 export function ProductImageManager({ title = "Photos", description = "First slot is the Cover. Drag photos to reorder, use × to remove, or crop from the tile.", productName, images, onChange, maxPhotos = DEFAULT_MAX_PHOTOS, storageKey, facts = [], links = [], compact = false }: ProductImageManagerProps) {
   const cleanImages = images.slice(0, maxPhotos);
   const slots = Array.from({ length: maxPhotos }, (_, index) => cleanImages[index]);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [cropState, setCropState] = useState<CropState | null>(null);
   const [error, setError] = useState("");
+  const [uploading, setUploading] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const railRef = useRef<HTMLDivElement | null>(null);
@@ -183,13 +200,15 @@ export function ProductImageManager({ title = "Photos", description = "First slo
       return true;
     });
     const remaining = Math.max(0, maxPhotos - cleanImages.length);
-    const encoded = await Promise.all(usable.slice(0, remaining).map((file) => new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result));
-      reader.onerror = () => reject(reader.error);
-      reader.readAsDataURL(file);
-    })));
-    if (encoded.length) setImages([...cleanImages, ...encoded]);
+    setUploading(true);
+    try {
+      const uploaded = await Promise.all(usable.slice(0, remaining).map((file) => uploadProductImage(file, file.name || "product-image.jpg")));
+      if (uploaded.length) setImages([...cleanImages, ...uploaded]);
+    } catch (uploadError) {
+      setError(uploadError instanceof Error ? uploadError.message : "This image could not be uploaded. Please retry before publishing.");
+    } finally {
+      setUploading(false);
+    }
   }
 
   function removeImage(index: number) {
@@ -270,12 +289,15 @@ export function ProductImageManager({ title = "Photos", description = "First slo
       const context = canvas.getContext("2d");
       if (!context) throw new Error("Image editor is not available in this browser.");
       context.drawImage(image, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, outputWidth, outputHeight);
-      const editedImage = canvas.toDataURL("image/jpeg", 0.92);
+      setUploading(true);
+      const editedImage = await uploadProductImage(await canvasBlob(canvas), `product-crop-${cropState.index + 1}.jpg`);
       saveCropRecord(storageKey, editedImage, { original: cropState.original, transform: { box: cropState.box, ratio: cropState.ratio, zoom: cropState.zoom }, croppedAt: new Date().toISOString() });
       setImages(cleanImages.map((src, index) => index === cropState.index ? editedImage : src));
       setCropState(null);
-    } catch {
-      setError("That image could not be cropped. Try uploading it from your computer first.");
+    } catch (cropError) {
+      setError(cropError instanceof Error ? cropError.message : "That image could not be cropped. Try uploading it from your computer first.");
+    } finally {
+      setUploading(false);
     }
   }
 
@@ -303,7 +325,7 @@ export function ProductImageManager({ title = "Photos", description = "First slo
           <p className={compact ? "mt-1 max-w-xl text-xs leading-5 text-muted-foreground" : "mt-1 text-sm text-muted-foreground"}>{description}</p>
         </div>
         {compact ? (
-          <button type="button" onClick={() => setExpanded(true)} className="inline-flex shrink-0 items-center gap-2 rounded-full border border-slate-700/60 bg-zinc-950/55 px-3 py-2 text-xs font-semibold text-[#f6f8ff] transition hover:border-[#c8d2e6]/70 focus-visible:border-[#c8d2e6]/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#66708d]/40">
+          <button type="button" disabled={uploading} onClick={() => setExpanded(true)} className="inline-flex shrink-0 items-center gap-2 rounded-full border border-slate-700/60 bg-zinc-950/55 px-3 py-2 text-xs font-semibold text-[#f6f8ff] transition hover:border-[#c8d2e6]/70 focus-visible:border-[#c8d2e6]/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#66708d]/40 disabled:opacity-50">
             <Maximize2 className="h-3.5 w-3.5" />Manage Photos
           </button>
         ) : null}
@@ -359,9 +381,9 @@ export function ProductImageManager({ title = "Photos", description = "First slo
               </div>
             </div>
           ) : (
-            <button key={`empty-${index}`} type="button" onClick={() => fileInputRef.current?.click()} className={`${compact ? "h-36 w-28 shrink-0 snap-start md:h-40 md:w-32" : "aspect-square"} rounded-2xl border border-dashed border-slate-600/60 bg-zinc-950/45 p-4 text-center text-sm text-muted-foreground transition hover:border-[#c8d2e6]/70 hover:text-[#f6f8ff] focus-visible:border-[#c8d2e6]/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#66708d]/40`}>
+            <button key={`empty-${index}`} type="button" disabled={uploading} onClick={() => fileInputRef.current?.click()} className={`${compact ? "h-36 w-28 shrink-0 snap-start md:h-40 md:w-32" : "aspect-square"} rounded-2xl border border-dashed border-slate-600/60 bg-zinc-950/45 p-4 text-center text-sm text-muted-foreground transition hover:border-[#c8d2e6]/70 hover:text-[#f6f8ff] focus-visible:border-[#c8d2e6]/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#66708d]/40 disabled:opacity-50`}>
               <Camera className={`${compact ? "h-6 w-6" : "h-7 w-7"} mx-auto text-[#c8d2e6]`} />
-              <span className="mt-3 block font-semibold">Add photo</span>
+              <span className="mt-3 block font-semibold">{uploading ? "Uploading..." : "Add photo"}</span>
               <span className="mt-1 block text-xs">{compact ? "Upload" : "JPG, PNG, WEBP"}</span>
             </button>
           ))}
@@ -373,6 +395,7 @@ export function ProductImageManager({ title = "Photos", description = "First slo
         ) : null}
       </div>
       <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" multiple className="sr-only" onChange={(event) => void addImageFiles(event.target.files)} />
+      {uploading ? <p role="status" className="mt-2 text-sm text-muted-foreground">Uploading image before saving it to the product...</p> : null}
       {error ? <p role="status" className="mt-2 text-sm text-amber-200">{error}</p> : null}
       {!cleanImages.length ? <p className={compact ? "text-xs text-muted-foreground" : "mt-4 text-sm text-muted-foreground"}>No product photos yet. Upload photos to create a cover and marketplace image set.</p> : null}
       {facts.length ? <dl className="mt-7 space-y-3 text-sm">{facts.filter(([, value]) => value !== undefined && value !== "").map(([label, value]) => <div key={label} className="flex justify-between gap-4"><dt className="text-muted-foreground">{label}</dt><dd className="text-right font-medium">{value}</dd></div>)}</dl> : null}
@@ -415,7 +438,7 @@ export function ProductImageManager({ title = "Photos", description = "First slo
               <div className="flex flex-wrap items-end justify-end gap-2">
                 <button type="button" className="faust-secondary-action" onClick={resetCrop}>Reset Crop</button>
                 <button type="button" className="faust-secondary-action" onClick={() => setCropState(null)}>Cancel</button>
-                <button type="button" className="faust-action" onClick={() => void saveCrop()}>Save crop</button>
+                <button type="button" disabled={uploading} className="faust-action disabled:opacity-50" onClick={() => void saveCrop()}>{uploading ? "Uploading..." : "Save crop"}</button>
               </div>
             </div>
             <p className="mt-3 text-xs text-muted-foreground">Keyboard: arrows move, Shift moves faster, Alt + arrows resizes, + / - zooms, Enter saves, Escape cancels.</p>

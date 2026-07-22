@@ -20,11 +20,12 @@ test("product images are first-class owned records and reject temporary browser 
   const product: Product = { id: "product-1", title: "Photo product", category: "Accessories", tags: [], status: "draft", createdAt: time, updatedAt: time };
   data.products.push(product);
 
-  setProductImages(data, product, ["blob:https://faust.invalid/temp", "https://cdn.example.test/one.jpg", "chrome-extension://abc/two.jpg", "https://cdn.example.test/two.jpg", "https://cdn.example.test/one.jpg"], { now: time, id, sourceType: "supplier" });
+  setProductImages(data, product, ["blob:https://faust.invalid/temp", "data:image/jpeg;base64,AAAA", "https://cdn.example.test/one.jpg", "chrome-extension://abc/two.jpg", "/api/import-image?key=product-images/2026-07-22/uploaded.jpg", "https://cdn.example.test/two.jpg", "https://cdn.example.test/one.jpg"], { now: time, id, sourceType: "supplier" });
 
-  assert.deepEqual(product.images, ["https://cdn.example.test/one.jpg", "https://cdn.example.test/two.jpg"]);
+  assert.deepEqual(product.images, ["https://cdn.example.test/one.jpg", "/api/import-image?key=product-images/2026-07-22/uploaded.jpg", "https://cdn.example.test/two.jpg"]);
   assert.equal(product.image, "https://cdn.example.test/one.jpg");
-  assert.equal(data.productImages?.length, 2);
+  assert.equal(data.productImages?.length, 3);
+  assert.ok(data.productImages?.every((image) => !image.url.startsWith("data:image/") && !image.url.startsWith("blob:")));
   assert.equal(data.productImages?.[0].isCover, true);
   assert.equal(productCoverImage(data, product), "https://cdn.example.test/one.jpg");
 });
