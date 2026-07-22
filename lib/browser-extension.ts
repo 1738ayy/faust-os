@@ -5,6 +5,7 @@ import { createFiveChannelDrafts, seedMarketplaceAccountsAndTemplates, syncDraft
 import { money } from "./business-calculations";
 import { adapterForMarketplace, adapterHealth, marketplaceAdapters } from "./extension-adapters";
 import { upsertImportQueueScan } from "./import-queue";
+import { normalizeProductImageUrls, setProductImages } from "./product-images";
 
 const now = () => new Date().toISOString();
 const id = () => crypto.randomUUID();
@@ -172,11 +173,13 @@ export function importExtensionProduct(data: OperatingData, input: unknown, assu
   const analysis = analyzeExtensionProduct(input, assumptions);
   const product = analysis.product;
   const existing = data.products.find((entry) => entry.sourceUrl === product.superbuyUrl);
+  const productImages = normalizeProductImageUrls(product.images);
   if (existing) {
+    if (productImages.length) setProductImages(data, existing, productImages, { now: now(), id, sourceType: "extension" });
     const variants = data.variants.filter((entry) => entry.productId === existing.id);
     if (variants.length) {
       seedMarketplaceAccountsAndTemplates(data);
-      for (const variant of variants) createFiveChannelDrafts(data, { variantId: variant.id, physicalSku: variant.sku, basePrice: variant.defaultSalePrice, imageUrls: product.images, idempotencyKey: `${idempotencyKey || product.superbuyUrl}:${variant.id}` });
+      for (const variant of variants) createFiveChannelDrafts(data, { variantId: variant.id, physicalSku: variant.sku, basePrice: variant.defaultSalePrice, imageUrls: productImages, idempotencyKey: `${idempotencyKey || product.superbuyUrl}:${variant.id}` });
     }
     const variantIds = variants.map((variant) => variant.id);
     return { analysis, productId: existing.id, variantId: variants[0]?.id, variantIds, idempotent: true, drafts: data.channelListingDrafts?.filter((draft) => variantIds.includes(draft.variantId)) || [] };
@@ -184,8 +187,9 @@ export function importExtensionProduct(data: OperatingData, input: unknown, assu
   const createdAt = now();
   let supplier: Supplier | undefined = data.suppliers.find((entry) => entry.name.toLowerCase() === supplierName(product).toLowerCase());
   if (!supplier) { supplier = { id: id(), name: supplierName(product), contact: product.supplier, sourcePlatform: product.source, leadDays: 12, rating: product.sellerRating, status: "active", notes: `Created by Faust extension from ${product.superbuyUrl}` }; data.suppliers.push(supplier); }
-  const catalogProduct: Product = { id: id(), title: product.title, category: product.category || "Imported source product", tags: ["extension-import", product.source], supplierId: supplier.id, sourceUrl: product.superbuyUrl, image: product.images[0], status: "draft", createdAt, updatedAt: createdAt };
+  const catalogProduct: Product = { id: id(), title: product.title, category: product.category || "Imported source product", tags: ["extension-import", product.source], supplierId: supplier.id, sourceUrl: product.superbuyUrl, image: productImages[0], images: productImages, status: "draft", createdAt, updatedAt: createdAt };
   data.products.push(catalogProduct);
+  setProductImages(data, catalogProduct, productImages, { now: createdAt, id, sourceType: "extension" });
   const createdVariants: Variant[] = [];
   for (const scannedVariant of scannedVariants(product)) {
     const landedUnitCost = variantLandedUnitCost(product, analysis, scannedVariant.price);
@@ -201,7 +205,7 @@ export function importExtensionProduct(data: OperatingData, input: unknown, assu
   data.purchaseBatches.push({ id: batchId, supplierId: supplier.id, reference: `EXT-DRAFT-${createdVariants[0].sku}`, currency: product.source === "1688" ? "RMB" : "USD", status: "draft", itemCount: analysis.quantity * createdVariants.length, subtotalOriginal: product.price || 0, subtotalUsd: analysis.purchaseCostUsd * analysis.quantity, landedCostUsd: (analysis.domesticFreightUsd + analysis.internationalFreightUsd + analysis.dutyCustomsUsd) * analysis.quantity, totalCostUsd: analysis.cashCommitment, receivedAt: createdAt, idempotencyKey, createdAt, updatedAt: createdAt });
   data.landedCostComponents.push({ id: id(), batchId, type: "product", description: "Extension source product estimate", amountOriginal: product.price || 0, currency: product.source === "1688" ? "RMB" : "USD", amountUsd: analysis.purchaseCostUsd, allocationMethod: "by_quantity", linkedObjectType: "manual", linkedObjectId: catalogProduct.id, createdAt });
   seedMarketplaceAccountsAndTemplates(data);
-  for (const variant of createdVariants) createFiveChannelDrafts(data, { variantId: variant.id, physicalSku: variant.sku, basePrice: variant.defaultSalePrice, imageUrls: product.images, idempotencyKey: `${idempotencyKey || product.superbuyUrl}:${variant.id}` });
+  for (const variant of createdVariants) createFiveChannelDrafts(data, { variantId: variant.id, physicalSku: variant.sku, basePrice: variant.defaultSalePrice, imageUrls: productImages, idempotencyKey: `${idempotencyKey || product.superbuyUrl}:${variant.id}` });
   const variantIds = createdVariants.map((variant) => variant.id);
   const drafts = data.channelListingDrafts?.filter((draft) => variantIds.includes(draft.variantId)) || [];
   audit(data, "Extension product imported", "product", catalogProduct.id, `${product.title} imported with ${createdVariants.length} scanned variant(s) and ${drafts.length} channel drafts. Cash commitment ${money(analysis.cashCommitment)}.`);

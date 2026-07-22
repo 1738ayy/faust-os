@@ -62,7 +62,7 @@ Expected afterward:
 
 - no duplicate migration numbers
 - no migration gaps
-- latest migration is `022_browser_extension_phase2.sql`
+- latest migration is `023_product_image_ownership.sql`
 
 ## 3. Create storage buckets
 

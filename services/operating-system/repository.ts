@@ -22,17 +22,18 @@ import { approveAutomation, archiveAutomationRule, cancelAutomationRun, createAu
 import { ensureAiCollections, generateAiRecommendations, mutateAiCenterData, type AiCenterActionInput } from "@/lib/ai-center";
 import { applyExtensionAction, type ExtensionAction } from "@/lib/browser-extension";
 import { canonicalListingIdentity, markImportQueueItemCompleted, removeImportQueueItems as removeImportQueueItemsFromData } from "@/lib/import-queue";
+import { ensureProductImageOwnership, normalizeProductImageUrls, productGallery, setProductImages } from "@/lib/product-images";
 
 const file = path.join(process.cwd(), ".faust", "operating-system.json");
 const now = () => new Date().toISOString();
 const id = () => crypto.randomUUID();
-const empty = (): OperatingData => { const data: OperatingData = { version: 1, mode: "empty", products: [], variants: [], locations: [], balances: [], stockMovements: [], suppliers: [], purchaseOrders: [], parcels: [], listings: [], customers: [], orders: [], transactions: [], tasks: [], notices: [], insights: [], activity: [], orderImportReviews: [], orderImportBatches: [], savedOrderViews: defaultOrderViews(), fulfillmentShipments: [], fulfillmentPickLists: [], fulfillmentExceptions: [], fulfillmentManifests: [], purchaseBatches: [], inventoryLots: [], landedCostComponents: [], exchangeRates: [], orderItemCostAllocations: [], journalEntries: [], journalLines: [], outboxEvents: [], durableJobs: [], deadLetters: [], channelSyncStates: [], inventoryRiskLocks: [], physicalSkuMappings: [], marketplaceAccounts: [], listingTemplates: [], channelListingDrafts: [], listingSyncJobs: [], listingReviewItems: [], supplierContacts: [], supplierCommunications: [], supplierScorecards: [], purchaseApprovals: [], purchasePayments: [], freightConsolidations: [], receivingSessions: [], supplierClaims: [], supplierPriceHistory: [], reorderRecommendations: [], analyticsSavedReports: [], analyticsFilterPresets: [], analyticsReportRuns: [], automationRules: [], automationRuns: [], automationSteps: [], automationApprovals: [], automationRetries: [], automationDeadLetters: [], automationTemplates: [], automationIdempotencyReceipts: [], automationEventReceipts: [], automationWorkerLeases: [], automationWorkerHeartbeats: [], automationExecutionTraces: [], aiConversations: [], aiMessages: [], aiSavedQuestions: [], aiToolCalls: [], aiRecommendations: [], aiEvidenceLinks: [], aiScenarios: [], aiDailyBriefs: [], aiApprovalProposals: [], aiFeedback: [], aiObservabilityEvents: [], updatedAt: now() }; ensureAnalyticsCollections(data); ensureAutomationCollections(data); ensureAiCollections(data); return data; };
+const empty = (): OperatingData => { const data: OperatingData = { version: 1, mode: "empty", products: [], productImages: [], variants: [], locations: [], balances: [], stockMovements: [], suppliers: [], purchaseOrders: [], parcels: [], listings: [], customers: [], orders: [], transactions: [], tasks: [], notices: [], insights: [], activity: [], orderImportReviews: [], orderImportBatches: [], savedOrderViews: defaultOrderViews(), fulfillmentShipments: [], fulfillmentPickLists: [], fulfillmentExceptions: [], fulfillmentManifests: [], purchaseBatches: [], inventoryLots: [], landedCostComponents: [], exchangeRates: [], orderItemCostAllocations: [], journalEntries: [], journalLines: [], outboxEvents: [], durableJobs: [], deadLetters: [], channelSyncStates: [], inventoryRiskLocks: [], physicalSkuMappings: [], marketplaceAccounts: [], listingTemplates: [], channelListingDrafts: [], listingSyncJobs: [], listingReviewItems: [], supplierContacts: [], supplierCommunications: [], supplierScorecards: [], purchaseApprovals: [], purchasePayments: [], freightConsolidations: [], receivingSessions: [], supplierClaims: [], supplierPriceHistory: [], reorderRecommendations: [], analyticsSavedReports: [], analyticsFilterPresets: [], analyticsReportRuns: [], automationRules: [], automationRuns: [], automationSteps: [], automationApprovals: [], automationRetries: [], automationDeadLetters: [], automationTemplates: [], automationIdempotencyReceipts: [], automationEventReceipts: [], automationWorkerLeases: [], automationWorkerHeartbeats: [], automationExecutionTraces: [], aiConversations: [], aiMessages: [], aiSavedQuestions: [], aiToolCalls: [], aiRecommendations: [], aiEvidenceLinks: [], aiScenarios: [], aiDailyBriefs: [], aiApprovalProposals: [], aiFeedback: [], aiObservabilityEvents: [], updatedAt: now() }; ensureAnalyticsCollections(data); ensureAutomationCollections(data); ensureAiCollections(data); return data; };
 function developmentDemo(): OperatingData {
  const data = empty(); const time = now();
  const supplierId = "11111111-1111-4111-8111-111111111111"; const productId = "22222222-2222-4222-8222-222222222222"; const variantId = "33333333-3333-4333-8333-333333333333"; const locationId = "44444444-4444-4444-8444-444444444444"; const listingId = "55555555-5555-4555-8555-555555555555"; const customerId = "66666666-6666-4666-8666-666666666666"; const orderId = "77777777-7777-4777-8777-777777777777"; const orderItemId = "88888888-8888-4888-8888-888888888888"; const purchaseOrderId = "99999999-9999-4999-8999-999999999999"; const purchaseOrderItemId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"; const parcelId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"; const balanceId = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
  data.mode = "local";
  data.suppliers.push({ id: supplierId, name: "North Star Trading", sourcePlatform: "Superbuy", leadDays: 12, rating: 4.6, status: "active", notes: "Development demo supplier." });
- data.products.push({ id: productId, title: "Vintage wash heavyweight hoodie", brand: "Unbranded", category: "Streetwear", tags: ["hoodie", "vintage"], supplierId, sourceUrl: "https://example.test/product", image: "https://img.example.test/hoodie.jpg", status: "active", createdAt: time, updatedAt: time });
+ data.products.push({ id: productId, title: "Vintage wash heavyweight hoodie", brand: "Unbranded", category: "Streetwear", tags: ["hoodie", "vintage"], supplierId, sourceUrl: "https://example.test/product", image: "https://img.example.test/hoodie.jpg", images: ["https://img.example.test/hoodie.jpg"], status: "active", createdAt: time, updatedAt: time });
  data.variants.push({ id: variantId, productId, sku: "FST-HOOD-001", title: "Charcoal / L", condition: "New with tags", landedUnitCost: 31.7, defaultSalePrice: 86, weightOz: 22, reorderPoint: 5, reorderQuantity: 8, active: true });
  data.locations.push({ id: locationId, label: "A1-B2", warehouse: "Main warehouse", zone: "A", aisle: "1", shelf: "B", bin: "2" });
  data.balances.push({ id: balanceId, variantId, locationId, onHand: 12, reserved: 1, incoming: 2, damaged: 0, returned: 0, lost: 0, quarantined: 0 });
@@ -44,12 +45,12 @@ function developmentDemo(): OperatingData {
  data.transactions.push({ id: id(), type: "owner_contribution", amount: 500, status: "cleared", occurredAt: time, description: "Opening demo cash", category: "Owner equity" }, { id: id(), type: "sale", amount: 93.5, status: "cleared", occurredAt: time, orderId, sourceType: "order", sourceId: orderId, description: "FO-1042 gross sale", category: "Sales" }, { id: id(), type: "marketplace_fee", amount: -8.6, status: "cleared", occurredAt: time, orderId, sourceType: "order", sourceId: orderId, description: "FO-1042 marketplace fee", category: "Marketplace fee" }, { id: id(), type: "payment_fee", amount: -2.79, status: "cleared", occurredAt: time, orderId, sourceType: "order", sourceId: orderId, description: "FO-1042 payment fee", category: "Payment fee" });
  data.expenses = [{ id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd", vendor: "QuickBooks import", category: "Software", amount: 29, date: time.slice(0, 10), recurring: "monthly", taxDeductible: true, receiptStatus: "attached", notes: "Development demo expense.", createdAt: time, updatedAt: time }];
  data.activity.push({ id: id(), action: "Development demo loaded", entityType: "product", entityId: productId, detail: "Loaded deterministic product, order, purchasing, inventory, listing, and finance records for browser verification.", createdAt: time });
- seedMarketplaceAccountsAndTemplates(data); seedSupplierOperations(data); ensureAnalyticsCollections(data); ensureAutomationCollections(data); ensureAiCollections(data);
+ seedMarketplaceAccountsAndTemplates(data); seedSupplierOperations(data); ensureAnalyticsCollections(data); ensureAutomationCollections(data); ensureAiCollections(data); ensureProductImageOwnership(data, { now: time, id });
  return data;
 }
-async function readLocal(): Promise<OperatingData> { try { const data = JSON.parse(await fs.readFile(file, "utf8")) as OperatingData; if (!["empty", "local"].includes(String((data as OperatingData & { mode?: string }).mode))) return empty(); ensureAnalyticsCollections(data); ensureAutomationCollections(data); ensureAiCollections(data); return data; } catch (error: unknown) { if (typeof error === "object" && error && "code" in error && error.code === "ENOENT") return empty(); throw error; } }
+async function readLocal(): Promise<OperatingData> { try { const data = JSON.parse(await fs.readFile(file, "utf8")) as OperatingData; if (!["empty", "local"].includes(String((data as OperatingData & { mode?: string }).mode))) return empty(); ensureAnalyticsCollections(data); ensureAutomationCollections(data); ensureAiCollections(data); ensureProductImageOwnership(data, { now: now(), id }); return data; } catch (error: unknown) { if (typeof error === "object" && error && "code" in error && error.code === "ENOENT") return empty(); throw error; } }
 async function read(): Promise<OperatingData> { return isProductionAuthEnabled() ? readNormalizedOperatingData() : readLocal(); }
-async function write(data: OperatingData) { ensureAnalyticsCollections(data); ensureAutomationCollections(data); ensureAiCollections(data); data.updatedAt = now(); if (isProductionAuthEnabled()) return writeNormalizedOperatingData(data); await fs.mkdir(path.dirname(file), { recursive: true }); await fs.writeFile(file, JSON.stringify(data, null, 2)); return data; }
+async function write(data: OperatingData) { ensureAnalyticsCollections(data); ensureAutomationCollections(data); ensureAiCollections(data); ensureProductImageOwnership(data, { now: now(), id }); data.updatedAt = now(); if (isProductionAuthEnabled()) return writeNormalizedOperatingData(data); await fs.mkdir(path.dirname(file), { recursive: true }); await fs.writeFile(file, JSON.stringify(data, null, 2)); return data; }
 function activity(data: OperatingData, action: string, entityType: string, entityId: string, detail: string) { data.activity.unshift({ id: id(), action, entityType, entityId, detail, createdAt: now() }); }
 function defaultOrderViews(): SavedOrderView[] { const time = now(); return ["All Orders", "Needs Action", "Ship Today", "Unpaid", "Reservation Failed", "Negative Margin", "Returns Open", "Refund Review", "Import Review"].map((name, position) => ({ id: id(), name, filters: {}, isDefault: position === 0, position, createdAt: time })); }
 function ensureOrderCollections(data: OperatingData) { data.orderImportReviews ||= []; data.orderImportBatches ||= []; data.savedOrderViews ||= defaultOrderViews(); }
@@ -98,11 +99,13 @@ export async function duplicateCatalogProduct(variantId: string) {
  const data = await read(); const sourceVariant = data.variants.find((entry) => entry.id === variantId); if (!sourceVariant) throw new Error("Product variant not found.");
  const sourceProduct = data.products.find((entry) => entry.id === sourceVariant.productId); if (!sourceProduct) throw new Error("Product not found.");
  const createdAt = now(); const productId = id(); const newVariantId = id();
- const product = { ...sourceProduct, id: productId, title: nextCopyTitle(data, sourceProduct.title), sourceUrl: undefined, status: "draft" as const, createdAt, updatedAt: createdAt };
+ const sourceImages = productGallery(data, sourceProduct);
+ const product = { ...sourceProduct, id: productId, title: nextCopyTitle(data, sourceProduct.title), sourceUrl: undefined, status: "draft" as const, image: sourceImages[0], images: sourceImages, createdAt, updatedAt: createdAt };
  const variant = { ...sourceVariant, id: newVariantId, productId, sku: nextCopySku(data, sourceVariant.sku), active: true };
  data.products.unshift(product); data.variants.unshift(variant); data.balances.unshift({ id: id(), variantId: newVariantId, onHand: 0, reserved: 0, incoming: 0, damaged: 0, returned: 0, lost: 0, quarantined: 0 });
+ setProductImages(data, product, sourceImages, { now: createdAt, id, sourceType: "manual" });
  for (const listing of data.listings.filter((entry) => entry.variantId === sourceVariant.id)) data.listings.unshift({ ...listing, id: id(), variantId: newVariantId, quantity: 0, status: "draft", marketplaceUrl: undefined, syncState: "manual", createdAt });
- for (const draft of data.channelListingDrafts?.filter((entry) => entry.variantId === sourceVariant.id) || []) data.channelListingDrafts!.unshift({ ...draft, id: id(), variantId: newVariantId, physicalSku: variant.sku, quantity: 0, status: "draft", externalListingId: undefined, externalUrl: undefined, lastSyncAt: undefined, syncState: "pending", riskLockId: undefined, idempotencyKey: id(), createdAt, updatedAt: createdAt });
+ for (const draft of data.channelListingDrafts?.filter((entry) => entry.variantId === sourceVariant.id) || []) data.channelListingDrafts!.unshift({ ...draft, id: id(), variantId: newVariantId, physicalSku: variant.sku, imageUrls: sourceImages, quantity: 0, status: "draft", externalListingId: undefined, externalUrl: undefined, lastSyncAt: undefined, syncState: "pending", riskLockId: undefined, idempotencyKey: id(), createdAt, updatedAt: createdAt });
  activity(data, "Product duplicated", "product", product.id, `${sourceProduct.title} was copied as ${product.title}. Stock was not duplicated.`);
  return write(data);
 }
@@ -111,14 +114,14 @@ export async function updateCatalogProduct(input: { variantId: string; title?: s
  const product = data.products.find((entry) => entry.id === variant.productId); if (!product) throw new Error("Product not found.");
  const updatedAt = now();
  const previousSku = variant.sku;
- const images = input.images ? Array.from(new Set(input.images.map((image) => image.trim()).filter(Boolean))).slice(0, 12) : undefined;
+ const images = input.images ? normalizeProductImageUrls(input.images) : undefined;
  if (input.title !== undefined) product.title = input.title.trim() || product.title;
  if (input.brand !== undefined) product.brand = input.brand.trim() || undefined;
  if (input.category !== undefined) product.category = input.category.trim() || product.category;
  if (input.description !== undefined) product.description = input.description.trim() || undefined;
  if (input.notes !== undefined) product.notes = input.notes.trim() || undefined;
  if (input.sourceUrl !== undefined) product.sourceUrl = input.sourceUrl.trim() || product.sourceUrl;
- if (images) { product.images = images; product.image = images[0]; }
+ if (images) setProductImages(data, product, images, { now: updatedAt, id, sourceType: "manual" });
  if (input.sku !== undefined) {
   const sku = input.sku.trim();
   if (sku) variant.sku = assertUniqueSku(data, sku, variant.id);
@@ -164,6 +167,7 @@ export async function deleteCatalogProduct(variantId: string) {
   data.balances = data.balances.filter((entry) => entry.variantId !== variant.id);
   data.listings = data.listings.filter((entry) => entry.variantId !== variant.id);
   data.channelListingDrafts = (data.channelListingDrafts || []).filter((entry) => entry.variantId !== variant.id);
+  data.productImages = (data.productImages || []).filter((entry) => entry.productId !== product.id);
   data.physicalSkuMappings = (data.physicalSkuMappings || []).filter((entry) => entry.variantId !== variant.id);
   data.inventoryRiskLocks = (data.inventoryRiskLocks || []).filter((entry) => entry.variantId !== variant.id);
   data.notices = data.notices.filter((notice) => notice.entityId !== product.id && notice.entityId !== variant.id);
@@ -232,13 +236,23 @@ export async function convertOpportunity(opportunity: LegacyOpportunity) {
   }
  });
  const queueItemId = "importQueueItemId" in opportunity && typeof opportunity.importQueueItemId === "string" ? opportunity.importQueueItemId : undefined;
- if (product) { markImportQueueItemCompleted(data, queueItemId, product.id); return write(data); }
+ const productImages = normalizeProductImageUrls(opportunity.product.media.images);
+ if (product) {
+  if (productImages.length) {
+   setProductImages(data, product, productImages, { now: now(), id, sourceType: "supplier" });
+   for (const draft of data.channelListingDrafts?.filter((entry) => data.variants.some((variant) => variant.id === entry.variantId && variant.productId === product!.id)) || []) draft.imageUrls = productImages;
+  }
+  markImportQueueItemCompleted(data, queueItemId, product.id);
+  activity(data, "Opportunity linked to existing product", "product", product.id, `${product.title} already existed for this source, so Faust refreshed its image set and completed the import queue item.`);
+  return write(data);
+ }
  if (data.mode === "empty") data.mode = "local";
  const supplierName = opportunity.product.supplier.storeName || opportunity.product.supplier.name || "Unassigned supplier";
  let supplier = data.suppliers.find((entry) => entry.name.toLowerCase() === supplierName.toLowerCase());
  if (!supplier) { supplier = { id: id(), name: supplierName, sourcePlatform: "Superbuy", status: "active", notes: "Created from saved opportunity." }; data.suppliers.push(supplier); }
- const createdAt = now(); const productImages = Array.from(new Set(opportunity.product.media.images.filter(Boolean)));
+ const createdAt = now();
  product = { id: id(), title: opportunity.product.name, category: opportunity.product.category || "Uncategorized", tags: opportunity.listing.tags || [], supplierId: supplier.id, sourceUrl, image: productImages[0], images: productImages, description: opportunity.product.description, notes: opportunity.notes, status: "draft", createdAt, updatedAt: createdAt }; data.products.push(product);
+ setProductImages(data, product, productImages, { now: createdAt, id, sourceType: "supplier" });
  const unitCost = Object.values(opportunity.costs).reduce((sum, line) => sum + (line.amount || 0), 0); const sourceVariants = opportunity.product.variants.length ? opportunity.product.variants : [{ id: "default", name: "Default variant", options: [] }];
  const baseSku = opportunity.product.sku?.trim() || `FST-${product.id.slice(0, 6).toUpperCase()}`;
  const createdVariants = sourceVariants.map((sourceVariant, index) => { const requestedSku = sourceVariants.length === 1 ? baseSku : `${baseSku}-${String(index + 1).padStart(2, "0")}`; const variant = { id: id(), productId: product!.id, sku: assertUniqueSku(data, requestedSku), title: sourceVariant.name || `Variant ${index + 1}`, condition: "New", landedUnitCost: sourceVariant.price ? Math.max(0, unitCost - (opportunity.product.sourcing.sourcePrice || 0) + sourceVariant.price) : unitCost, defaultSalePrice: opportunity.salePrice, weightOz: Number.parseFloat(opportunity.product.shippingWeight || opportunity.product.weight || "") || undefined, reorderPoint: 1, reorderQuantity: Math.max(1, opportunity.product.sourcing.minimumOrderQuantity || 5), active: true }; data.variants.push(variant); const balance: StockBalance = { id: id(), variantId: variant.id, onHand: 0, reserved: 0, incoming: 0, damaged: 0, returned: 0, lost: 0, quarantined: 0 }; data.balances.push(balance); return variant; });

@@ -48,9 +48,10 @@ test("storage descriptors cover every required production artifact boundary", ()
 test("migration inventory is ordered and includes the production connection prerequisites", () => {
   const inventory = migrationInventory();
   assert.equal(inventory.ready, true);
-  assert.equal(inventory.latest, "022_browser_extension_phase2.sql");
+  assert.equal(inventory.latest, "023_product_image_ownership.sql");
   assert.ok(inventory.files.includes("001_core_auth_and_tenancy.sql"));
   assert.ok(inventory.files.includes("022_browser_extension_phase2.sql"));
+  assert.ok(inventory.files.includes("023_product_image_ownership.sql"));
 });
 
 test("production health reports database, worker, storage, migrations, extension, and provider status", () => {

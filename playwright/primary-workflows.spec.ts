@@ -250,10 +250,43 @@ test("import queue manages multiple scans, removal, and catalog completion", asy
   };
   const created = await request.post("/api/opportunities", { data: opportunity });
   expect(created.ok(), await created.text()).toBeTruthy();
+  const createdState = await created.json();
+  expect(createdState.product.title).toBe("Queue Review Product 1");
+  expect(createdState.product.images).toContain("https://cbu01.alicdn.com/img/queue-1.jpg");
+  expect(createdState.trace.productImageCount).toBeGreaterThanOrEqual(1);
   queueResponse = await request.get("/api/import-queue");
   queueState = await queueResponse.json();
   expect(queueState.queue.some((item: { id: string }) => item.id === first.id)).toBeFalsy();
   expect(queueState.counts.completed).toBeGreaterThanOrEqual(1);
+
+  const third = queueState.queue.find((item: { title: string }) => item.title === "Queue Review Product 3");
+  expect(third).toBeTruthy();
+  const thirdProduct = third.product;
+  const secondOpportunity = {
+    ...opportunity,
+    id: crypto.randomUUID(),
+    importQueueItemId: third.id,
+    product: {
+      ...opportunity.product,
+      id: crypto.randomUUID(),
+      name: thirdProduct.title,
+      category: thirdProduct.category,
+      description: thirdProduct.description,
+      supplier: { name: thirdProduct.supplier, storeName: thirdProduct.storeName, storeUrl: thirdProduct.supplierStoreUrl },
+      sourcing: { superbuyUrl: thirdProduct.superbuyUrl, original1688Url: thirdProduct.original1688Url, sourcePrice: thirdProduct.price, stock: thirdProduct.stock, minimumOrderQuantity: thirdProduct.minimumOrderQuantity },
+      media: { images: thirdProduct.images },
+      variants: thirdProduct.variants,
+      source: thirdProduct,
+    },
+    listing: { ...opportunity.listing, title: thirdProduct.title, description: thirdProduct.description || "", category: thirdProduct.category || "" },
+  };
+  const secondCreated = await request.post("/api/opportunities", { data: secondOpportunity });
+  expect(secondCreated.ok(), await secondCreated.text()).toBeTruthy();
+  const secondCreatedState = await secondCreated.json();
+  expect(secondCreatedState.product.title).toBe("Queue Review Product 3");
+  expect(secondCreatedState.product.sourceUrl).toBe("https://detail.1688.com/offer/queue-3.html");
+  expect(secondCreatedState.product.images).toContain("https://cbu01.alicdn.com/img/queue-3.jpg");
+  expect(secondCreatedState.product.id).not.toBe(createdState.product.id);
 });
 
 test("product lifecycle stays synchronized across active views, archive, restore, and hard delete", async ({ request, page }) => {

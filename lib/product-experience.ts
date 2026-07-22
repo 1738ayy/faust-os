@@ -1,6 +1,7 @@
 import type { Activity, Marketplace, OperatingData, Product, Variant } from "@/domain/business";
 import { availableUnits, money, orderProfit } from "@/lib/business-calculations";
 import { buildProductIntelligence, type ProductIntelligence } from "@/lib/product-intelligence";
+import { productCoverImage } from "@/lib/product-images";
 import { getProductReadiness } from "@/lib/product-readiness";
 import { activeVariants, isActiveProduct, isActiveVariant } from "./product-state";
 
@@ -150,7 +151,7 @@ export function buildProductExperience(data: OperatingData, product: Product, va
     product,
     variant,
     href: `/catalog/${variant.id}`,
-    image: product.image || product.images?.[0] || drafts.find((draft) => draft.imageUrls.length)?.imageUrls[0],
+    image: productCoverImage(data, product) || drafts.find((draft) => draft.imageUrls.length)?.imageUrls[0],
     supplierName: supplier?.name || "Supplier not linked",
     supplierDetail: supplier ? `${supplier.sourcePlatform}${supplier.leadDays ? ` · ${supplier.leadDays} day lead time` : ""}` : "Link supplier before purchasing.",
     readiness,

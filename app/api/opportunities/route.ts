@@ -15,6 +15,16 @@ export async function POST(request: Request) {
 
     const operatingData = await convertOpportunity(opportunity);
     const product = operatingData.products.find((entry) => entry.sourceUrl === opportunity.product.sourcing.superbuyUrl);
+    const productImages = product ? (operatingData.productImages || []).filter((entry) => entry.productId === product.id) : [];
+    const trace = {
+      sourceUrl: opportunity.product.sourcing.superbuyUrl,
+      queueItemId: "importQueueItemId" in opportunity && typeof opportunity.importQueueItemId === "string" ? opportunity.importQueueItemId : undefined,
+      analyzerImageCount: opportunity.product.media.images.length,
+      productId: product?.id,
+      productImageCount: productImages.length || product?.images?.length || 0,
+      coverImage: productImages.find((entry) => entry.isCover)?.url || product?.image,
+    };
+    console.info("[faust:opportunity-publish]", trace);
 
     await Promise.allSettled([
       saveOpportunity(opportunity),
@@ -22,7 +32,7 @@ export async function POST(request: Request) {
       recordActivity({ type: "opportunity_saved", title: "Opportunity saved", detail: opportunity.product.name }),
     ]);
 
-    return NextResponse.json({ success: true, opportunity, product });
+    return NextResponse.json({ success: true, opportunity, product, trace });
   } catch (error) {
     return NextResponse.json({ success: false, message: error instanceof Error ? error.message : "Unable to save this opportunity." }, { status: 500 });
   }
