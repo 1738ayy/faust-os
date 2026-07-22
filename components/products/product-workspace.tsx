@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Atom, CheckCircle2, CircleAlert, Edit3, GitBranch, Save, Sparkles, X } from "lucide-react";
@@ -68,7 +68,7 @@ export function ProductWorkspace({ item }: { item: ProductExperience }) {
         </div>
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
+      <section className="grid items-start gap-6 xl:grid-cols-[0.9fr_1.1fr]">
         <Panel title="Faust Score">
           <div className="grid gap-5 lg:grid-cols-[170px_1fr]">
             <div className="rounded-[2rem] border border-slate-700/45 bg-slate-800/15 p-5 text-center">
@@ -91,6 +91,9 @@ export function ProductWorkspace({ item }: { item: ProductExperience }) {
               </div>
             </div>
           </div>
+        </Panel>
+        <Panel title="Photos">
+          <PersistentProductImages item={item} />
         </Panel>
       </section>
 
@@ -134,16 +137,6 @@ export function ProductWorkspace({ item }: { item: ProductExperience }) {
             <Row label="Best marketplace" value={item.analytics.bestMarketplace} />
             <Row label="Velocity" value={item.analytics.velocityLabel} />
           </Panel>
-          <Panel title="Related products">
-            <div className="grid gap-3">
-              {item.intelligence.relationships.length ? item.intelligence.relationships.map((relationship) => (
-                <Link key={`${relationship.type}-${relationship.href}`} href={relationship.href} className="rounded-2xl border border-slate-700/35 bg-black/35 p-3 transition hover:border-slate-400/45">
-                  <p className="text-sm font-medium">{relationship.label}</p>
-                  <p className="mt-1 text-xs leading-5 text-muted-foreground">{relationship.detail}</p>
-                </Link>
-              )) : <p className="text-sm text-muted-foreground">No strong product relationships are proven yet. Shared supplier, category, marketplace, and pricing patterns will appear here as the catalog grows.</p>}
-            </div>
-          </Panel>
         </div>
         <div className="space-y-6">
           <Panel title="Marketplace presence" id="marketplaces">
@@ -165,8 +158,15 @@ export function ProductWorkspace({ item }: { item: ProductExperience }) {
               Supplier: <span className="text-foreground">{item.supplierName}</span> · Lead time {item.purchasing.leadTime} · Reorder point {item.purchasing.reorderPoint} · Suggested reorder {item.purchasing.recommendedReorderQuantity}
             </div>
           </Panel>
-          <Panel title="Photos">
-            <PersistentProductImages item={item} />
+          <Panel title="Related products">
+            <div className="grid gap-3">
+              {item.intelligence.relationships.length ? item.intelligence.relationships.map((relationship) => (
+                <Link key={`${relationship.type}-${relationship.href}`} href={relationship.href} className="rounded-2xl border border-slate-700/35 bg-black/35 p-3 transition hover:border-slate-400/45">
+                  <p className="text-sm font-medium">{relationship.label}</p>
+                  <p className="mt-1 text-xs leading-5 text-muted-foreground">{relationship.detail}</p>
+                </Link>
+              )) : <p className="text-sm text-muted-foreground">No strong product relationships are proven yet. Shared supplier, category, marketplace, and pricing patterns will appear here as the catalog grows.</p>}
+            </div>
           </Panel>
         </div>
       </section>
@@ -197,6 +197,8 @@ export function ProductWorkspace({ item }: { item: ProductExperience }) {
 function ProductDnaCapsule({ item }: { item: ProductExperience }) {
   const dnaTags = item.intelligence.dna.length ? item.intelligence.dna : [{ tag: "Needs attention" as const, reason: "Faust needs more product history before stronger DNA traits become reliable." }];
   const liveChannels = item.marketplaces.filter((marketplace) => marketplace.status === "live").length;
+  const twinImage = item.image || item.product.images?.[0] || "";
+  const twinPose = productTwinPose(item.product.category);
   const knowledgeSignals = [
     item.product.description ? 1 : 0,
     item.product.images?.length ? 1 : 0,
@@ -233,13 +235,36 @@ function ProductDnaCapsule({ item }: { item: ProductExperience }) {
           <DnaInsightTile icon={<Atom size={16} />} title="Product fingerprint" value={dnaTags.slice(0, 5).map((dna) => dna.tag).join(" · ")} />
         </div>
 
-        <div className="relative mx-auto grid min-h-[300px] w-full max-w-[380px] place-items-center">
+        <div className="dna-twin-stage relative mx-auto grid min-h-[300px] w-full max-w-[380px] place-items-center">
           <div className="absolute inset-x-8 top-8 h-8 rounded-full border border-slate-500/35 bg-slate-300/10 blur-[1px]" />
           <div className="dna-capsule relative h-[276px] w-[150px] rounded-[5rem] border border-slate-400/35 bg-[linear-gradient(90deg,rgba(200,210,230,.08),rgba(200,210,230,.22),rgba(40,48,65,.2))] shadow-[0_0_50px_rgba(102,112,141,.22),inset_0_0_30px_rgba(200,210,230,.12)]">
             <div className="absolute inset-3 rounded-[5rem] border border-slate-200/10 bg-black/30 backdrop-blur-sm" />
-            <div className="absolute left-1/2 top-1/2 h-32 w-20 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(237,243,255,.95),rgba(102,112,141,.58)_36%,transparent_72%)] opacity-80 blur-[1px]" />
-            <div className="dna-helix absolute left-1/2 top-1/2 h-40 w-16 -translate-x-1/2 -translate-y-1/2">
-              {Array.from({ length: 7 }).map((_, index) => <span key={index} style={{ top: `${index * 15}%` }} />)}
+            <div className="absolute inset-6 rounded-[5rem] bg-[radial-gradient(circle_at_50%_45%,rgba(237,243,255,.18),rgba(102,112,141,.1)_42%,transparent_72%)]" />
+            <div className={`digital-twin ${twinPose} absolute left-1/2 top-1/2 h-[178px] w-[116px] -translate-x-1/2 -translate-y-1/2`} aria-label={`${item.product.title} digital twin`}>
+              {twinImage ? (
+                <>
+                  <ProductImage src={twinImage} alt={`${item.product.title} shadow plane`} className="twin-layer twin-shadow" fallbackClassName="twin-layer twin-shadow" />
+                  <ProductImage src={twinImage} alt={`${item.product.title} reconstructed product twin`} className="twin-layer twin-body" fallbackClassName="twin-layer twin-body" />
+                  <ProductImage src={twinImage} alt={`${item.product.title} light plane`} className="twin-layer twin-highlight" fallbackClassName="twin-layer twin-highlight" />
+                </>
+              ) : (
+                <div className="twin-placeholder" aria-hidden="true"><Atom size={42} /></div>
+              )}
+              <span className="twin-scan" aria-hidden="true" />
+              <span className="twin-orbit twin-orbit-a" aria-hidden="true" />
+              <span className="twin-orbit twin-orbit-b" aria-hidden="true" />
+            </div>
+            <div className="twin-particles absolute inset-7" aria-hidden="true">
+              {Array.from({ length: 10 }).map((_, index) => (
+                <span
+                  key={index}
+                  style={{
+                    "--particle-index": index,
+                    "--particle-left": `${20 + (index % 5) * 15}%`,
+                    "--particle-top": `${16 + (index % 4) * 17}%`,
+                  } as CSSProperties}
+                />
+              ))}
             </div>
             <div className="absolute inset-x-[-18px] bottom-7 h-5 rounded-full border border-slate-400/25 bg-slate-950/70" />
           </div>
@@ -278,28 +303,119 @@ function ProductDnaCapsule({ item }: { item: ProductExperience }) {
           transform: translateX(-24px);
           animation: capsule-sheen 7s ease-in-out infinite;
         }
-        .dna-helix span {
+        .digital-twin {
+          transform-style: preserve-3d;
+          perspective: 700px;
+          animation: twin-float 7.5s ease-in-out infinite;
+          transition: transform .5s ease, filter .5s ease;
+        }
+        .dna-twin-stage:hover .digital-twin,
+        .digital-twin:focus-within {
+          transform: translate(-50%, -51%) rotateX(4deg) rotateY(-7deg) scale(1.035);
+          filter: drop-shadow(0 0 24px rgba(200,210,230,.34));
+        }
+        .twin-layer,
+        .twin-placeholder {
+          position: absolute;
+          inset: 0;
+          height: 100%;
+          width: 100%;
+          object-fit: contain;
+          object-position: center;
+          pointer-events: none;
+          filter: saturate(.55) contrast(1.15) brightness(1.15);
+          mix-blend-mode: screen;
+          opacity: .88;
+          mask-image: radial-gradient(ellipse at center, black 58%, transparent 84%);
+        }
+        .twin-shirt .twin-body { object-position: 50% 48%; }
+        .twin-jewelry .twin-body,
+        .twin-jewelry .twin-highlight,
+        .twin-jewelry .twin-shadow { object-position: 50% 42%; transform: scale(.9); }
+        .twin-bag .twin-body,
+        .twin-bag .twin-highlight,
+        .twin-bag .twin-shadow { transform: scale(.94); }
+        .twin-shadow {
+          opacity: .32;
+          transform: translate3d(7px, 10px, -26px) scale(.96);
+          filter: blur(8px) saturate(.35) brightness(.6);
+        }
+        .twin-body {
+          transform: translateZ(18px);
+          filter: saturate(.62) contrast(1.18) brightness(1.2) drop-shadow(0 0 16px rgba(200,210,230,.28));
+        }
+        .twin-highlight {
+          transform: translate3d(-4px, -4px, 36px) scale(1.02);
+          opacity: .26;
+          filter: blur(1px) brightness(1.7) saturate(.35);
+        }
+        .twin-placeholder {
+          display: grid;
+          place-items: center;
+          color: rgba(237,243,255,.82);
+          border-radius: 999px;
+          background: radial-gradient(circle, rgba(237,243,255,.16), transparent 68%);
+        }
+        .twin-scan {
+          position: absolute;
+          inset: -8px 8px;
+          border-radius: 999px;
+          background: linear-gradient(180deg, transparent, rgba(237,243,255,.58), transparent);
+          opacity: 0;
+          transform: translateY(-70%);
+          animation: twin-scan 6.5s ease-in-out infinite;
+        }
+        .twin-orbit {
           position: absolute;
           left: 50%;
-          width: 54px;
-          height: 2px;
+          top: 50%;
+          height: 128px;
+          width: 82px;
+          border: 1px solid rgba(200,210,230,.18);
           border-radius: 999px;
-          background: linear-gradient(90deg, transparent, rgba(237,243,255,.9), rgba(102,112,141,.62), transparent);
-          transform: translateX(-50%) rotate(var(--tw-rotate, -16deg));
-          box-shadow: 0 0 16px rgba(200,210,230,.28);
-          animation: helix-breathe 5s ease-in-out infinite;
+          transform: translate(-50%, -50%) rotateX(64deg) rotateZ(18deg);
+          box-shadow: 0 0 18px rgba(102,112,141,.16);
         }
-        .dna-helix span:nth-child(even) { --tw-rotate: 16deg; opacity: .72; }
+        .twin-orbit-b {
+          height: 148px;
+          width: 98px;
+          opacity: .6;
+          transform: translate(-50%, -50%) rotateX(68deg) rotateZ(-24deg);
+        }
+        .twin-particles span {
+          position: absolute;
+          left: var(--particle-left);
+          top: var(--particle-top);
+          height: 2px;
+          width: 2px;
+          border-radius: 999px;
+          background: rgba(237,243,255,.72);
+          box-shadow: 0 0 10px rgba(200,210,230,.8);
+          animation: particle-drift 8s ease-in-out infinite;
+          animation-delay: calc(var(--particle-index) * -.42s);
+        }
         @keyframes capsule-sheen {
           0%, 64%, 100% { opacity: .28; transform: translateX(-24px); }
           76% { opacity: .68; transform: translateX(28px); }
         }
-        @keyframes helix-breathe {
-          0%, 100% { opacity: .45; transform: translateX(-50%) rotate(var(--tw-rotate, -16deg)) scaleX(.78); }
-          50% { opacity: .95; transform: translateX(-50%) rotate(var(--tw-rotate, -16deg)) scaleX(1); }
+        @keyframes twin-float {
+          0%, 100% { transform: translate(-50%, -50%) rotateX(0deg) rotateY(-2deg) translateY(0); }
+          50% { transform: translate(-50%, -52%) rotateX(2deg) rotateY(4deg) translateY(-7px); }
+        }
+        @keyframes twin-scan {
+          0%, 72%, 100% { opacity: 0; transform: translateY(-72%); }
+          78% { opacity: .72; }
+          88% { opacity: .2; transform: translateY(72%); }
+        }
+        @keyframes particle-drift {
+          0%, 100% { opacity: .25; transform: translate3d(0, 0, 0); }
+          50% { opacity: .78; transform: translate3d(6px, -8px, 0); }
         }
         @media (prefers-reduced-motion: reduce) {
-          .dna-capsule::before, .dna-helix span { animation: none; }
+          .dna-capsule::before,
+          .digital-twin,
+          .twin-scan,
+          .twin-particles span { animation: none; }
         }
       `}</style>
     </section>
@@ -313,6 +429,14 @@ function DnaInsightTile({ icon, title, value }: { icon: ReactNode; title: string
       <p className="mt-2 text-sm leading-6 text-muted-foreground">{value}</p>
     </div>
   );
+}
+
+function productTwinPose(category: string) {
+  const normalized = category.toLowerCase();
+  if (/(necklace|jewelry|bracelet|ring|chain|pendant)/.test(normalized)) return "twin-jewelry";
+  if (/(bag|purse|tote|backpack)/.test(normalized)) return "twin-bag";
+  if (/(shirt|tee|hoodie|jacket|sweater|top|dress|pants|shorts)/.test(normalized)) return "twin-shirt";
+  return "twin-object";
 }
 
 function ProductEditDrawer({ item, onClose }: { item: ProductExperience; onClose: () => void }) {
