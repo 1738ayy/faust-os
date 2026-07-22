@@ -242,11 +242,7 @@ function ProductDnaCapsule({ item }: { item: ProductExperience }) {
             <div className="absolute inset-6 rounded-[5rem] bg-[radial-gradient(circle_at_50%_45%,rgba(237,243,255,.18),rgba(102,112,141,.1)_42%,transparent_72%)]" />
             <div className={`digital-twin ${twinPose} absolute left-1/2 top-1/2 h-[178px] w-[116px] -translate-x-1/2 -translate-y-1/2`} aria-label={`${item.product.title} digital twin`}>
               {twinImage ? (
-                <>
-                  <ProductImage src={twinImage} alt={`${item.product.title} shadow plane`} className="twin-layer twin-shadow" fallbackClassName="twin-layer twin-shadow" />
-                  <ProductImage src={twinImage} alt={`${item.product.title} reconstructed product twin`} className="twin-layer twin-body" fallbackClassName="twin-layer twin-body" />
-                  <ProductImage src={twinImage} alt={`${item.product.title} light plane`} className="twin-layer twin-highlight" fallbackClassName="twin-layer twin-highlight" />
-                </>
+                <ProductImage src={twinImage} alt={`${item.product.title} digital twin`} className="twin-artifact" fallbackClassName="twin-artifact twin-fallback" />
               ) : (
                 <div className="twin-placeholder" aria-hidden="true"><Atom size={42} /></div>
               )}
@@ -304,17 +300,16 @@ function ProductDnaCapsule({ item }: { item: ProductExperience }) {
           animation: capsule-sheen 7s ease-in-out infinite;
         }
         .digital-twin {
-          transform-style: preserve-3d;
-          perspective: 700px;
           animation: twin-float 7.5s ease-in-out infinite;
+          isolation: isolate;
           transition: transform .5s ease, filter .5s ease;
         }
         .dna-twin-stage:hover .digital-twin,
         .digital-twin:focus-within {
-          transform: translate(-50%, -51%) rotateX(4deg) rotateY(-7deg) scale(1.035);
-          filter: drop-shadow(0 0 24px rgba(200,210,230,.34));
+          transform: translate(-50%, -51%) scale(1.025);
+          filter: brightness(1.06) drop-shadow(0 0 24px rgba(200,210,230,.34));
         }
-        .twin-layer,
+        .twin-artifact,
         .twin-placeholder {
           position: absolute;
           inset: 0;
@@ -323,32 +318,17 @@ function ProductDnaCapsule({ item }: { item: ProductExperience }) {
           object-fit: contain;
           object-position: center;
           pointer-events: none;
-          filter: saturate(.55) contrast(1.15) brightness(1.15);
-          mix-blend-mode: screen;
-          opacity: .88;
-          mask-image: radial-gradient(ellipse at center, black 58%, transparent 84%);
+          filter: saturate(.72) contrast(1.22) brightness(1.08) drop-shadow(0 0 18px rgba(200,210,230,.26));
+          mix-blend-mode: multiply;
+          opacity: .94;
+          mask-image: radial-gradient(ellipse at center, black 64%, rgba(0,0,0,.92) 74%, transparent 91%);
+          animation: twin-stabilize .82s ease-out both;
         }
-        .twin-shirt .twin-body { object-position: 50% 48%; }
-        .twin-jewelry .twin-body,
-        .twin-jewelry .twin-highlight,
-        .twin-jewelry .twin-shadow { object-position: 50% 42%; transform: scale(.9); }
-        .twin-bag .twin-body,
-        .twin-bag .twin-highlight,
-        .twin-bag .twin-shadow { transform: scale(.94); }
-        .twin-shadow {
-          opacity: .32;
-          transform: translate3d(7px, 10px, -26px) scale(.96);
-          filter: blur(8px) saturate(.35) brightness(.6);
-        }
-        .twin-body {
-          transform: translateZ(18px);
-          filter: saturate(.62) contrast(1.18) brightness(1.2) drop-shadow(0 0 16px rgba(200,210,230,.28));
-        }
-        .twin-highlight {
-          transform: translate3d(-4px, -4px, 36px) scale(1.02);
-          opacity: .26;
-          filter: blur(1px) brightness(1.7) saturate(.35);
-        }
+        .twin-shirt .twin-artifact { object-position: 50% 48%; transform: scale(.88); }
+        .twin-jewelry .twin-artifact { object-position: 50% 42%; transform: scale(.72); }
+        .twin-bag .twin-artifact { transform: scale(.92); }
+        .twin-object .twin-artifact { transform: scale(.82); }
+        .twin-fallback { mix-blend-mode: normal; opacity: .72; }
         .twin-placeholder {
           display: grid;
           place-items: center;
@@ -363,7 +343,7 @@ function ProductDnaCapsule({ item }: { item: ProductExperience }) {
           background: linear-gradient(180deg, transparent, rgba(237,243,255,.58), transparent);
           opacity: 0;
           transform: translateY(-70%);
-          animation: twin-scan 6.5s ease-in-out infinite;
+          animation: twin-scan .88s ease-out .08s both;
         }
         .twin-orbit {
           position: absolute;
@@ -399,8 +379,13 @@ function ProductDnaCapsule({ item }: { item: ProductExperience }) {
           76% { opacity: .68; transform: translateX(28px); }
         }
         @keyframes twin-float {
-          0%, 100% { transform: translate(-50%, -50%) rotateX(0deg) rotateY(-2deg) translateY(0); }
-          50% { transform: translate(-50%, -52%) rotateX(2deg) rotateY(4deg) translateY(-7px); }
+          0%, 100% { transform: translate(-50%, -50%) translateY(0); }
+          50% { transform: translate(-50%, -52%) translateY(-6px); }
+        }
+        @keyframes twin-stabilize {
+          0% { opacity: 0; filter: saturate(.2) contrast(1.4) brightness(1.55) blur(4px); clip-path: inset(48% 0 48% 0); }
+          58% { opacity: .72; filter: saturate(.55) contrast(1.28) brightness(1.22) blur(1px); clip-path: inset(8% 0 8% 0); }
+          100% { opacity: .94; filter: saturate(.72) contrast(1.22) brightness(1.08) drop-shadow(0 0 18px rgba(200,210,230,.26)); clip-path: inset(0); }
         }
         @keyframes twin-scan {
           0%, 72%, 100% { opacity: 0; transform: translateY(-72%); }
@@ -414,6 +399,7 @@ function ProductDnaCapsule({ item }: { item: ProductExperience }) {
         @media (prefers-reduced-motion: reduce) {
           .dna-capsule::before,
           .digital-twin,
+          .twin-artifact,
           .twin-scan,
           .twin-particles span { animation: none; }
         }
