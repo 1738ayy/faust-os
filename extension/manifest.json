@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Faust Commerce Bridge",
-  "version": "1.1.0",
-  "description": "Scan source products, analyze profitability, import to Faust, and assist marketplace publishing.",
+  "version": "2.0.0",
+  "description": "Review source products, analyze profitability, import to Faust, and assist marketplace publishing.",
   "permissions": ["activeTab", "scripting", "storage", "sidePanel", "tabs"],
   "host_permissions": [
     "https://*.superbuy.com/*",

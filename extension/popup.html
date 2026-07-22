@@ -3,52 +3,70 @@
   <head>
     <meta charset="utf-8" />
     <style>
-      :root { color-scheme: dark; }
+      :root { color-scheme: dark; --quartz:#66708d; --soft:#c8d2e6; --muted:#a8afbf; --line:rgba(200,210,230,.15); }
       * { box-sizing: border-box; }
       body {
-        width: 360px;
+        width: 370px;
         margin: 0;
         padding: 14px;
         background:
-          radial-gradient(circle at top right, rgba(86, 98, 127, .34), transparent 185px),
-          radial-gradient(circle at bottom left, rgba(47, 58, 85, .2), transparent 220px),
-          linear-gradient(180deg, #151518, #09090b);
+          radial-gradient(circle at top right, rgba(102,112,141,.36), transparent 190px),
+          radial-gradient(circle at bottom left, rgba(47,58,85,.22), transparent 220px),
+          linear-gradient(180deg, #11151d, #06070a);
         color: #f8fafc;
         font: 14px/1.45 Aptos, Inter, "SF Pro Text", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
       }
-      .shell { border: 1px solid rgba(154,167,194,.16); border-radius: 26px; background: rgba(19,19,22,.9); overflow: hidden; box-shadow: 0 24px 70px rgba(0,0,0,.46), 0 0 42px rgba(47,58,85,.2); }
-      .hero { padding: 22px 18px 18px; text-align: center; border-bottom: 1px solid rgba(255,255,255,.08); }
-      .hero img { display: block; width: 192px; height: 125px; margin: 0 auto 4px; object-fit: contain; object-position: center; }
-      h1 { margin: 0; font-size: 24px; letter-spacing: -.04em; }
-      p { margin: 7px 0 0; color: #a1a1aa; }
-      .content { padding: 14px; }
-      button { width: 100%; border: 0; border-radius: 18px; padding: 13px 14px; color: #f8fafc; background: linear-gradient(180deg, #56627f, #0f172a); font: inherit; font-weight: 800; cursor: pointer; margin-top: 9px; box-shadow: 0 12px 30px rgba(47,58,85,.32); }
-      button.secondary { color: #f4f4f5; background: rgba(36,36,40,.92); border: 1px solid rgba(154,167,194,.14); box-shadow: 0 10px 26px rgba(0,0,0,.24); }
-      button:hover { filter: brightness(1.08); }
-      button:disabled { opacity: .55; cursor: wait; }
-      #status { min-height: 20px; margin: 12px 2px 0; color: #c8d2e6; font-size: 12px; }
-      #summary { margin: 10px 0 0; white-space: pre-wrap; color: #d4d4d8; font-size: 12px; }
-      details { margin-top: 12px; border: 1px solid rgba(255,255,255,.08); border-radius: 16px; background: #101014; padding: 10px 12px; }
-      summary { cursor: pointer; color: #a1a1aa; font-size: 12px; font-weight: 700; }
-      pre { white-space: pre-wrap; max-height: 180px; overflow: auto; color: #eef3ff; font-size: 11px; }
+      .shell { border:1px solid var(--line); border-radius:26px; overflow:hidden; background:rgba(14,17,24,.9); box-shadow:0 24px 70px rgba(0,0,0,.46), 0 0 42px rgba(102,112,141,.16); }
+      .hero { display:flex; align-items:center; gap:10px; padding:14px; border-bottom:1px solid var(--line); }
+      .hero img { width:58px; height:42px; object-fit:contain; }
+      h1 { margin:0; font-size:20px; letter-spacing:-.04em; }
+      p { margin:5px 0 0; color:var(--muted); }
+      .content { padding:14px; display:grid; gap:12px; }
+      .status { display:flex; align-items:center; justify-content:space-between; border:1px solid var(--line); border-radius:18px; background:rgba(0,0,0,.24); padding:10px 12px; color:var(--muted); font-size:12px; }
+      .dot { width:9px; height:9px; border-radius:999px; background:#f59e0b; }
+      .dot.ok { background:#75d39f; box-shadow:0 0 16px rgba(117,211,159,.3); }
+      .preview { display:grid; grid-template-columns:72px 1fr; gap:10px; border:1px solid var(--line); border-radius:20px; padding:10px; background:rgba(0,0,0,.22); }
+      .preview img, .placeholder { width:72px; height:72px; border-radius:16px; object-fit:cover; background:#06070a; display:grid; place-items:center; color:var(--muted); }
+      .title { margin:0; font-weight:850; letter-spacing:-.03em; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+      .metrics { display:flex; gap:6px; flex-wrap:wrap; margin-top:7px; }
+      .pill { border:1px solid rgba(200,210,230,.16); border-radius:999px; padding:4px 7px; background:rgba(102,112,141,.14); color:#edf3ff; font-size:11px; font-weight:800; }
+      button { width:100%; border:1px solid rgba(200,210,230,.17); border-radius:17px; padding:12px; color:#f8fafc; background:rgba(25,29,39,.92); font:inherit; font-weight:850; cursor:pointer; box-shadow:0 10px 30px rgba(0,0,0,.25); }
+      button.primary { background:linear-gradient(180deg, #7782a1, #45506b); border-color:rgba(200,210,230,.32); box-shadow:0 14px 34px rgba(102,112,141,.25); }
+      button:hover { filter:brightness(1.06); }
+      button:disabled { opacity:.55; cursor:wait; }
+      .grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+      .history { border-top:1px solid var(--line); padding-top:10px; display:grid; gap:7px; }
+      .history-row { display:flex; align-items:center; gap:8px; min-width:0; color:var(--muted); font-size:12px; }
+      .history-row b { color:#fff; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+      details { border:1px solid var(--line); border-radius:16px; background:rgba(0,0,0,.24); padding:9px 11px; }
+      summary { cursor:pointer; color:var(--muted); font-size:12px; font-weight:800; }
+      pre { white-space:pre-wrap; max-height:160px; overflow:auto; color:#dbe6ff; font-size:11px; }
+      .hide { display:none; }
     </style>
   </head>
   <body>
     <main class="shell">
       <section class="hero">
         <img src="assets/faust-logo.png" alt="Faust Snow Leopard" />
-        <h1>Faust OS</h1>
-        <p>Import a source product and continue the review in Faust.</p>
+        <div><h1>Faust OS</h1><p>Business Operating System</p></div>
       </section>
       <section class="content">
-        <button id="import-product">Import to Faust</button>
-        <button id="scan-product" class="secondary">Preview scan only</button>
-        <button id="open-options" class="secondary">Settings</button>
-        <p id="status" role="status">Ready.</p>
-        <pre id="summary"></pre>
-        <details>
-          <summary>Technical details</summary>
-          <pre id="raw-output">No details yet.</pre>
+        <div class="status"><span id="status">Checking connection...</span><span id="dot" class="dot"></span></div>
+        <div id="preview" class="preview">
+          <div class="placeholder">No scan</div>
+          <div><p class="title">Open a supported listing to begin.</p><p>Superbuy, 1688, Depop, eBay, Etsy, Mercari, or Poshmark.</p></div>
+        </div>
+        <button id="import-product" class="primary">Quick Import to Faust</button>
+        <div class="grid">
+          <button id="scan-product">Scan</button>
+          <button id="open-sidepanel">Review</button>
+          <button id="open-options">Settings</button>
+          <button id="debug-toggle">Debug</button>
+        </div>
+        <div class="history" id="history"></div>
+        <details id="debug" class="hide">
+          <summary>Developer details</summary>
+          <pre id="raw-output">Debug mode is off.</pre>
         </details>
       </section>
     </main>

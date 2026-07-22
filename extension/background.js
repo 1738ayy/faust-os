@@ -1,4 +1,4 @@
-const DEFAULTS = { faustBaseUrl: "http://localhost:3000", environment: "local", extensionVersion: "1.1.0-phase2", deviceName: "Faust Chrome Extension" };
+const DEFAULTS = { faustBaseUrl: "http://localhost:3000", environment: "local", extensionVersion: "2.0.0-ux", deviceName: "Faust Chrome Extension" };
 
 async function settings() {
   const stored = await chrome.storage.sync.get(DEFAULTS);
@@ -64,6 +64,20 @@ async function registerDevice() {
   return data;
 }
 
+async function rememberActivity(entry) {
+  const existing = await chrome.storage.local.get(["importHistory"]);
+  const history = Array.isArray(existing.importHistory) ? existing.importHistory : [];
+  await chrome.storage.local.set({ importHistory: [{ id: crypto.randomUUID(), at: new Date().toISOString(), ...entry }, ...history].slice(0, 20) });
+}
+
+async function scanActiveSourceProduct() {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  await ensureSourceScanner(tab);
+  const product = await chrome.tabs.sendMessage(tab.id, { action: "scan-current-product" });
+  await chrome.storage.session.set({ lastProduct: product });
+  return product;
+}
+
 function tabHost(tab) {
   try {
     return tab?.url ? new URL(tab.url).hostname.toLowerCase() : "";
@@ -119,19 +133,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return;
     }
     if (message.type === "FAUST_SCAN_PRODUCT") {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      await ensureSourceScanner(tab);
-      const product = await chrome.tabs.sendMessage(tab.id, { action: "scan-current-product" });
-      await chrome.storage.session.set({ lastProduct: product });
+      const product = await scanActiveSourceProduct();
       const scan = await callFaust("/api/extension/scan", { payload: product });
       const analysis = await callFaust("/api/extension/analyze", { product });
+      await rememberActivity({ kind: "scan", title: product.title || "Untitled product", image: product.images?.[0], sourceUrl: product.original1688Url || product.superbuyUrl });
       sendResponse({ ok: true, product, scan, analysis });
       return;
     }
     if (message.type === "FAUST_IMPORT_TO_ANALYZER") {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      await ensureSourceScanner(tab);
-      const product = await chrome.tabs.sendMessage(tab.id, { action: "scan-current-product" });
+      const product = message.product || await scanActiveSourceProduct();
       await chrome.storage.session.set({ lastProduct: product });
       const warnings = [];
       let scan = null;
@@ -147,6 +157,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         warnings.push(`Faust will calculate in the analyzer because extension analysis was unavailable: ${error.message || "unknown error"}`);
       }
       await openAnalyzerWithHandoff(product, scan, analysis, warnings);
+      await rememberActivity({ kind: "import", title: product.title || "Untitled product", image: product.images?.[0], sourceUrl: product.original1688Url || product.superbuyUrl });
       sendResponse({ ok: true, product, scan, analysis, warnings });
       return;
     }
@@ -183,7 +194,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return;
     }
     if (message.type === "FAUST_GET_SESSION_STATE") {
-      sendResponse({ ok: true, session: await chrome.storage.session.get(["lastProduct", "lastImport"]), config: await settings() });
+      const local = await chrome.storage.local.get(["importHistory", "deviceId", "tokenExpiresAt"]);
+      sendResponse({ ok: true, session: await chrome.storage.session.get(["lastProduct", "lastImport"]), local, config: await settings() });
       return;
     }
   })().catch((error) => sendResponse({ ok: false, error: error.message || "Extension action failed." }));

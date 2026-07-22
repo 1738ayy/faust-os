@@ -3,78 +3,152 @@
   <head>
     <meta charset="utf-8" />
     <style>
-      :root { color-scheme: dark; }
+      :root { color-scheme: dark; --quartz:#66708d; --quartz-2:#c8d2e6; --obsidian:#07090d; --panel:#11141b; --line:rgba(200,210,230,.15); --muted:#a8afbf; }
       * { box-sizing: border-box; }
       body {
         margin: 0;
-        padding: 14px;
-        min-width: 320px;
+        min-width: 340px;
         background:
-          radial-gradient(circle at top right, rgba(86, 98, 127, .32), transparent 245px),
-          radial-gradient(circle at bottom left, rgba(47, 58, 85, .18), transparent 270px),
-          #09090b;
+          radial-gradient(circle at 85% -10%, rgba(102,112,141,.34), transparent 240px),
+          radial-gradient(circle at 0% 100%, rgba(44,53,73,.25), transparent 280px),
+          linear-gradient(180deg, #0d1016, #050609 62%);
         color: #f8fafc;
         font: 14px/1.5 Aptos, Inter, "SF Pro Text", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
       }
-      .shell { border: 1px solid rgba(154,167,194,.16); border-radius: 28px; background: rgba(19,19,22,.92); overflow: hidden; box-shadow: 0 26px 76px rgba(0,0,0,.48), 0 0 46px rgba(47,58,85,.2); }
-      .hero { padding: 24px 18px 18px; text-align: center; border-bottom: 1px solid rgba(255,255,255,.08); }
-      .hero img { display: block; width: 232px; height: 151px; margin: 0 auto 4px; object-fit: contain; object-position: center; }
-      h1 { margin: 0; font-size: 26px; letter-spacing: -.04em; }
-      p { margin: 7px 0 0; color: #a1a1aa; }
-      .content { padding: 14px; }
-      .section-title { margin: 4px 2px 9px; color: #71717a; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .12em; }
-      button { width: 100%; margin: 7px 0; padding: 13px 14px; border: 1px solid rgba(154,167,194,.14); border-radius: 18px; background: rgba(36,36,40,.92); color: #f4f4f5; font: inherit; font-weight: 760; cursor: pointer; text-align: left; box-shadow: 0 10px 26px rgba(0,0,0,.24); }
-      button.primary { background: linear-gradient(180deg, #56627f, #0f172a); border-color: rgba(154,167,194,.28); color: #f8fafc; text-align: center; box-shadow: 0 12px 32px rgba(47,58,85,.34); }
-      button:hover { filter: brightness(1.06); }
-      button:disabled { opacity: .55; cursor: wait; }
-      .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-      .grid button { text-align: center; margin: 0; padding: 12px 10px; }
-      .card { border: 1px solid rgba(255,255,255,.08); border-radius: 20px; padding: 13px; margin: 12px 0; background: #111114; }
-      .card strong { display: block; margin-bottom: 8px; color: #e5e7eb; letter-spacing: -.01em; }
-      #status { color: #c8d2e6; font-size: 12px; min-height: 18px; }
-      pre { white-space: pre-wrap; margin: 0; font-size: 12px; color: #d4d4d8; }
-      details { margin-top: 12px; border: 1px solid rgba(255,255,255,.08); border-radius: 18px; background: #0d0d10; padding: 11px 12px; }
-      summary { cursor: pointer; color: #a1a1aa; font-size: 12px; font-weight: 800; }
-      #output { margin-top: 10px; max-height: 260px; overflow: auto; color: #eef3ff; font-size: 11px; }
+      button, input, textarea { font: inherit; }
+      .shell { min-height: 100vh; padding: 14px; }
+      .card { border: 1px solid var(--line); border-radius: 24px; background: rgba(14,17,24,.82); box-shadow: 0 22px 70px rgba(0,0,0,.38), 0 0 38px rgba(102,112,141,.13); backdrop-filter: blur(18px); }
+      .hero { display:flex; align-items:center; gap:10px; padding: 14px 14px 12px; }
+      .hero img { width: 58px; height: 42px; object-fit: contain; }
+      h1 { margin:0; font-size: 19px; letter-spacing:-.04em; }
+      .sub { margin: 1px 0 0; color: var(--muted); font-size: 12px; }
+      .toolbar { display:grid; grid-template-columns: 1fr auto; gap: 8px; padding: 0 14px 14px; }
+      .mode { display:flex; gap:6px; border:1px solid var(--line); border-radius: 16px; padding:4px; background:rgba(0,0,0,.25); }
+      .mode button { padding:7px 9px; border-radius: 12px; border:0; background:transparent; color:var(--muted); box-shadow:none; }
+      .mode button.active { background:rgba(102,112,141,.28); color:#fff; }
+      .connection { display:flex; align-items:center; justify-content:space-between; border-top:1px solid var(--line); padding: 10px 14px; color:var(--muted); font-size:12px; }
+      .dot { width:9px; height:9px; border-radius:999px; background:#f59e0b; box-shadow:0 0 18px rgba(245,158,11,.36); }
+      .dot.ok { background:#75d39f; box-shadow:0 0 18px rgba(117,211,159,.3); }
+      .content { display:grid; gap:12px; padding-top:12px; }
+      .section { padding:14px; }
+      .section h2 { margin:0 0 9px; font-size: 13px; letter-spacing:-.01em; }
+      .timeline { display:grid; gap:7px; }
+      .step { display:flex; align-items:center; gap:9px; color:var(--muted); font-size:12px; }
+      .step::before { content:""; width:10px; height:10px; border-radius:999px; border:1px solid rgba(200,210,230,.32); background:#111827; }
+      .step.done { color:#eff5ff; }
+      .step.done::before { background:var(--quartz-2); box-shadow:0 0 16px rgba(200,210,230,.36); }
+      .step.active::before { background:var(--quartz); box-shadow:0 0 20px rgba(102,112,141,.45); }
+      .preview { display:grid; grid-template-columns: 96px 1fr; gap:12px; align-items:stretch; }
+      .cover { position:relative; min-height:122px; border:1px solid var(--line); border-radius:20px; overflow:hidden; background:#07090d; display:grid; place-items:center; color:var(--muted); }
+      .cover img { width:100%; height:100%; object-fit:cover; }
+      .placeholder { width:100%; height:100%; min-height:78px; display:grid; place-items:center; padding:8px; border-radius:17px; background:#07090d; color:var(--muted); text-align:center; font-size:11px; }
+      .pill { display:inline-flex; align-items:center; gap:5px; padding:5px 8px; border:1px solid rgba(200,210,230,.16); border-radius:999px; background:rgba(102,112,141,.14); color:#edf3ff; font-size:11px; font-weight:750; }
+      .title { margin:0; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; font-size:15px; font-weight:800; letter-spacing:-.03em; }
+      .facts { display:grid; grid-template-columns: 1fr 1fr; gap:7px; margin-top:10px; }
+      .fact { border:1px solid rgba(200,210,230,.12); border-radius:14px; padding:7px; background:rgba(0,0,0,.25); }
+      .fact span { display:block; color:var(--muted); font-size:10px; }
+      .fact b { display:block; margin-top:2px; font-size:12px; }
+      .actions { display:grid; grid-template-columns: 1fr 1fr; gap:8px; }
+      button { width:100%; border:1px solid rgba(200,210,230,.17); border-radius:17px; padding:12px; color:#f8fafc; background:rgba(25,29,39,.9); font-weight:800; cursor:pointer; box-shadow:0 10px 30px rgba(0,0,0,.25); transition: transform .16s ease, border-color .16s ease, filter .16s ease; }
+      button:hover { transform: translateY(-1px); border-color:rgba(200,210,230,.35); filter:brightness(1.05); }
+      button:disabled { opacity:.55; cursor:wait; transform:none; }
+      button.primary { background:linear-gradient(180deg, #7782a1, #45506b); border-color:rgba(200,210,230,.32); box-shadow:0 14px 34px rgba(102,112,141,.25); }
+      button.full { grid-column:1 / -1; }
+      .photo-tools { display:flex; gap:8px; margin-bottom:9px; }
+      .photo-tools button { padding:8px 10px; border-radius:13px; font-size:12px; }
+      .photos { display:flex; gap:9px; overflow-x:auto; padding-bottom:8px; scrollbar-color: var(--quartz) rgba(255,255,255,.08); }
+      .thumb { position:relative; flex:0 0 78px; height:78px; border:1px solid rgba(200,210,230,.14); border-radius:17px; overflow:hidden; background:#080a0f; cursor:pointer; transition:transform .16s ease, border-color .16s ease; }
+      .thumb:hover { transform:scale(1.04); border-color:rgba(200,210,230,.42); }
+      .thumb.selected { border-color:var(--quartz-2); box-shadow:0 0 0 2px rgba(200,210,230,.16); }
+      .thumb img { width:100%; height:100%; object-fit:cover; display:block; }
+      .thumb .badge { position:absolute; left:5px; top:5px; border-radius:999px; background:rgba(0,0,0,.72); padding:2px 6px; font-size:10px; font-weight:800; }
+      .summary-grid { display:grid; grid-template-columns: repeat(3, 1fr); gap:7px; }
+      .check { border:1px solid rgba(200,210,230,.12); border-radius:14px; padding:8px; background:rgba(0,0,0,.22); font-size:11px; color:var(--muted); }
+      .check b { display:block; color:#fff; font-size:12px; }
+      .success { display:none; border-color:rgba(117,211,159,.26); background:linear-gradient(180deg, rgba(34,197,94,.12), rgba(10,13,18,.85)); }
+      .success.show { display:block; animation: pop .35s ease both; }
+      @keyframes pop { from { transform:scale(.98); opacity:.4 } to { transform:scale(1); opacity:1 } }
+      .history { display:grid; gap:8px; max-height:160px; overflow:auto; }
+      .history-item { display:flex; align-items:center; gap:9px; min-width:0; color:var(--muted); font-size:12px; }
+      .history-item img { width:34px; height:34px; border-radius:10px; object-fit:cover; background:#050609; }
+      .history-item b { display:block; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; color:#f8fafc; }
+      details { border:1px solid rgba(200,210,230,.13); border-radius:18px; background:rgba(0,0,0,.25); padding:10px 12px; }
+      summary { cursor:pointer; color:var(--muted); font-size:12px; font-weight:800; }
+      pre { margin:10px 0 0; white-space:pre-wrap; max-height:220px; overflow:auto; color:#dbe6ff; font-size:11px; }
+      .debug-hidden { display:none; }
+      .empty { padding:18px; text-align:center; color:var(--muted); }
     </style>
   </head>
   <body>
     <main class="shell">
-      <section class="hero">
-        <img src="assets/faust-logo.png" alt="Faust Snow Leopard" />
-        <h1>Faust OS</h1>
-        <p>Import a source product and continue the review in Faust.</p>
+      <section class="card">
+        <div class="hero">
+          <img src="assets/faust-logo.png" alt="Faust Snow Leopard" />
+          <div>
+            <h1>Faust OS</h1>
+            <p class="sub">Business Operating System</p>
+          </div>
+        </div>
+        <div class="toolbar">
+          <div class="mode" aria-label="View mode">
+            <button id="compact-mode" type="button">Compact</button>
+            <button id="expanded-mode" type="button" class="active">Expanded</button>
+          </div>
+          <button id="debug-toggle" type="button" title="Debug mode">Debug</button>
+        </div>
+        <div class="connection"><span id="connection-label">Checking Faust connection...</span><span id="connection-dot" class="dot"></span></div>
       </section>
+
       <section class="content">
-        <p class="section-title">Source product</p>
-        <button id="import-button" class="primary">Import to Faust</button>
-        <button id="scan-button">Preview scan only</button>
+        <section class="card section">
+          <h2>Import progress</h2>
+          <div id="timeline" class="timeline"></div>
+        </section>
 
-        <div class="card">
-          <strong>Review</strong>
-          <pre id="readiness">No product scanned yet.</pre>
-        </div>
+        <section class="card section">
+          <h2>Product preview</h2>
+          <div id="empty-state" class="empty">Open a Superbuy or 1688 product listing. Faust will detect the product and prepare it for import.</div>
+          <div id="product-preview" class="preview" hidden></div>
+        </section>
 
-        <p class="section-title">Marketplace listing</p>
-        <div class="grid">
-          <button id="dry-run-button">Preview fill</button>
-          <button id="fill-button">Fill form</button>
-        </div>
+        <section id="photo-section" class="card section" hidden>
+          <h2>Photos <span id="image-count" class="pill">0 selected</span></h2>
+          <div class="photo-tools">
+            <button id="select-all" type="button">Select all</button>
+            <button id="clear-all" type="button">Clear</button>
+          </div>
+          <div id="photos" class="photos" role="listbox" aria-label="Product photos"></div>
+        </section>
 
-        <p class="section-title">Connection</p>
-        <div class="grid">
-          <button id="status-button">Check</button>
-          <button id="register-button">Connect</button>
-        </div>
+        <section class="card section">
+          <h2>Ready check</h2>
+          <div id="summary" class="summary-grid"></div>
+        </section>
 
-        <div class="card">
-          <strong>Status</strong>
-          <p id="status" role="status">Ready.</p>
-        </div>
+        <section class="actions">
+          <button id="quick-import" class="primary full" type="button">Quick Import to Faust</button>
+          <button id="scan-button" type="button">Scan Again</button>
+          <button id="open-faust" type="button">Open Queue</button>
+          <button id="dry-run-button" type="button">Preview Listing Fill</button>
+          <button id="fill-button" type="button">Fill form</button>
+          <button id="register-button" type="button">Connect Browser</button>
+          <button id="status-button" type="button">Check Connection</button>
+        </section>
 
-        <details>
-          <summary>Technical details</summary>
-          <pre id="output">No details yet.</pre>
+        <section id="success" class="card section success">
+          <h2>Imported successfully</h2>
+          <p class="sub">Product added to your Faust queue. You can open Faust or keep sourcing.</p>
+          <button id="import-another" type="button">Import Another</button>
+        </section>
+
+        <section class="card section">
+          <h2>Recent imports</h2>
+          <div id="history" class="history"></div>
+        </section>
+
+        <details id="debug-panel" class="debug-hidden">
+          <summary>Developer details</summary>
+          <pre id="output">Debug mode is off.</pre>
         </details>
       </section>
     </main>
