@@ -33,7 +33,7 @@ const defaultCropBox: CropBox = { x: 10, y: 10, width: 80, height: 80 };
 
 export function proxiedProductImage(src: string) {
   if (src.startsWith("data:")) return src;
-  if (src.startsWith("/api/import-image?key=")) return src;
+  if (src.startsWith("/api/import-image?key=") || src.startsWith("/api/import-image?storageKey=")) return src;
   const params = new URLSearchParams();
   params.set("url", src);
   return `/api/import-image?${params.toString()}`;

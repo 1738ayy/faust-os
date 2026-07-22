@@ -1,5 +1,7 @@
 import { expect, test, type APIRequestContext } from "@playwright/test";
 
+const onePixelPng = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/lZtfVQAAAABJRU5ErkJggg==", "base64");
+
 async function resetDemo(request: APIRequestContext) {
   const response = await request.post("/api/operating-system", { data: { action: "reset", mode: "development_demo" } });
   expect(response.ok()).toBeTruthy(); const data = await response.json(); expect(data.data?.orders?.some((order: { number: string }) => order.number === "FO-1042")).toBeTruthy(); expect(data.data?.balances?.length).toBeGreaterThan(0);
@@ -298,6 +300,26 @@ test("import queue manages multiple scans, removal, and catalog completion", asy
   const thirdVariant = persistedState.variants.find((entry: { productId: string }) => entry.productId === secondCreatedState.product.id);
   expect(firstVariant).toBeTruthy();
   expect(thirdVariant).toBeTruthy();
+
+  const upload = await request.post("/api/import-image", { multipart: { file: { name: "queue-upload.png", mimeType: "image/png", buffer: onePixelPng } } });
+  expect(upload.ok(), await upload.text()).toBeTruthy();
+  const uploaded = await upload.json();
+  expect(uploaded.ok).toBeTruthy();
+  expect(uploaded.url).toMatch(/^\/api\/import-image\?key=|^https:\/\//);
+  expect(uploaded.url).not.toContain("data:image");
+  expect(uploaded.url.length).toBeLessThan(5000);
+
+  const updateImages = await request.post("/api/products/actions", { data: { action: "update", variantId: firstVariant.id, images: ["https://cbu01.alicdn.com/img/queue-1.jpg", uploaded.url] } });
+  expect(updateImages.ok(), await updateImages.text()).toBeTruthy();
+  persisted = await request.get("/api/operating-system");
+  persistedState = (await persisted.json()).data;
+  const firstAfterUpload = persistedState.products.find((entry: { id: string }) => entry.id === createdState.product.id);
+  expect(firstAfterUpload.images).toContain(uploaded.url);
+  expect(persistedState.productImages.filter((entry: { productId: string }) => entry.productId === createdState.product.id)).toHaveLength(2);
+  expect(persistedState.productImages.some((entry: { productId: string; url: string }) => entry.productId === createdState.product.id && entry.url === uploaded.url)).toBeTruthy();
+  persisted = await request.get("/api/operating-system");
+  persistedState = (await persisted.json()).data;
+  expect(persistedState.products.find((entry: { id: string }) => entry.id === createdState.product.id).images).toContain(uploaded.url);
 
   const deleteFirst = await request.post("/api/products/actions", { data: { action: "delete", variantId: firstVariant.id } });
   expect(deleteFirst.ok(), await deleteFirst.text()).toBeTruthy();

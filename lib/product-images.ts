@@ -8,7 +8,7 @@ export function normalizeImageUrl(value: unknown): string | undefined {
   if (!url) return undefined;
   if (/^(blob:|data:image\/|chrome-extension:)/i.test(url)) return undefined;
   if (/^https?:\/\//i.test(url)) return url;
-  if (url.startsWith("/api/import-image?key=")) return url;
+  if (url.startsWith("/api/import-image?key=") || url.startsWith("/api/import-image?storageKey=")) return url;
   return undefined;
 }
 

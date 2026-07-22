@@ -108,27 +108,77 @@ export function ProductWorkspace({ item }: { item: ProductExperience }) {
         </div>
       </Panel>
 
-      <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-        <Panel title="Business summary">
-          <div className="grid gap-3 md:grid-cols-3">
-            <MiniMetric label="Selling price" value={money(item.finance.sellingPrice)} />
-            <MiniMetric label="ROI" value={`${item.finance.roi.toFixed(1)}%`} />
-            <MiniMetric label="Average selling price" value={money(item.finance.averageSellingPrice)} />
-            <MiniMetric label="Cash invested" value={money(item.finance.cashInvested)} />
-            <MiniMetric label="Cash returned" value={money(item.finance.cashReturned)} />
-            <MiniMetric label="Projected revenue" value={money(item.finance.projectedRevenue)} />
-          </div>
-        </Panel>
-        <Panel title="Marketplace presence" id="marketplaces">
-          <div className="grid gap-3">
-            {item.marketplaces.map((marketplace) => <MarketplaceRow key={marketplace.marketplace} marketplace={marketplace} />)}
-          </div>
-          <p className="mt-4 text-sm text-muted-foreground">{live} marketplace(s) live. {needsReview} marketplace(s) need review.</p>
-        </Panel>
+      <section className="grid items-start gap-6 xl:grid-cols-[1.05fr_0.95fr]">
+        <div className="space-y-6">
+          <Panel title="Business summary">
+            <div className="grid gap-3 md:grid-cols-3">
+              <MiniMetric label="Selling price" value={money(item.finance.sellingPrice)} />
+              <MiniMetric label="ROI" value={`${item.finance.roi.toFixed(1)}%`} />
+              <MiniMetric label="Average selling price" value={money(item.finance.averageSellingPrice)} />
+              <MiniMetric label="Cash invested" value={money(item.finance.cashInvested)} />
+              <MiniMetric label="Cash returned" value={money(item.finance.cashReturned)} />
+              <MiniMetric label="Projected revenue" value={money(item.finance.projectedRevenue)} />
+            </div>
+          </Panel>
+          <Panel title="Readiness checklist" id="readiness">
+            <div className="grid gap-3 sm:grid-cols-2">
+              {item.readiness.dimensions.map((dimension) => (
+                <div className="rounded-2xl border border-slate-700/35 bg-black/35 p-3" key={dimension.key}>
+                  <div className="flex items-center gap-2">
+                    {dimension.ready ? <CheckCircle2 className="h-4 w-4 text-[#edf3ff]" /> : <CircleAlert className="h-4 w-4 text-amber-300" />}
+                    <b className="text-sm">{dimension.label}</b>
+                  </div>
+                  <p className="mt-2 text-xs leading-5 text-muted-foreground">{dimension.detail}</p>
+                </div>
+              ))}
+            </div>
+          </Panel>
+          <Panel title="Analytics">
+            <Row label="Units sold" value={item.analytics.unitsSold} />
+            <Row label="Sell-through" value={`${item.analytics.sellThrough.toFixed(1)}%`} />
+            <Row label="Returns" value={item.analytics.returns} />
+            <Row label="Best marketplace" value={item.analytics.bestMarketplace} />
+            <Row label="Velocity" value={item.analytics.velocityLabel} />
+          </Panel>
+          <Panel title="Related products">
+            <div className="grid gap-3">
+              {item.intelligence.relationships.length ? item.intelligence.relationships.map((relationship) => (
+                <Link key={`${relationship.type}-${relationship.href}`} href={relationship.href} className="rounded-2xl border border-slate-700/35 bg-black/35 p-3 transition hover:border-slate-400/45">
+                  <p className="text-sm font-medium">{relationship.label}</p>
+                  <p className="mt-1 text-xs leading-5 text-muted-foreground">{relationship.detail}</p>
+                </Link>
+              )) : <p className="text-sm text-muted-foreground">No strong product relationships are proven yet. Shared supplier, category, marketplace, and pricing patterns will appear here as the catalog grows.</p>}
+            </div>
+          </Panel>
+        </div>
+        <div className="space-y-6">
+          <Panel title="Marketplace presence" id="marketplaces">
+            <div className="grid gap-3">
+              {item.marketplaces.map((marketplace) => <MarketplaceRow key={marketplace.marketplace} marketplace={marketplace} />)}
+            </div>
+            <p className="mt-4 text-sm text-muted-foreground">{live} marketplace(s) live. {needsReview} marketplace(s) need review.</p>
+          </Panel>
+          <Panel title="Inventory and purchasing">
+            <div className="grid gap-3 md:grid-cols-3">
+              <MiniMetric label="On hand" value={String(item.inventory.onHand)} />
+              <MiniMetric label="Incoming" value={String(item.inventory.incoming)} />
+              <MiniMetric label="Reserved" value={String(item.inventory.reserved)} />
+              <MiniMetric label="Damaged" value={String(item.inventory.damaged)} />
+              <MiniMetric label="Quarantine" value={String(item.inventory.quarantined)} />
+              <MiniMetric label="Inventory value" value={money(item.inventory.value)} />
+            </div>
+            <div className="mt-4 rounded-2xl border border-slate-700/35 bg-black/35 p-4 text-sm text-muted-foreground">
+              Supplier: <span className="text-foreground">{item.supplierName}</span> · Lead time {item.purchasing.leadTime} · Reorder point {item.purchasing.reorderPoint} · Suggested reorder {item.purchasing.recommendedReorderQuantity}
+            </div>
+          </Panel>
+          <Panel title="Photos">
+            <PersistentProductImages item={item} />
+          </Panel>
+        </div>
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
-        <Panel title="Readiness checklist" id="readiness">
+      <section className="hidden">
+        <Panel title="Readiness checklist">
           <div className="grid gap-3 sm:grid-cols-2">
             {item.readiness.dimensions.map((dimension) => (
               <div className="rounded-2xl border border-slate-700/35 bg-black/35 p-3" key={dimension.key}>
@@ -156,7 +206,7 @@ export function ProductWorkspace({ item }: { item: ProductExperience }) {
         </Panel>
       </section>
 
-      <section className="grid items-start gap-6 xl:grid-cols-3">
+      <section className="hidden">
         <Panel title="Analytics">
           <Row label="Units sold" value={item.analytics.unitsSold} />
           <Row label="Sell-through" value={`${item.analytics.sellThrough.toFixed(1)}%`} />
