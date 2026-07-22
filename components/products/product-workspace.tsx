@@ -38,7 +38,7 @@ export function ProductWorkspace({ item }: { item: ProductExperience }) {
               </div>
               <div className="flex items-start gap-3">
                 <button type="button" onClick={() => setEditing(true)} className="inline-flex items-center gap-2 rounded-full border border-slate-700/60 bg-zinc-950/60 px-4 py-2 text-sm font-semibold text-[#f6f8ff] transition hover:border-slate-400/60"><Edit3 size={15} />Edit Product</button>
-                <ReadinessRing readiness={item.readiness} size="lg" />
+                <ReadinessRing readiness={item.readiness} size="lg" recommendation={item.intelligence.recommendation.situation} confidence={item.intelligence.recommendation.confidence} />
               </div>
             </div>
 
@@ -156,10 +156,7 @@ export function ProductWorkspace({ item }: { item: ProductExperience }) {
         </Panel>
       </section>
 
-      <section className="grid items-start gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(260px,0.8fr)_minmax(260px,0.85fr)]">
-        <Panel title="Photos">
-          <PersistentProductImages item={item} />
-        </Panel>
+      <section className="grid items-start gap-6 xl:grid-cols-3">
         <Panel title="Analytics">
           <Row label="Units sold" value={item.analytics.unitsSold} />
           <Row label="Sell-through" value={`${item.analytics.sellThrough.toFixed(1)}%`} />
@@ -176,6 +173,9 @@ export function ProductWorkspace({ item }: { item: ProductExperience }) {
               </Link>
             )) : <p className="text-sm text-muted-foreground">No strong product relationships are proven yet. Shared supplier, category, marketplace, and pricing patterns will appear here as the catalog grows.</p>}
           </div>
+        </Panel>
+        <Panel title="Photos">
+          <PersistentProductImages item={item} />
         </Panel>
       </section>
 
