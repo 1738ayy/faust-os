@@ -156,7 +156,7 @@ export function ProductWorkspace({ item }: { item: ProductExperience }) {
         </Panel>
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-3">
+      <section className="grid items-start gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(260px,0.8fr)_minmax(260px,0.85fr)]">
         <Panel title="Photos">
           <PersistentProductImages item={item} />
         </Panel>
@@ -323,7 +323,7 @@ function MiniMetric({ label, value }: { label: string; value: string }) {
 }
 
 function Panel({ title, children, id }: { title: string; children: ReactNode; id?: string }) {
-  return <section id={id} className="faust-surface p-5"><h2 className="text-xl font-semibold">{title}</h2><div className="mt-4">{children}</div></section>;
+  return <section id={id} className="faust-surface h-fit p-5"><h2 className="text-xl font-semibold">{title}</h2><div className="mt-4">{children}</div></section>;
 }
 
 function Row({ label, value }: { label: string; value: ReactNode }) {

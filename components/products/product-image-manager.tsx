@@ -1,7 +1,7 @@
 "use client";
 /* eslint-disable @next/next/no-img-element -- The crop editor needs direct access to rendered image bounds for canvas output. */
 
-import { Camera, Crop, ExternalLink, MoveLeft, MoveRight, Star, X } from "lucide-react";
+import { Camera, ChevronLeft, ChevronRight, Crop, ExternalLink, Maximize2, MoveLeft, MoveRight, Star, X } from "lucide-react";
 import { useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 
 const DEFAULT_MAX_PHOTOS = 12;
@@ -157,9 +157,12 @@ export function ProductImageManager({ title = "Photos", description = "First slo
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [cropState, setCropState] = useState<CropState | null>(null);
   const [error, setError] = useState("");
+  const [expanded, setExpanded] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const railRef = useRef<HTMLDivElement | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
   const imageRef = useRef<HTMLImageElement | null>(null);
+  const visibleSlots = compact ? [...cleanImages, undefined].slice(0, maxPhotos) : slots;
 
   function setImages(next: string[]) {
     onChange(Array.from(new Set(next.map((image) => image.trim()).filter(Boolean))).slice(0, maxPhotos));
@@ -293,24 +296,37 @@ export function ProductImageManager({ title = "Photos", description = "First slo
   }
 
   return (
-    <section className={compact ? "space-y-4" : "faust-surface p-6"}>
-      <div>
-        <h2 className="text-xl font-semibold">{title}</h2>
-        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+    <section className={compact ? "space-y-3" : "faust-surface p-6"}>
+      <div className={compact ? "flex items-start justify-between gap-3" : ""}>
+        <div>
+          <h2 className={compact ? "text-base font-semibold" : "text-xl font-semibold"}>{title}</h2>
+          <p className={compact ? "mt-1 max-w-xl text-xs leading-5 text-muted-foreground" : "mt-1 text-sm text-muted-foreground"}>{description}</p>
+        </div>
+        {compact ? (
+          <button type="button" onClick={() => setExpanded(true)} className="inline-flex shrink-0 items-center gap-2 rounded-full border border-slate-700/60 bg-zinc-950/55 px-3 py-2 text-xs font-semibold text-[#f6f8ff] transition hover:border-[#c8d2e6]/70 focus-visible:border-[#c8d2e6]/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#66708d]/40">
+            <Maximize2 className="h-3.5 w-3.5" />Manage Photos
+          </button>
+        ) : null}
       </div>
-      <div className={compact ? "grid gap-3 lg:grid-cols-[1.1fr_0.9fr]" : ""}>
+      <div className={compact ? "relative" : ""}>
+        {compact && visibleSlots.length > 3 ? (
+          <button type="button" aria-label="Scroll photos left" onClick={() => railRef.current?.scrollBy({ left: -180, behavior: "smooth" })} className="absolute left-0 top-1/2 z-10 hidden -translate-y-1/2 rounded-full border border-slate-700/60 bg-black/70 p-2 text-[#f6f8ff] shadow-lg shadow-black/40 transition hover:border-[#c8d2e6]/70 md:block">
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+        ) : null}
         <div
-          className={compact ? "grid grid-cols-3 gap-2" : "mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4"}
+          ref={railRef}
+          className={compact ? "faust-scrollbar flex snap-x gap-3 overflow-x-auto pb-2 md:px-8" : "mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4"}
           onDragOver={(event) => event.preventDefault()}
           onDrop={(event) => {
             event.preventDefault();
             if (event.dataTransfer.files.length) void addImageFiles(event.dataTransfer.files);
           }}
         >
-          {slots.map((src, index) => src ? (
+          {visibleSlots.map((src, index) => src ? (
             <div
               key={`${src}-${index}`}
-              className={`group relative aspect-square overflow-hidden rounded-2xl border border-slate-700/45 bg-zinc-950/65 shadow-lg shadow-black/20 outline-none transition focus-within:border-[#c8d2e6]/70 ${compact && index === 0 ? "col-span-2 row-span-2" : ""}`}
+              className={`group relative shrink-0 snap-start overflow-hidden rounded-2xl border bg-zinc-950/65 shadow-lg shadow-black/20 outline-none transition focus-within:border-[#c8d2e6]/70 hover:-translate-y-0.5 hover:border-[#c8d2e6]/55 ${compact ? index === 0 ? "h-36 w-44 border-[#c8d2e6]/55 shadow-[#66708d]/15 md:h-40 md:w-52" : "h-36 w-28 border-slate-700/45 md:h-40 md:w-32" : "aspect-square border-slate-700/45"}`}
               draggable
               onDragStart={() => setDragIndex(index)}
               onDragEnd={() => setDragIndex(null)}
@@ -323,12 +339,12 @@ export function ProductImageManager({ title = "Photos", description = "First slo
             >
               <div aria-label={`${productName} photo ${index + 1}`} role="img" className="absolute inset-0 bg-cover bg-center transition duration-300 group-hover:scale-[1.02]" style={{ backgroundImage: `url("${proxiedProductImage(src)}")` }} />
               <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-2 p-2">
-                {index === 0 ? <span className="inline-flex items-center gap-1 rounded-full bg-black/70 px-2 py-1 text-[11px] font-semibold text-[#f6f8ff]"><Star className="h-3 w-3 text-[#c8d2e6]" />Cover</span> : <span />}
-                <button type="button" aria-label={`Remove image ${index + 1}`} onClick={() => removeImage(index)} className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-600/60 bg-black/70 text-white transition hover:border-[#c8d2e6]">
+                {index === 0 ? <span className="inline-flex items-center gap-1 rounded-full bg-black/75 px-2 py-1 text-[11px] font-semibold text-[#f6f8ff]"><Star className="h-3 w-3 text-[#c8d2e6]" />Cover</span> : <span className="rounded-full bg-black/65 px-2 py-1 text-[11px] font-semibold text-[#c8d2e6]">{index === 1 ? "Front" : index === 2 ? "Detail" : index === 3 ? "Back" : `Photo ${index + 1}`}</span>}
+                <button type="button" aria-label={`Remove image ${index + 1}`} onClick={() => removeImage(index)} className={`flex h-8 w-8 items-center justify-center rounded-full border border-slate-600/60 bg-black/70 text-white transition hover:border-[#c8d2e6] ${compact ? "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100" : ""}`}>
                   <X className="h-4 w-4" />
                 </button>
               </div>
-              <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 bg-gradient-to-t from-black/80 to-transparent p-2 pt-8 opacity-100">
+              <div className={`absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 bg-gradient-to-t from-black/80 to-transparent p-2 pt-8 transition ${compact ? "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100" : "opacity-100"}`}>
                 <button type="button" aria-label={`Crop image ${index + 1}`} onClick={() => openCrop(index)} className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-600/60 bg-black/70 text-white transition hover:border-[#c8d2e6]">
                   <Crop className="h-4 w-4" />
                 </button>
@@ -343,20 +359,35 @@ export function ProductImageManager({ title = "Photos", description = "First slo
               </div>
             </div>
           ) : (
-            <button key={`empty-${index}`} type="button" onClick={() => fileInputRef.current?.click()} className="aspect-square rounded-2xl border border-dashed border-slate-600/60 bg-zinc-950/45 p-4 text-center text-sm text-muted-foreground transition hover:border-[#c8d2e6]/70 hover:text-[#f6f8ff] focus-visible:border-[#c8d2e6]/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#66708d]/40">
-              <Camera className="mx-auto h-7 w-7 text-[#c8d2e6]" />
+            <button key={`empty-${index}`} type="button" onClick={() => fileInputRef.current?.click()} className={`${compact ? "h-36 w-28 shrink-0 snap-start md:h-40 md:w-32" : "aspect-square"} rounded-2xl border border-dashed border-slate-600/60 bg-zinc-950/45 p-4 text-center text-sm text-muted-foreground transition hover:border-[#c8d2e6]/70 hover:text-[#f6f8ff] focus-visible:border-[#c8d2e6]/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#66708d]/40`}>
+              <Camera className={`${compact ? "h-6 w-6" : "h-7 w-7"} mx-auto text-[#c8d2e6]`} />
               <span className="mt-3 block font-semibold">Add photo</span>
-              <span className="mt-1 block text-xs">JPG, PNG, WEBP</span>
+              <span className="mt-1 block text-xs">{compact ? "Upload" : "JPG, PNG, WEBP"}</span>
             </button>
           ))}
         </div>
-        {compact ? <div className="rounded-3xl border border-slate-700/35 bg-black/25 p-4 text-sm text-muted-foreground">Cover image updates Catalog, listing drafts, search previews, and this workspace after save. Drag the photo you want into the first slot.</div> : null}
+        {compact && visibleSlots.length > 3 ? (
+          <button type="button" aria-label="Scroll photos right" onClick={() => railRef.current?.scrollBy({ left: 180, behavior: "smooth" })} className="absolute right-0 top-1/2 z-10 hidden -translate-y-1/2 rounded-full border border-slate-700/60 bg-black/70 p-2 text-[#f6f8ff] shadow-lg shadow-black/40 transition hover:border-[#c8d2e6]/70 md:block">
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        ) : null}
       </div>
       <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" multiple className="sr-only" onChange={(event) => void addImageFiles(event.target.files)} />
-      {error ? <p role="status" className="mt-3 text-sm text-amber-200">{error}</p> : null}
-      {!cleanImages.length ? <p className="mt-4 text-sm text-muted-foreground">Add at least one product image before creating the product.</p> : null}
+      {error ? <p role="status" className="mt-2 text-sm text-amber-200">{error}</p> : null}
+      {!cleanImages.length ? <p className={compact ? "text-xs text-muted-foreground" : "mt-4 text-sm text-muted-foreground"}>No product photos yet. Upload photos to create a cover and marketplace image set.</p> : null}
       {facts.length ? <dl className="mt-7 space-y-3 text-sm">{facts.filter(([, value]) => value !== undefined && value !== "").map(([label, value]) => <div key={label} className="flex justify-between gap-4"><dt className="text-muted-foreground">{label}</dt><dd className="text-right font-medium">{value}</dd></div>)}</dl> : null}
       {links.length ? <div className="mt-6 grid gap-2 sm:grid-cols-2">{links.filter((link) => link.href).map((link) => <a key={link.label} href={link.href} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 rounded-full border border-slate-700/60 bg-zinc-950/50 px-3 py-2 text-sm font-medium transition hover:border-slate-400/50 hover:text-white"><ExternalLink className="h-4 w-4" />{link.label}</a>)}</div> : null}
+      {compact && expanded ? (
+        <div role="dialog" aria-modal="true" aria-label="Manage product photos" className="fixed inset-0 z-50 grid place-items-center bg-black/75 p-5">
+          <div className="max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-[2rem] border border-slate-700/45 bg-[#080b10] p-5 shadow-2xl shadow-black/70">
+            <div className="mb-4 flex items-start justify-between gap-4">
+              <div><h3 className="text-xl font-semibold">Manage Photos</h3><p className="mt-1 text-sm text-muted-foreground">Use the full image manager for upload, crop, reorder, replace, delete, cover selection, and image-purpose work.</p></div>
+              <button type="button" aria-label="Close photo manager" className="faust-secondary-action px-3 py-2" onClick={() => setExpanded(false)}><X className="h-4 w-4" /></button>
+            </div>
+            <ProductImageManager title={title} description={description} productName={productName} images={images} onChange={onChange} maxPhotos={maxPhotos} storageKey={storageKey} facts={facts} links={links} compact={false} />
+          </div>
+        </div>
+      ) : null}
       {cropState ? (
         <div role="dialog" aria-modal="true" aria-label="Crop photo" className="fixed inset-0 z-50 grid place-items-center bg-black/75 p-5" onKeyDown={handleCropKeys}>
           <div className="faust-surface w-full max-w-4xl p-5 shadow-2xl shadow-slate-950/80">
