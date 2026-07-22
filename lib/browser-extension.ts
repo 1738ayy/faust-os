@@ -4,7 +4,7 @@ import { parseSuperbuyProduct } from "./validation/superbuy-product";
 import { createFiveChannelDrafts, seedMarketplaceAccountsAndTemplates, syncDraftQuantity, pauseOrDelistDraft, confirmExternalListing } from "./listings-core";
 import { money } from "./business-calculations";
 import { adapterForMarketplace, adapterHealth, marketplaceAdapters } from "./extension-adapters";
-import { upsertImportQueueScan } from "./import-queue";
+import { canonicalListingIdentity, upsertImportQueueScan } from "./import-queue";
 import { normalizeProductImageUrls, setProductImages } from "./product-images";
 
 const now = () => new Date().toISOString();
@@ -172,7 +172,17 @@ function targetPriceForLandedCost(landedUnitCost: number, analysis: ReturnType<t
 export function importExtensionProduct(data: OperatingData, input: unknown, assumptions: Partial<ProfitabilityAssumptions> = {}, idempotencyKey?: string) {
   const analysis = analyzeExtensionProduct(input, assumptions);
   const product = analysis.product;
-  const existing = data.products.find((entry) => entry.sourceUrl === product.superbuyUrl);
+  const identity = canonicalListingIdentity(product);
+  const existing = data.products.find((entry) => {
+    if (!entry.sourceUrl) return false;
+    if (entry.sourceUrl === product.superbuyUrl || entry.sourceUrl === product.original1688Url) return true;
+    try {
+      const entryIdentity = canonicalListingIdentity({ ...product, superbuyUrl: entry.sourceUrl, original1688Url: undefined });
+      return entryIdentity.canonicalListingKey === identity.canonicalListingKey;
+    } catch {
+      return false;
+    }
+  });
   const productImages = normalizeProductImageUrls(product.images);
   if (existing) {
     if (productImages.length) setProductImages(data, existing, productImages, { now: now(), id, sourceType: "extension" });

@@ -74,6 +74,32 @@ test("extension import is approved, idempotent, and creates five channel drafts"
   assert.equal(data.products.length, 1);
 });
 
+test("sequential extension imports create independent catalog products without stale identity reuse", () => {
+  const data = fixture();
+  const products = ["Radiohead Tee", "Affliction Tee", "JNCO Shorts"].map((title, index) => ({
+    ...sourceProduct,
+    title,
+    superbuyUrl: `https://www.superbuy.com/en/page/buy/?url=${encodeURIComponent(`https://detail.1688.com/offer/catalog-${index + 1}.html`)}`,
+    original1688Url: `https://detail.1688.com/offer/catalog-${index + 1}.html`,
+    images: [`https://img.example.test/catalog-${index + 1}.jpg`],
+    variants: [{ id: `catalog-${index + 1}-black`, name: `${title} / Black`, options: ["Black"], price: 20 + index, stock: 10 }],
+    price: 20 + index,
+  }));
+
+  const imported = products.map((product, index) => importExtensionProduct(data, product, { rmbUsdRate: 0.14, quantity: 1 }, `catalog-import-${index + 1}`));
+  assert.equal(data.products.length, 3);
+  assert.deepEqual(data.products.map((product) => product.title), ["Radiohead Tee", "Affliction Tee", "JNCO Shorts"]);
+  assert.equal(new Set(data.products.map((product) => product.id)).size, 3);
+  assert.equal(new Set(data.products.map((product) => product.sourceUrl)).size, 3);
+  assert.deepEqual(imported.map((result) => result.idempotent), [false, false, false]);
+  assert.ok(data.products.every((product, index) => product.images?.includes(`https://img.example.test/catalog-${index + 1}.jpg`)));
+
+  const repeat = importExtensionProduct(data, { ...products[1], superbuyUrl: "https://detail.1688.com/offer/catalog-2.html?spm=tracking" }, { rmbUsdRate: 0.14, quantity: 1 }, "catalog-import-2-repeat");
+  assert.equal(repeat.idempotent, true);
+  assert.equal(repeat.productId, imported[1].productId);
+  assert.equal(data.products.length, 3);
+});
+
 test("extension import preserves every scanned color row as a Faust SKU variant", () => {
   const data = fixture();
   const scanned = {

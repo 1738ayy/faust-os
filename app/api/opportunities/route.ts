@@ -4,6 +4,7 @@ import { getOpportunities, saveOpportunity } from "@/services/opportunities/loca
 import { ensureInventoryForOpportunity } from "@/services/inventory/local-inventory-store";
 import { recordActivity } from "@/services/activity/repository";
 import { convertOpportunity } from "@/services/operating-system/repository";
+import { canonicalListingIdentity, isSourceScanArtifact } from "@/lib/import-queue";
 import type { Opportunity } from "@/types/opportunity";
 
 export async function POST(request: Request) {
@@ -14,11 +15,26 @@ export async function POST(request: Request) {
     }
 
     const operatingData = await convertOpportunity(opportunity);
-    const product = operatingData.products.find((entry) => entry.sourceUrl === opportunity.product.sourcing.superbuyUrl);
+    const queueItemId = "importQueueItemId" in opportunity && typeof opportunity.importQueueItemId === "string" ? opportunity.importQueueItemId : undefined;
+    const completedProductId = queueItemId
+      ? (operatingData.extensionArtifacts || []).find((entry) => entry.id === queueItemId && isSourceScanArtifact(entry))?.metadata?.completedProductId
+      : undefined;
+    const identity = canonicalListingIdentity(opportunity.product.source);
+    const product = operatingData.products.find((entry) => {
+      if (completedProductId && entry.id === completedProductId) return true;
+      if (entry.sourceUrl === opportunity.product.sourcing.superbuyUrl || entry.sourceUrl === opportunity.product.sourcing.original1688Url) return true;
+      if (!entry.sourceUrl) return false;
+      try {
+        const entryIdentity = canonicalListingIdentity({ ...opportunity.product.source, superbuyUrl: entry.sourceUrl, original1688Url: undefined });
+        return entryIdentity.canonicalListingKey === identity.canonicalListingKey;
+      } catch {
+        return false;
+      }
+    });
     const productImages = product ? (operatingData.productImages || []).filter((entry) => entry.productId === product.id) : [];
     const trace = {
       sourceUrl: opportunity.product.sourcing.superbuyUrl,
-      queueItemId: "importQueueItemId" in opportunity && typeof opportunity.importQueueItemId === "string" ? opportunity.importQueueItemId : undefined,
+      queueItemId,
       analyzerImageCount: opportunity.product.media.images.length,
       productId: product?.id,
       productImageCount: productImages.length || product?.images?.length || 0,

@@ -162,11 +162,16 @@ export async function deleteCatalogProduct(variantId: string) {
  const hasListingHistory = data.listings.some((listing) => listing.variantId === variant.id && ["active", "sold"].includes(listing.status)) || (data.channelListingDrafts || []).some((draft) => draft.variantId === variant.id && draft.externalListingId);
  const shouldArchive = hasOrderHistory || hasPurchaseHistory || hasInventoryHistory || hasFinanceOrLotHistory || hasListingHistory;
  if (!shouldArchive) {
+  const draftIds = new Set((data.channelListingDrafts || []).filter((entry) => entry.variantId === variant.id).map((entry) => entry.id));
+  const listingIds = new Set(data.listings.filter((entry) => entry.variantId === variant.id).map((entry) => entry.id));
   data.variants = data.variants.filter((entry) => entry.id !== variant.id);
   data.products = data.products.filter((entry) => entry.id !== product.id);
   data.balances = data.balances.filter((entry) => entry.variantId !== variant.id);
   data.listings = data.listings.filter((entry) => entry.variantId !== variant.id);
   data.channelListingDrafts = (data.channelListingDrafts || []).filter((entry) => entry.variantId !== variant.id);
+  data.listingSyncJobs = (data.listingSyncJobs || []).filter((entry) => !draftIds.has(entry.channelDraftId));
+  data.listingReviewItems = (data.listingReviewItems || []).filter((entry) => !entry.channelDraftId || !draftIds.has(entry.channelDraftId));
+  data.channelSyncStates = (data.channelSyncStates || []).filter((entry) => entry.variantId !== variant.id && !listingIds.has(entry.listingId));
   data.productImages = (data.productImages || []).filter((entry) => entry.productId !== product.id);
   data.physicalSkuMappings = (data.physicalSkuMappings || []).filter((entry) => entry.variantId !== variant.id);
   data.inventoryRiskLocks = (data.inventoryRiskLocks || []).filter((entry) => entry.variantId !== variant.id);

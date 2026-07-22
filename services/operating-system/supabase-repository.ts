@@ -192,6 +192,26 @@ export async function writeNormalizedOperatingData(data: OperatingData) {
     return { ...row, business_id: businessId };
   };
   const upsert = async (table: string, values: Row[]) => { if (!values.length) return; const { error } = await client.from(table).upsert(values.map(normalizeRow)); if (error) throw new Error(error.message); };
+  const deleteMissing = async (table: string, idColumn: string, ids: string[]) => {
+    const query = client.from(table).delete().eq("business_id", businessId);
+    const { error } = ids.length ? await query.not(idColumn, "in", `(${ids.join(",")})`) : await query;
+    if (error) throw new Error(error.message);
+  };
+  const productIds = data.products.map((entry) => entry.id);
+  const variantIds = data.variants.map((entry) => entry.id);
+  const listingIds = data.listings.map((entry) => entry.id);
+  const channelDraftIds = (data.channelListingDrafts || []).map((entry) => entry.id);
+  await deleteMissing("listing_review_items", "id", (data.listingReviewItems || []).map((entry) => entry.id));
+  await deleteMissing("listing_sync_jobs", "id", (data.listingSyncJobs || []).map((entry) => entry.id));
+  await deleteMissing("channel_listing_drafts", "id", channelDraftIds);
+  await deleteMissing("physical_sku_mappings", "id", (data.physicalSkuMappings || []).map((entry) => entry.id));
+  await deleteMissing("inventory_risk_locks", "id", (data.inventoryRiskLocks || []).map((entry) => entry.id));
+  await deleteMissing("channel_inventory_sync_states", "id", (data.channelSyncStates || []).map((entry) => entry.id));
+  await deleteMissing("listings", "id", listingIds);
+  await deleteMissing("inventory_balances", "id", data.balances.map((entry) => entry.id));
+  await deleteMissing("product_images", "product_id", productIds);
+  await deleteMissing("product_variants", "id", variantIds);
+  await deleteMissing("products", "id", productIds);
   await upsert("suppliers", data.suppliers.map((x) => ({ id: x.id, name: x.name, source_platform: x.sourcePlatform, lead_days: x.leadDays, rating: x.rating, status: x.status, notes: x.notes })));
   await upsert("products", data.products.map((x) => ({ id: x.id, title: x.title, brand: x.brand, category: x.category, tags: x.tags, default_supplier_id: x.supplierId, source_url: x.sourceUrl, status: x.status, created_at: x.createdAt, updated_at: x.updatedAt })));
   const imageRows = data.products.flatMap((product) => {

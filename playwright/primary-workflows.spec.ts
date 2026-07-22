@@ -287,6 +287,30 @@ test("import queue manages multiple scans, removal, and catalog completion", asy
   expect(secondCreatedState.product.sourceUrl).toBe("https://detail.1688.com/offer/queue-3.html");
   expect(secondCreatedState.product.images).toContain("https://cbu01.alicdn.com/img/queue-3.jpg");
   expect(secondCreatedState.product.id).not.toBe(createdState.product.id);
+
+  let persisted = await request.get("/api/operating-system");
+  expect(persisted.ok(), await persisted.text()).toBeTruthy();
+  let persistedState = (await persisted.json()).data;
+  const createdProducts = persistedState.products.filter((entry: { title: string }) => ["Queue Review Product 1", "Queue Review Product 3"].includes(entry.title));
+  expect(createdProducts).toHaveLength(2);
+  expect(new Set(createdProducts.map((entry: { id: string }) => entry.id)).size).toBe(2);
+  const firstVariant = persistedState.variants.find((entry: { productId: string }) => entry.productId === createdState.product.id);
+  const thirdVariant = persistedState.variants.find((entry: { productId: string }) => entry.productId === secondCreatedState.product.id);
+  expect(firstVariant).toBeTruthy();
+  expect(thirdVariant).toBeTruthy();
+
+  const deleteFirst = await request.post("/api/products/actions", { data: { action: "delete", variantId: firstVariant.id } });
+  expect(deleteFirst.ok(), await deleteFirst.text()).toBeTruthy();
+  persisted = await request.get("/api/operating-system");
+  persistedState = (await persisted.json()).data;
+  expect(persistedState.products.some((entry: { id: string }) => entry.id === createdState.product.id)).toBeFalsy();
+  expect(persistedState.products.some((entry: { id: string }) => entry.id === secondCreatedState.product.id)).toBeTruthy();
+
+  const bulkDelete = await request.post("/api/products/actions", { data: { action: "delete-many", variantIds: [thirdVariant.id] } });
+  expect(bulkDelete.ok(), await bulkDelete.text()).toBeTruthy();
+  persisted = await request.get("/api/operating-system");
+  persistedState = (await persisted.json()).data;
+  expect(persistedState.products.some((entry: { id: string }) => entry.id === secondCreatedState.product.id)).toBeFalsy();
 });
 
 test("product lifecycle stays synchronized across active views, archive, restore, and hard delete", async ({ request, page }) => {
