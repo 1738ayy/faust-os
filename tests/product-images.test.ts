@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { OperatingData, Product } from "../domain/business";
 import { importExtensionProduct } from "../lib/browser-extension";
-import { ensureProductImageOwnership, productCoverImage, productGallery, setProductImages } from "../lib/product-images";
+import { currentProductDigitalTwin, ensureProductImageOwnership, productCoverImage, productGallery, setProductImages } from "../lib/product-images";
 
 const time = "2026-07-21T00:00:00.000Z";
 const ids = ["image-1", "image-2", "image-3", "image-4"];
@@ -43,6 +43,28 @@ test("owned image records hydrate product image caches after reload", () => {
   assert.deepEqual(productGallery(data, data.products[0]), ["https://cdn.example.test/a.jpg", "https://cdn.example.test/b.jpg"]);
   assert.deepEqual(data.products[0].images, ["https://cdn.example.test/a.jpg", "https://cdn.example.test/b.jpg"]);
   assert.equal(data.products[0].image, "https://cdn.example.test/a.jpg");
+});
+
+test("digital twin assets hydrate separately from the original cover image", () => {
+  const data = fixture();
+  const product: Product = { id: "product-twin", title: "Twin hoodie", category: "T-shirt", tags: [], status: "active", createdAt: time, updatedAt: time };
+  data.products.push(product);
+  data.variants.push({ id: "variant-twin", productId: product.id, sku: "TWIN-HOOD-001", title: "Black / L", condition: "New", landedUnitCost: 12, defaultSalePrice: 48, reorderPoint: 2, reorderQuantity: 8, active: true });
+  data.productImages = [
+    { id: "cover-current", productId: product.id, url: "https://cdn.example.test/cover-current.jpg", position: 0, isCover: true, sourceType: "supplier", createdAt: time, updatedAt: time },
+    { id: "cover-old", productId: product.id, url: "https://cdn.example.test/cover-old.jpg", position: 1, isCover: false, sourceType: "supplier", createdAt: time, updatedAt: time },
+  ];
+  data.productDigitalTwins = [
+    { id: "twin-old", productId: product.id, sourceImageId: "cover-old", sourceImageUrl: "https://cdn.example.test/cover-old.jpg", transparentImageUrl: "/api/import-image?key=digital-twins/old.png", storageKey: "digital-twins/old.png", processingStatus: "ready", segmentationConfidence: 0.91, bounds: { x: 10, y: 20, width: 300, height: 400 }, sourceDimensions: { width: 800, height: 900 }, transparentDimensions: { width: 1024, height: 1024 }, generatedAt: time, processorVersion: "faust-canvas-segmentation-v1", failureCode: null, createdAt: time, updatedAt: "2026-07-21T00:00:00.000Z" },
+    { id: "twin-current", productId: product.id, sourceImageId: "cover-current", sourceImageUrl: "https://cdn.example.test/cover-current.jpg", transparentImageUrl: "/api/import-image?key=digital-twins/current.png", storageKey: "digital-twins/current.png", processingStatus: "ready", segmentationConfidence: 0.88, bounds: { x: 12, y: 30, width: 320, height: 420 }, sourceDimensions: { width: 800, height: 900 }, transparentDimensions: { width: 1024, height: 1024 }, generatedAt: time, processorVersion: "faust-canvas-segmentation-v1", failureCode: null, createdAt: time, updatedAt: "2026-07-20T00:00:00.000Z" },
+  ];
+
+  const twin = currentProductDigitalTwin(data, product, "faust-canvas-segmentation-v1");
+
+  assert.equal(productCoverImage(data, product), "https://cdn.example.test/cover-current.jpg");
+  assert.equal(twin?.id, "twin-current");
+  assert.equal(twin?.transparentImageUrl, "/api/import-image?key=digital-twins/current.png");
+  assert.equal(product.image, undefined);
 });
 
 test("extension import persists product images and reuses them for five channel drafts", () => {

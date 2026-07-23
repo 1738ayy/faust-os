@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Atom, CheckCircle2, CircleAlert, Edit3, GitBranch, Save, Sparkles, X } from "lucide-react";
 import { toast } from "sonner";
@@ -235,40 +235,7 @@ function ProductDnaCapsule({ item }: { item: ProductExperience }) {
           <DnaInsightTile icon={<Atom size={16} />} title="Product fingerprint" value={dnaTags.slice(0, 5).map((dna) => dna.tag).join(" · ")} />
         </div>
 
-        <div className="dna-twin-stage relative mx-auto grid min-h-[300px] w-full max-w-[380px] place-items-center">
-          <div className="absolute inset-x-8 top-8 h-8 rounded-full border border-slate-500/35 bg-slate-300/10 blur-[1px]" />
-          <div className="dna-capsule relative h-[276px] w-[150px] rounded-[5rem] border border-slate-400/35 bg-[linear-gradient(90deg,rgba(200,210,230,.08),rgba(200,210,230,.22),rgba(40,48,65,.2))] shadow-[0_0_50px_rgba(102,112,141,.22),inset_0_0_30px_rgba(200,210,230,.12)]">
-            <div className="absolute inset-3 rounded-[5rem] border border-slate-200/10 bg-black/30 backdrop-blur-sm" />
-            <div className="absolute inset-6 rounded-[5rem] bg-[radial-gradient(circle_at_50%_45%,rgba(237,243,255,.18),rgba(102,112,141,.1)_42%,transparent_72%)]" />
-            <div className={`digital-twin ${twinPose} absolute left-1/2 top-1/2 h-[178px] w-[116px] -translate-x-1/2 -translate-y-1/2`} aria-label={`${item.product.title} digital twin`}>
-              {twinImage ? (
-                <ProductImage src={twinImage} alt={`${item.product.title} digital twin`} className="twin-artifact" fallbackClassName="twin-artifact twin-fallback" />
-              ) : (
-                <div className="twin-placeholder" aria-hidden="true"><Atom size={42} /></div>
-              )}
-              <span className="twin-scan" aria-hidden="true" />
-              <span className="twin-orbit twin-orbit-a" aria-hidden="true" />
-              <span className="twin-orbit twin-orbit-b" aria-hidden="true" />
-            </div>
-            <div className="twin-particles absolute inset-7" aria-hidden="true">
-              {Array.from({ length: 10 }).map((_, index) => (
-                <span
-                  key={index}
-                  style={{
-                    "--particle-index": index,
-                    "--particle-left": `${20 + (index % 5) * 15}%`,
-                    "--particle-top": `${16 + (index % 4) * 17}%`,
-                  } as CSSProperties}
-                />
-              ))}
-            </div>
-            <div className="absolute inset-x-[-18px] bottom-7 h-5 rounded-full border border-slate-400/25 bg-slate-950/70" />
-          </div>
-          <div className="absolute bottom-2 rounded-full border border-slate-600/45 bg-black/55 px-4 py-2 text-center shadow-lg shadow-black/40">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Knowledge state</p>
-            <p className="font-heading text-xl font-semibold text-[#f6f8ff]">{growth}</p>
-          </div>
-        </div>
+        <DigitalTwinChamber item={item} sourceImage={twinImage} twinPose={twinPose} growth={growth} />
 
         <div className="space-y-4">
           <DnaInsightTile icon={<GitBranch size={16} />} title="Market position" value={`${marketPosition}. ${item.analytics.bestMarketplace} is ${item.analytics.unitsSold ? "supported by order history" : "the current best candidate"} for early learning.`} />
@@ -408,6 +375,123 @@ function ProductDnaCapsule({ item }: { item: ProductExperience }) {
   );
 }
 
+const digitalTwinProcessorVersion = "faust-canvas-segmentation-v1";
+
+function DigitalTwinChamber({ item, sourceImage, twinPose, growth }: { item: ProductExperience; sourceImage: string; twinPose: string; growth: string }) {
+  const sourceMatches = Boolean(sourceImage && item.digitalTwin?.sourceImageUrl === sourceImage && item.digitalTwin.processorVersion === digitalTwinProcessorVersion);
+  const initialStatus = sourceMatches ? item.digitalTwin?.processingStatus || "not_started" : sourceImage ? "not_started" : "failed";
+  const [status, setStatus] = useState(initialStatus);
+  const [assetUrl, setAssetUrl] = useState(sourceMatches && item.digitalTwin?.processingStatus === "ready" ? item.digitalTwin.transparentImageUrl || "" : "");
+  const [message, setMessage] = useState(sourceImage ? "Digital Twin unavailable" : "Add a cover photo to generate a Digital Twin.");
+  const [busy, setBusy] = useState(false);
+
+  async function generateTwin() {
+    if (!sourceImage || busy) return;
+    setBusy(true);
+    setStatus("processing");
+    setMessage("Reconstructing product");
+    try {
+      const result = await generateTransparentProductCutout(sourceImage, item.product.category);
+      const file = new File([result.blob], `${item.product.id}-digital-twin.png`, { type: "image/png" });
+      const form = new FormData();
+      form.append("file", file);
+      const upload = await fetch("/api/import-image", { method: "POST", body: form }).then((response) => response.json());
+      if (!upload.ok || !upload.url) throw new Error(upload.message || "Digital Twin asset could not be uploaded.");
+      const processingStatus = result.confidence >= 0.42 ? "ready" : "needs_review";
+      const save = await fetch("/api/products/actions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "save-digital-twin",
+          productId: item.product.id,
+          sourceImageUrl: sourceImage,
+          transparentImageUrl: upload.url,
+          storageKey: upload.storageKey,
+          processingStatus,
+          segmentationConfidence: result.confidence,
+          bounds: result.bounds,
+          sourceDimensions: result.sourceDimensions,
+          transparentDimensions: result.transparentDimensions,
+          processorVersion: digitalTwinProcessorVersion,
+          failureCode: processingStatus === "needs_review" ? "low_confidence" : null,
+        }),
+      }).then((response) => response.json());
+      if (!save.ok) throw new Error(save.message || "Digital Twin metadata could not be saved.");
+      setAssetUrl(upload.url);
+      setStatus(processingStatus);
+      setMessage(processingStatus === "ready" ? "Digital Twin ready" : "Cutout needs review");
+    } catch (error) {
+      setStatus("failed");
+      setMessage(error instanceof Error ? error.message : "Digital Twin could not be generated.");
+      await fetch("/api/products/actions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "save-digital-twin",
+          productId: item.product.id,
+          sourceImageUrl: sourceImage,
+          processingStatus: "failed",
+          segmentationConfidence: null,
+          processorVersion: digitalTwinProcessorVersion,
+          failureCode: error instanceof Error ? error.message.slice(0, 100) : "processing_failed",
+        }),
+      }).catch(() => undefined);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!sourceImage || assetUrl || busy || status === "failed") return;
+    const run = window.setTimeout(() => void generateTwin(), 0);
+    return () => window.clearTimeout(run);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- generation is keyed by the source image and stored twin state.
+  }, [sourceImage]);
+
+  const ready = status === "ready" && assetUrl;
+
+  return (
+    <div className="dna-twin-stage relative mx-auto grid min-h-[300px] w-full max-w-[380px] place-items-center">
+      <div className="absolute inset-x-8 top-8 h-8 rounded-full border border-slate-500/35 bg-slate-300/10 blur-[1px]" />
+      <div className="dna-capsule relative h-[286px] w-[176px] rounded-[5rem] border border-slate-400/35 bg-[linear-gradient(90deg,rgba(200,210,230,.08),rgba(200,210,230,.22),rgba(40,48,65,.2))] shadow-[0_0_50px_rgba(102,112,141,.22),inset_0_0_30px_rgba(200,210,230,.12)]">
+        <div className="absolute inset-3 rounded-[5rem] border border-slate-200/10 bg-black/30 backdrop-blur-sm" />
+        <div className="absolute inset-6 rounded-[5rem] bg-[radial-gradient(circle_at_50%_45%,rgba(237,243,255,.18),rgba(102,112,141,.1)_42%,transparent_72%)]" />
+        <div className={`digital-twin ${twinPose} absolute left-1/2 top-1/2 h-[188px] w-[132px] -translate-x-1/2 -translate-y-1/2`} aria-label={`${item.product.title} digital twin`}>
+          {ready ? (
+            <ProductImage src={assetUrl} alt={`${item.product.title} transparent Digital Twin`} className="twin-artifact" fallbackClassName="twin-placeholder" />
+          ) : (
+            <div className="twin-placeholder" aria-hidden="true">
+              <Atom size={42} />
+              <span className="sr-only">{message}</span>
+            </div>
+          )}
+          <span className="twin-scan" aria-hidden="true" />
+          <span className="twin-orbit twin-orbit-a" aria-hidden="true" />
+          <span className="twin-orbit twin-orbit-b" aria-hidden="true" />
+        </div>
+        <div className="twin-particles absolute inset-7" aria-hidden="true">
+          {Array.from({ length: 10 }).map((_, index) => (
+            <span
+              key={index}
+              style={{
+                "--particle-index": index,
+                "--particle-left": `${20 + (index % 5) * 15}%`,
+                "--particle-top": `${16 + (index % 4) * 17}%`,
+              } as CSSProperties}
+            />
+          ))}
+        </div>
+        <div className="absolute inset-x-[-18px] bottom-7 h-5 rounded-full border border-slate-400/25 bg-slate-950/70" />
+      </div>
+      <div className="absolute bottom-2 rounded-full border border-slate-600/45 bg-black/55 px-4 py-2 text-center shadow-lg shadow-black/40">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{ready ? "Knowledge state" : status === "processing" ? "Reconstructing" : "Twin state"}</p>
+        <p className="font-heading text-xl font-semibold text-[#f6f8ff]">{ready ? growth : status === "needs_review" ? "Review" : status === "failed" ? "Dormant" : "Processing"}</p>
+        {!ready ? <button type="button" disabled={!sourceImage || busy} onClick={generateTwin} className="mt-2 text-[11px] font-semibold text-[#c8d2e6] transition hover:text-[#f6f8ff] disabled:opacity-50">{status === "failed" ? "Retry" : "Generate Twin"}</button> : null}
+      </div>
+    </div>
+  );
+}
+
 function DnaInsightTile({ icon, title, value }: { icon: ReactNode; title: string; value: ReactNode }) {
   return (
     <div className="rounded-3xl border border-slate-700/35 bg-black/30 p-4 shadow-lg shadow-black/15">
@@ -423,6 +507,148 @@ function productTwinPose(category: string) {
   if (/(bag|purse|tote|backpack)/.test(normalized)) return "twin-bag";
   if (/(shirt|tee|hoodie|jacket|sweater|top|dress|pants|shorts)/.test(normalized)) return "twin-shirt";
   return "twin-object";
+}
+
+function proxiedImageUrl(url: string) {
+  if (/^https?:\/\//i.test(url)) return `/api/import-image?url=${encodeURIComponent(url)}`;
+  return url;
+}
+
+function loadCanvasImage(url: string) {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    image.crossOrigin = "anonymous";
+    image.decoding = "async";
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("source_image_unavailable"));
+    image.src = proxiedImageUrl(url);
+  });
+}
+
+async function generateTransparentProductCutout(sourceUrl: string, category: string) {
+  const image = await loadCanvasImage(sourceUrl);
+  const maxSide = 900;
+  const scale = Math.min(1, maxSide / Math.max(image.naturalWidth, image.naturalHeight));
+  const width = Math.max(1, Math.round(image.naturalWidth * scale));
+  const height = Math.max(1, Math.round(image.naturalHeight * scale));
+  const sourceCanvas = document.createElement("canvas");
+  sourceCanvas.width = width;
+  sourceCanvas.height = height;
+  const sourceContext = sourceCanvas.getContext("2d", { willReadFrequently: true });
+  if (!sourceContext) throw new Error("canvas_unavailable");
+  sourceContext.drawImage(image, 0, 0, width, height);
+  const imageData = sourceContext.getImageData(0, 0, width, height);
+  const data = imageData.data;
+  const background = new Uint8Array(width * height);
+  const queue: number[] = [];
+  const borderSamples: [number, number, number][] = [];
+  const sampleBorder = (x: number, y: number) => {
+    const index = (y * width + x) * 4;
+    borderSamples.push([data[index], data[index + 1], data[index + 2]]);
+  };
+  const stride = Math.max(1, Math.floor(Math.min(width, height) / 80));
+  for (let x = 0; x < width; x += stride) {
+    sampleBorder(x, 0);
+    sampleBorder(x, height - 1);
+  }
+  for (let y = 0; y < height; y += stride) {
+    sampleBorder(0, y);
+    sampleBorder(width - 1, y);
+  }
+  const avg = borderSamples.reduce((sum, color) => [sum[0] + color[0], sum[1] + color[1], sum[2] + color[2]], [0, 0, 0]).map((value) => value / Math.max(1, borderSamples.length));
+  const colorDistance = (offset: number, color = avg) => Math.hypot(data[offset] - color[0], data[offset + 1] - color[1], data[offset + 2] - color[2]);
+  const edgeEnergy = (x: number, y: number) => {
+    const left = (y * width + Math.max(0, x - 1)) * 4;
+    const right = (y * width + Math.min(width - 1, x + 1)) * 4;
+    const top = (Math.max(0, y - 1) * width + x) * 4;
+    const bottom = (Math.min(height - 1, y + 1) * width + x) * 4;
+    return Math.abs(data[left] - data[right]) + Math.abs(data[left + 1] - data[right + 1]) + Math.abs(data[left + 2] - data[right + 2]) + Math.abs(data[top] - data[bottom]) + Math.abs(data[top + 1] - data[bottom + 1]) + Math.abs(data[top + 2] - data[bottom + 2]);
+  };
+  const enqueue = (x: number, y: number) => {
+    if (x < 0 || y < 0 || x >= width || y >= height) return;
+    const pixel = y * width + x;
+    if (background[pixel]) return;
+    background[pixel] = 1;
+    queue.push(pixel);
+  };
+  for (let x = 0; x < width; x++) {
+    enqueue(x, 0);
+    enqueue(x, height - 1);
+  }
+  for (let y = 0; y < height; y++) {
+    enqueue(0, y);
+    enqueue(width - 1, y);
+  }
+  const threshold = Math.max(34, Math.min(78, 42 + Math.hypot(...avg.map((channel) => channel - 128)) / 8));
+  for (let cursor = 0; cursor < queue.length; cursor += 1) {
+    const pixel = queue[cursor];
+    const x = pixel % width;
+    const y = Math.floor(pixel / width);
+    const neighbors = [pixel - 1, pixel + 1, pixel - width, pixel + width];
+    for (const neighbor of neighbors) {
+      if (neighbor < 0 || neighbor >= width * height || background[neighbor]) continue;
+      const nx = neighbor % width;
+      const ny = Math.floor(neighbor / width);
+      if (Math.abs(nx - x) + Math.abs(ny - y) !== 1) continue;
+      const offset = neighbor * 4;
+      const smoothBackground = colorDistance(offset) <= threshold && edgeEnergy(nx, ny) < 138;
+      const lowAlpha = data[offset + 3] < 32;
+      if (smoothBackground || lowAlpha) enqueue(nx, ny);
+    }
+  }
+  let minX = width;
+  let minY = height;
+  let maxX = -1;
+  let maxY = -1;
+  let foregroundPixels = 0;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const pixel = y * width + x;
+      const offset = pixel * 4;
+      if (background[pixel]) {
+        data[offset + 3] = 0;
+        continue;
+      }
+      const alpha = data[offset + 3];
+      if (alpha > 0) {
+        const nearbyBackground = x <= 1 || y <= 1 || x >= width - 2 || y >= height - 2 || background[pixel - 1] || background[pixel + 1] || background[pixel - width] || background[pixel + width];
+        if (nearbyBackground) data[offset + 3] = Math.max(0, alpha - 24);
+        foregroundPixels += 1;
+        minX = Math.min(minX, x);
+        minY = Math.min(minY, y);
+        maxX = Math.max(maxX, x);
+        maxY = Math.max(maxY, y);
+      }
+    }
+  }
+  if (maxX < minX || maxY < minY) throw new Error("foreground_not_detected");
+  sourceContext.putImageData(imageData, 0, 0);
+  const bounds = { x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1 };
+  const outputSize = 1024;
+  const output = document.createElement("canvas");
+  output.width = outputSize;
+  output.height = outputSize;
+  const outputContext = output.getContext("2d");
+  if (!outputContext) throw new Error("canvas_unavailable");
+  const normalized = category.toLowerCase();
+  const targetFill = /(necklace|jewelry|bracelet|ring|chain|pendant)/.test(normalized) ? 0.62 : /(bag|purse|tote|backpack)/.test(normalized) ? 0.7 : 0.74;
+  const drawScale = Math.min((outputSize * targetFill) / bounds.width, (outputSize * targetFill) / bounds.height);
+  const drawWidth = bounds.width * drawScale;
+  const drawHeight = bounds.height * drawScale;
+  const dx = (outputSize - drawWidth) / 2;
+  const dy = (outputSize - drawHeight) / 2;
+  outputContext.drawImage(sourceCanvas, bounds.x, bounds.y, bounds.width, bounds.height, dx, dy, drawWidth, drawHeight);
+  const edgeClear = bounds.x > 2 && bounds.y > 2 && maxX < width - 3 && maxY < height - 3 ? 0.18 : -0.12;
+  const foregroundRatio = foregroundPixels / (width * height);
+  const confidence = Math.max(0.2, Math.min(0.92, 0.46 + edgeClear + (foregroundRatio > 0.08 && foregroundRatio < 0.78 ? 0.2 : -0.08)));
+  const blob = await new Promise<Blob>((resolve, reject) => output.toBlob((next) => next ? resolve(next) : reject(new Error("transparent_export_failed")), "image/png"));
+  return {
+    blob,
+    confidence,
+    bounds,
+    sourceDimensions: { width: image.naturalWidth, height: image.naturalHeight },
+    transparentDimensions: { width: outputSize, height: outputSize },
+  };
 }
 
 function ProductEditDrawer({ item, onClose }: { item: ProductExperience; onClose: () => void }) {

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { deleteCatalogProduct, duplicateCatalogProduct, getOperatingData, restoreCatalogProduct, snapshot, updateCatalogProduct } from "@/services/operating-system/repository";
+import { deleteCatalogProduct, duplicateCatalogProduct, getOperatingData, restoreCatalogProduct, saveProductDigitalTwinAsset, snapshot, updateCatalogProduct } from "@/services/operating-system/repository";
 
 const skuSchema = z.string().trim().min(1).max(120).regex(/^[A-Za-z0-9_-]+$/, "SKU can only use letters, numbers, hyphens, and underscores.");
 
@@ -9,6 +9,20 @@ const productActionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("delete"), variantId: z.string().uuid() }),
   z.object({ action: z.literal("restore"), variantId: z.string().uuid() }),
   z.object({ action: z.literal("update"), variantId: z.string().uuid(), title: z.string().trim().min(1).max(300).optional(), sku: skuSchema.optional(), brand: z.string().trim().max(120).optional(), category: z.string().trim().min(1).max(120).optional(), condition: z.string().trim().max(120).optional(), description: z.string().trim().max(2000).optional(), notes: z.string().trim().max(2000).optional(), sourceUrl: z.string().trim().max(1000).optional(), landedUnitCost: z.coerce.number().nonnegative().optional(), defaultSalePrice: z.coerce.number().nonnegative().optional(), images: z.array(z.string().trim().min(1).max(5000)).max(12).optional() }),
+  z.object({
+    action: z.literal("save-digital-twin"),
+    productId: z.string().uuid(),
+    sourceImageUrl: z.string().trim().min(1).max(5000),
+    transparentImageUrl: z.string().trim().min(1).max(5000).optional(),
+    storageKey: z.string().trim().min(1).max(1000).optional(),
+    processingStatus: z.enum(["not_started", "queued", "processing", "ready", "failed", "needs_review"]),
+    segmentationConfidence: z.coerce.number().min(0).max(1).nullable().optional(),
+    bounds: z.object({ x: z.number(), y: z.number(), width: z.number().positive(), height: z.number().positive() }).nullable().optional(),
+    sourceDimensions: z.object({ width: z.number().positive(), height: z.number().positive() }).optional(),
+    transparentDimensions: z.object({ width: z.number().positive(), height: z.number().positive() }).optional(),
+    processorVersion: z.string().trim().min(1).max(80),
+    failureCode: z.string().trim().max(120).nullable().optional(),
+  }),
   z.object({ action: z.literal("delete-many"), variantIds: z.array(z.string().uuid()).min(1) }),
 ]);
 
@@ -38,11 +52,13 @@ export async function POST(request: Request) {
       ? await duplicateCatalogProduct(body.variantId)
       : body.action === "delete"
         ? await deleteCatalogProduct(body.variantId)
-        : body.action === "restore"
-          ? await restoreCatalogProduct(body.variantId)
-          : body.action === "update"
-            ? await updateCatalogProduct(body)
-            : await body.variantIds.reduce(async (previous, variantId) => {
+          : body.action === "restore"
+            ? await restoreCatalogProduct(body.variantId)
+            : body.action === "update"
+              ? await updateCatalogProduct(body)
+              : body.action === "save-digital-twin"
+                ? await saveProductDigitalTwinAsset(body)
+                : await body.variantIds.reduce(async (previous, variantId) => {
               await previous;
               return deleteCatalogProduct(variantId);
             }, Promise.resolve(await getOperatingData()));

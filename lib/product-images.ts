@@ -1,4 +1,4 @@
-import type { OperatingData, Product, ProductImageRecord } from "@/domain/business";
+import type { OperatingData, Product, ProductDigitalTwinAsset, ProductImageRecord } from "@/domain/business";
 
 const MAX_PRODUCT_IMAGES = 24;
 
@@ -70,6 +70,19 @@ export function productGallery(data: OperatingData, product: Product): string[] 
 
 export function productCoverImage(data: OperatingData, product: Product): string | undefined {
   return productGallery(data, product)[0];
+}
+
+export function currentProductDigitalTwin(data: OperatingData, product: Product, processorVersion: string): ProductDigitalTwinAsset | undefined {
+  const coverImage = productCoverImage(data, product);
+  const coverRecord = coverImage ? (data.productImages || []).find((entry) => entry.productId === product.id && entry.url === coverImage) : undefined;
+  return (data.productDigitalTwins || [])
+    .filter((entry) => entry.productId === product.id && entry.processorVersion === processorVersion)
+    .sort((a, b) => {
+      const aCurrent = coverRecord ? a.sourceImageId === coverRecord.id : a.sourceImageUrl === coverImage;
+      const bCurrent = coverRecord ? b.sourceImageId === coverRecord.id : b.sourceImageUrl === coverImage;
+      if (aCurrent !== bCurrent) return aCurrent ? -1 : 1;
+      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+    })[0];
 }
 
 export function ensureProductImageOwnership(data: OperatingData, options: { now: string; id: () => string }) {

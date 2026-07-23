@@ -1,7 +1,7 @@
 import "server-only";
 import fs from "fs/promises";
 import path from "path";
-import type { Budget, Expense, Forecast, FulfillmentException, FulfillmentLabel, FulfillmentManifest, FulfillmentPackage, FulfillmentPickList, FulfillmentRate, FulfillmentShipment, FulfillmentStatus, Marketplace, OperatingData, Order, OrderAddress, OrderImportBatch, OrderImportReview, OrderStatus, Payout, ReinvestmentAllocation, SavedOrderView, StockBalance, TaxReserveMovement } from "@/domain/business";
+import type { Budget, Expense, Forecast, FulfillmentException, FulfillmentLabel, FulfillmentManifest, FulfillmentPackage, FulfillmentPickList, FulfillmentRate, FulfillmentShipment, FulfillmentStatus, Marketplace, OperatingData, Order, OrderAddress, OrderImportBatch, OrderImportReview, OrderStatus, Payout, ProductDigitalTwinAsset, ReinvestmentAllocation, SavedOrderView, StockBalance, TaxReserveMovement } from "@/domain/business";
 import { availableCash, availableUnits, inventoryValue, orderProfit, reorderSuggestion } from "@/lib/business-calculations";
 import type { Opportunity as LegacyOpportunity } from "@/types/opportunity";
 import { isProductionAuthEnabled } from "@/lib/env";
@@ -27,7 +27,7 @@ import { ensureProductImageOwnership, normalizeProductImageUrls, productGallery,
 const file = path.join(process.cwd(), ".faust", "operating-system.json");
 const now = () => new Date().toISOString();
 const id = () => crypto.randomUUID();
-const empty = (): OperatingData => { const data: OperatingData = { version: 1, mode: "empty", products: [], productImages: [], variants: [], locations: [], balances: [], stockMovements: [], suppliers: [], purchaseOrders: [], parcels: [], listings: [], customers: [], orders: [], transactions: [], tasks: [], notices: [], insights: [], activity: [], orderImportReviews: [], orderImportBatches: [], savedOrderViews: defaultOrderViews(), fulfillmentShipments: [], fulfillmentPickLists: [], fulfillmentExceptions: [], fulfillmentManifests: [], purchaseBatches: [], inventoryLots: [], landedCostComponents: [], exchangeRates: [], orderItemCostAllocations: [], journalEntries: [], journalLines: [], outboxEvents: [], durableJobs: [], deadLetters: [], channelSyncStates: [], inventoryRiskLocks: [], physicalSkuMappings: [], marketplaceAccounts: [], listingTemplates: [], channelListingDrafts: [], listingSyncJobs: [], listingReviewItems: [], supplierContacts: [], supplierCommunications: [], supplierScorecards: [], purchaseApprovals: [], purchasePayments: [], freightConsolidations: [], receivingSessions: [], supplierClaims: [], supplierPriceHistory: [], reorderRecommendations: [], analyticsSavedReports: [], analyticsFilterPresets: [], analyticsReportRuns: [], automationRules: [], automationRuns: [], automationSteps: [], automationApprovals: [], automationRetries: [], automationDeadLetters: [], automationTemplates: [], automationIdempotencyReceipts: [], automationEventReceipts: [], automationWorkerLeases: [], automationWorkerHeartbeats: [], automationExecutionTraces: [], aiConversations: [], aiMessages: [], aiSavedQuestions: [], aiToolCalls: [], aiRecommendations: [], aiEvidenceLinks: [], aiScenarios: [], aiDailyBriefs: [], aiApprovalProposals: [], aiFeedback: [], aiObservabilityEvents: [], updatedAt: now() }; ensureAnalyticsCollections(data); ensureAutomationCollections(data); ensureAiCollections(data); return data; };
+const empty = (): OperatingData => { const data: OperatingData = { version: 1, mode: "empty", products: [], productImages: [], productDigitalTwins: [], variants: [], locations: [], balances: [], stockMovements: [], suppliers: [], purchaseOrders: [], parcels: [], listings: [], customers: [], orders: [], transactions: [], tasks: [], notices: [], insights: [], activity: [], orderImportReviews: [], orderImportBatches: [], savedOrderViews: defaultOrderViews(), fulfillmentShipments: [], fulfillmentPickLists: [], fulfillmentExceptions: [], fulfillmentManifests: [], purchaseBatches: [], inventoryLots: [], landedCostComponents: [], exchangeRates: [], orderItemCostAllocations: [], journalEntries: [], journalLines: [], outboxEvents: [], durableJobs: [], deadLetters: [], channelSyncStates: [], inventoryRiskLocks: [], physicalSkuMappings: [], marketplaceAccounts: [], listingTemplates: [], channelListingDrafts: [], listingSyncJobs: [], listingReviewItems: [], supplierContacts: [], supplierCommunications: [], supplierScorecards: [], purchaseApprovals: [], purchasePayments: [], freightConsolidations: [], receivingSessions: [], supplierClaims: [], supplierPriceHistory: [], reorderRecommendations: [], analyticsSavedReports: [], analyticsFilterPresets: [], analyticsReportRuns: [], automationRules: [], automationRuns: [], automationSteps: [], automationApprovals: [], automationRetries: [], automationDeadLetters: [], automationTemplates: [], automationIdempotencyReceipts: [], automationEventReceipts: [], automationWorkerLeases: [], automationWorkerHeartbeats: [], automationExecutionTraces: [], aiConversations: [], aiMessages: [], aiSavedQuestions: [], aiToolCalls: [], aiRecommendations: [], aiEvidenceLinks: [], aiScenarios: [], aiDailyBriefs: [], aiApprovalProposals: [], aiFeedback: [], aiObservabilityEvents: [], updatedAt: now() }; ensureAnalyticsCollections(data); ensureAutomationCollections(data); ensureAiCollections(data); return data; };
 function developmentDemo(): OperatingData {
  const data = empty(); const time = now();
  const supplierId = "11111111-1111-4111-8111-111111111111"; const productId = "22222222-2222-4222-8222-222222222222"; const variantId = "33333333-3333-4333-8333-333333333333"; const locationId = "44444444-4444-4444-8444-444444444444"; const listingId = "55555555-5555-4555-8555-555555555555"; const customerId = "66666666-6666-4666-8666-666666666666"; const orderId = "77777777-7777-4777-8777-777777777777"; const orderItemId = "88888888-8888-4888-8888-888888888888"; const purchaseOrderId = "99999999-9999-4999-8999-999999999999"; const purchaseOrderItemId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"; const parcelId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"; const balanceId = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
@@ -48,13 +48,30 @@ function developmentDemo(): OperatingData {
  seedMarketplaceAccountsAndTemplates(data); seedSupplierOperations(data); ensureAnalyticsCollections(data); ensureAutomationCollections(data); ensureAiCollections(data); ensureProductImageOwnership(data, { now: time, id });
  return data;
 }
-async function readLocal(): Promise<OperatingData> { try { const data = JSON.parse(await fs.readFile(file, "utf8")) as OperatingData; if (!["empty", "local"].includes(String((data as OperatingData & { mode?: string }).mode))) return empty(); ensureAnalyticsCollections(data); ensureAutomationCollections(data); ensureAiCollections(data); ensureProductImageOwnership(data, { now: now(), id }); return data; } catch (error: unknown) { if (typeof error === "object" && error && "code" in error && error.code === "ENOENT") return empty(); throw error; } }
+async function readLocal(): Promise<OperatingData> { try { const data = JSON.parse(await fs.readFile(file, "utf8")) as OperatingData; if (!["empty", "local"].includes(String((data as OperatingData & { mode?: string }).mode))) return empty(); ensureAnalyticsCollections(data); ensureAutomationCollections(data); ensureAiCollections(data); ensureProductImageOwnership(data, { now: now(), id }); ensureProductDigitalTwinCollections(data); return data; } catch (error: unknown) { if (typeof error === "object" && error && "code" in error && error.code === "ENOENT") return empty(); throw error; } }
 async function read(): Promise<OperatingData> { return isProductionAuthEnabled() ? readNormalizedOperatingData() : readLocal(); }
-async function write(data: OperatingData) { ensureAnalyticsCollections(data); ensureAutomationCollections(data); ensureAiCollections(data); ensureProductImageOwnership(data, { now: now(), id }); data.updatedAt = now(); if (isProductionAuthEnabled()) return writeNormalizedOperatingData(data); await fs.mkdir(path.dirname(file), { recursive: true }); await fs.writeFile(file, JSON.stringify(data, null, 2)); return data; }
+async function write(data: OperatingData) { ensureAnalyticsCollections(data); ensureAutomationCollections(data); ensureAiCollections(data); ensureProductImageOwnership(data, { now: now(), id }); ensureProductDigitalTwinCollections(data); data.updatedAt = now(); if (isProductionAuthEnabled()) return writeNormalizedOperatingData(data); await fs.mkdir(path.dirname(file), { recursive: true }); await fs.writeFile(file, JSON.stringify(data, null, 2)); return data; }
 function activity(data: OperatingData, action: string, entityType: string, entityId: string, detail: string) { data.activity.unshift({ id: id(), action, entityType, entityId, detail, createdAt: now() }); }
 function defaultOrderViews(): SavedOrderView[] { const time = now(); return ["All Orders", "Needs Action", "Ship Today", "Unpaid", "Reservation Failed", "Negative Margin", "Returns Open", "Refund Review", "Import Review"].map((name, position) => ({ id: id(), name, filters: {}, isDefault: position === 0, position, createdAt: time })); }
 function ensureOrderCollections(data: OperatingData) { data.orderImportReviews ||= []; data.orderImportBatches ||= []; data.savedOrderViews ||= defaultOrderViews(); }
 function orderNotice(data: OperatingData, title: string, detail: string, href: string, entityType: string, entityId: string, severity: "critical" | "warning" | "info" = "warning") { const existing = data.notices.find((notice) => !notice.resolved && !notice.archived && notice.category === "orders" && notice.entityType === entityType && notice.entityId === entityId && notice.title === title); if (existing) return existing; const notice = { id: id(), severity, title, detail, actionLabel: "Review", href, createdAt: now(), category: "orders" as const, entityType, entityId, read: false }; data.notices.unshift(notice); return notice; }
+function ensureProductDigitalTwinCollections(data: OperatingData) { data.productDigitalTwins ||= []; }
+function productCoverRecord(data: OperatingData, productId: string) {
+ const records = (data.productImages || []).filter((entry) => entry.productId === productId).sort((a, b) => a.position - b.position);
+ return records.find((entry) => entry.isCover) || records[0];
+}
+function markProductDigitalTwinSourceChanged(data: OperatingData, productId: string) {
+ ensureProductDigitalTwinCollections(data);
+ const cover = productCoverRecord(data, productId);
+ for (const twin of data.productDigitalTwins!.filter((entry) => entry.productId === productId)) {
+  const stillCurrent = cover ? twin.sourceImageId === cover.id && twin.sourceImageUrl === cover.url : false;
+  if (!stillCurrent && twin.processingStatus === "ready") {
+   twin.processingStatus = "needs_review";
+   twin.failureCode = "source_image_changed";
+   twin.updatedAt = now();
+  }
+ }
+}
 function summarizeBatch(batch: OrderImportBatch) { batch.acceptedRows = batch.rows.filter((row) => ["accepted", "resolved", "imported"].includes(row.status)).length; batch.rejectedRows = batch.rows.filter((row) => row.status === "rejected").length; batch.unresolvedRows = batch.rows.filter((row) => row.status === "review_required").length; batch.failedRows = batch.rows.filter((row) => row.status === "failed").length; batch.importedOrders = batch.createdOrderIds.length; batch.status = batch.archivedAt ? "archived" : batch.failedRows ? "partially_failed" : batch.importedOrders ? "completed" : batch.unresolvedRows ? "review_required" : "ready"; batch.updatedAt = now(); }
 function ensureFulfillmentCollections(data: OperatingData) { data.fulfillmentShipments ||= []; data.fulfillmentPickLists ||= []; data.fulfillmentExceptions ||= []; data.fulfillmentManifests ||= []; }
 function ensureFinanceCollections(data: OperatingData) { data.expenses ||= []; data.payouts ||= []; data.payoutReconciliations ||= []; data.budgets ||= []; data.taxReserveMovements ||= []; data.reinvestmentAllocations ||= []; data.forecasts ||= []; data.financialAccounts ||= []; data.financeCategories ||= []; }
@@ -121,7 +138,10 @@ export async function updateCatalogProduct(input: { variantId: string; title?: s
  if (input.description !== undefined) product.description = input.description.trim() || undefined;
  if (input.notes !== undefined) product.notes = input.notes.trim() || undefined;
  if (input.sourceUrl !== undefined) product.sourceUrl = input.sourceUrl.trim() || product.sourceUrl;
- if (images) setProductImages(data, product, images, { now: updatedAt, id, sourceType: "manual" });
+ if (images) {
+  setProductImages(data, product, images, { now: updatedAt, id, sourceType: "manual" });
+  markProductDigitalTwinSourceChanged(data, product.id);
+ }
  if (input.sku !== undefined) {
   const sku = input.sku.trim();
   if (sku) variant.sku = assertUniqueSku(data, sku, variant.id);
@@ -152,6 +172,57 @@ export async function updateCatalogProduct(input: { variantId: string; title?: s
  activity(data, "Product edited", "product", product.id, `${product.title} product details, pricing, or photos were updated.`);
  return write(data);
 }
+export async function saveProductDigitalTwinAsset(input: {
+ productId: string;
+ sourceImageUrl: string;
+ transparentImageUrl?: string;
+ storageKey?: string;
+ processingStatus: ProductDigitalTwinAsset["processingStatus"];
+ segmentationConfidence?: number | null;
+ bounds?: ProductDigitalTwinAsset["bounds"];
+ sourceDimensions?: ProductDigitalTwinAsset["sourceDimensions"];
+ transparentDimensions?: ProductDigitalTwinAsset["transparentDimensions"];
+ processorVersion: string;
+ failureCode?: string | null;
+}) {
+ const data = await read();
+ ensureProductDigitalTwinCollections(data);
+ const product = data.products.find((entry) => entry.id === input.productId);
+ if (!product) throw new Error("Product not found.");
+ const cover = productCoverRecord(data, product.id);
+ const sourceImageId = cover?.url === input.sourceImageUrl ? cover.id : cover?.id || `cover:${product.id}`;
+ const time = now();
+ const existing = data.productDigitalTwins!.find((entry) => entry.productId === product.id && entry.sourceImageId === sourceImageId && entry.processorVersion === input.processorVersion);
+ const base: ProductDigitalTwinAsset = existing || {
+  id: id(),
+  productId: product.id,
+  sourceImageId,
+  sourceImageUrl: input.sourceImageUrl,
+  processingStatus: "not_started",
+  segmentationConfidence: null,
+  bounds: null,
+  generatedAt: null,
+  processorVersion: input.processorVersion,
+  failureCode: null,
+  createdAt: time,
+  updatedAt: time,
+ };
+ base.sourceImageUrl = input.sourceImageUrl;
+ base.transparentImageUrl = input.transparentImageUrl;
+ base.storageKey = input.storageKey;
+ base.processingStatus = input.processingStatus;
+ base.segmentationConfidence = input.segmentationConfidence ?? null;
+ base.bounds = input.bounds || null;
+ base.sourceDimensions = input.sourceDimensions;
+ base.transparentDimensions = input.transparentDimensions;
+ base.generatedAt = input.processingStatus === "ready" || input.processingStatus === "needs_review" ? time : base.generatedAt;
+ base.processorVersion = input.processorVersion;
+ base.failureCode = input.failureCode ?? null;
+ base.updatedAt = time;
+ data.productDigitalTwins = [base, ...data.productDigitalTwins!.filter((entry) => entry.id !== base.id)];
+ activity(data, input.processingStatus === "ready" ? "Digital twin generated" : "Digital twin updated", "product", product.id, `${product.title} digital twin is ${input.processingStatus}.`);
+ return write(data);
+}
 export async function deleteCatalogProduct(variantId: string) {
  const data = await read(); const variant = data.variants.find((entry) => entry.id === variantId); if (!variant) throw new Error("Product variant not found.");
  const product = data.products.find((entry) => entry.id === variant.productId); if (!product) throw new Error("Product not found.");
@@ -173,6 +244,7 @@ export async function deleteCatalogProduct(variantId: string) {
   data.listingReviewItems = (data.listingReviewItems || []).filter((entry) => !entry.channelDraftId || !draftIds.has(entry.channelDraftId));
   data.channelSyncStates = (data.channelSyncStates || []).filter((entry) => entry.variantId !== variant.id && !listingIds.has(entry.listingId));
   data.productImages = (data.productImages || []).filter((entry) => entry.productId !== product.id);
+  data.productDigitalTwins = (data.productDigitalTwins || []).filter((entry) => entry.productId !== product.id);
   data.physicalSkuMappings = (data.physicalSkuMappings || []).filter((entry) => entry.variantId !== variant.id);
   data.inventoryRiskLocks = (data.inventoryRiskLocks || []).filter((entry) => entry.variantId !== variant.id);
   data.notices = data.notices.filter((notice) => notice.entityId !== product.id && notice.entityId !== variant.id);
