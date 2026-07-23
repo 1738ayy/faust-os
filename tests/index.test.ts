@@ -20,3 +20,4 @@ import "./browser-extension-extractor.test";
 import "./import-queue.test";
 import "./production-connection.test";
 import "./easypost-adapter.test";
+import "./performance.test";

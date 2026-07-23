@@ -82,6 +82,14 @@ export function buildProductExperiences(data: OperatingData): ProductExperience[
     .filter(Boolean) as ProductExperience[];
 }
 
+export function buildProductExperienceByVariantId(data: OperatingData, variantId: string): ProductExperience | undefined {
+  const variant = data.variants.find((entry) => entry.id === variantId);
+  if (!variant || !isActiveVariant(data, variant)) return undefined;
+  const product = data.products.find((entry) => entry.id === variant.productId);
+  if (!product || !isActiveProduct(product)) return undefined;
+  return buildProductExperience(data, product, variant);
+}
+
 export function buildProductExperience(data: OperatingData, product: Product, variant: Variant): ProductExperience {
   if (!isActiveProduct(product) || !isActiveVariant(data, variant)) throw new Error("Product is not active in the catalog.");
   const balances = data.balances.filter((balance) => balance.variantId === variant.id);

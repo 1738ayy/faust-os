@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { CSSProperties } from "react";
 import { ArrowRight } from "lucide-react";
 import { MarketplaceBadge, StatusBadge } from "@/components/faust/design-system";
 import { ReadinessRing } from "@/components/products/readiness-ring";
@@ -13,7 +14,7 @@ export function ProductCard({ item }: { item: ProductExperience }) {
   const primaryHealth = item.intelligence.health[0];
 
   return (
-    <article className="group relative min-h-[560px] overflow-hidden rounded-[2rem] border border-slate-700/45 bg-zinc-950/70 shadow-2xl shadow-black/25 backdrop-blur transition duration-300 motion-safe:hover:-translate-y-1 motion-safe:hover:shadow-slate-950/20">
+    <article className="group relative min-h-[560px] overflow-hidden rounded-[2rem] border border-slate-700/45 bg-zinc-950/70 shadow-2xl shadow-black/25 backdrop-blur transition duration-300 motion-safe:hover:-translate-y-1 motion-safe:hover:shadow-slate-950/20" style={{ contentVisibility: "auto", containIntrinsicSize: "560px" } as CSSProperties}>
         <div className="absolute inset-x-0 top-0 h-48 bg-gradient-to-b from-slate-900/30 to-transparent" />
         <div className="relative h-64 overflow-hidden bg-black/35">
           <Link href={item.href} className="block h-full focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#8f9bb8]/25" aria-label={`Open ${item.product.title} product workspace`}>

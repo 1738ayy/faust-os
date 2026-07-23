@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { PerformanceOverlay } from "@/components/performance/performance-overlay";
 
 import { Toaster } from "sonner";
 import { AuthProvider } from "@/components/auth/auth-provider";
@@ -46,6 +47,7 @@ export default function RootLayout({
             closeButton
             expand
           />
+          {process.env.NODE_ENV !== "production" ? <PerformanceOverlay /> : null}
         </TooltipProvider></AuthProvider>
       </body>
     </html>

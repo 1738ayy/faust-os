@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { createPerformanceTimer, serverTimingHeader } from "@/lib/performance";
 import { deleteCatalogProduct, duplicateCatalogProduct, getOperatingData, restoreCatalogProduct, saveProductDigitalTwinAsset, snapshot, updateCatalogProduct } from "@/services/operating-system/repository";
 
 const skuSchema = z.string().trim().min(1).max(120).regex(/^[A-Za-z0-9_-]+$/, "SKU can only use letters, numbers, hyphens, and underscores.");
@@ -38,8 +39,12 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const timer = createPerformanceTimer();
   try {
-    const parsed = productActionSchema.safeParse(await request.json());
+    const payload = await request.json();
+    timer.mark("parse_json");
+    const parsed = productActionSchema.safeParse(payload);
+    timer.mark("validate");
     if (!parsed.success) {
       const imageIssue = parsed.error.issues.find((issue) => issue.path[0] === "images");
       if (imageIssue) {
@@ -62,8 +67,14 @@ export async function POST(request: Request) {
               await previous;
               return deleteCatalogProduct(variantId);
             }, Promise.resolve(await getOperatingData()));
-    return NextResponse.json({ ok: true, ...snapshot(data) });
+    timer.mark("repository");
+    const response = NextResponse.json({ ok: true, ...snapshot(data) });
+    response.headers.set("Server-Timing", serverTimingHeader(timer.finish().marks));
+    return response;
   } catch (error) {
-    return NextResponse.json({ ok: false, message: error instanceof Error ? error.message : "Product action failed." }, { status: 400 });
+    timer.mark("error");
+    const response = NextResponse.json({ ok: false, message: error instanceof Error ? error.message : "Product action failed." }, { status: 400 });
+    response.headers.set("Server-Timing", serverTimingHeader(timer.finish().marks));
+    return response;
   }
 }
