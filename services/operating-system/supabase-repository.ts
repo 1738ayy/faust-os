@@ -153,7 +153,9 @@ export async function readNormalizedOperatingData(): Promise<OperatingData> {
   const productImageRecords = productImages.map((x) => ({ id: x.id as string, productId: x.product_id as string, url: x.url as string, position: number(x.position ?? x.sort_order), isCover: Boolean(x.is_cover) || number(x.position ?? x.sort_order) === 0, purpose: text(x.purpose) as NonNullable<OperatingData["productImages"]>[number]["purpose"] || (number(x.position ?? x.sort_order) === 0 ? "cover" : "source"), sourceType: text(x.source_type) as NonNullable<OperatingData["productImages"]>[number]["sourceType"] || "supplier", originalUrl: text(x.original_url), crop: (x.crop as Record<string, unknown>) || {}, altText: text(x.alt_text), createdAt: text(x.created_at) || new Date().toISOString(), updatedAt: text(x.updated_at) }));
   const productRows = products.map((x) => {
     const gallery = productImageRecords.filter((image) => image.productId === x.id).sort((a, b) => a.position - b.position).map((image) => image.url);
-    return { id: x.id as string, title: x.title as string, brand: text(x.brand), category: text(x.category) || "Uncategorized", tags: (x.tags as string[]) || [], supplierId: text(x.default_supplier_id), sourceUrl: text(x.source_url), image: gallery[0], images: gallery, status: x.status as "draft", createdAt: x.created_at as string, updatedAt: x.updated_at as string };
+    const coverImageId = text(x.cover_image_id) || productImageRecords.find((image) => image.productId === x.id && image.isCover)?.id || productImageRecords.find((image) => image.productId === x.id)?.id || null;
+    const coverUrl = coverImageId ? productImageRecords.find((image) => image.id === coverImageId)?.url : gallery[0];
+    return { id: x.id as string, title: x.title as string, brand: text(x.brand), category: text(x.category) || "Uncategorized", tags: (x.tags as string[]) || [], supplierId: text(x.default_supplier_id), sourceUrl: text(x.source_url), image: coverUrl || gallery[0], images: gallery, coverImageId, status: x.status as "draft", createdAt: x.created_at as string, updatedAt: x.updated_at as string };
   });
   return { version: 1, mode: products.length || orders.length ? "local" : "empty", updatedAt: new Date().toISOString(),
     suppliers: suppliers.map((x) => ({ id: x.id as string, name: x.name as string, sourcePlatform: text(x.source_platform) || "Manual", leadDays: number(x.lead_days) || undefined, rating: number(x.rating) || undefined, status: x.status as "active", notes: text(x.notes) })),
@@ -214,12 +216,12 @@ export async function writeNormalizedOperatingData(data: OperatingData) {
   await deleteMissing("product_variants", "id", variantIds);
   await deleteMissing("products", "id", productIds);
   await upsert("suppliers", data.suppliers.map((x) => ({ id: x.id, name: x.name, source_platform: x.sourcePlatform, lead_days: x.leadDays, rating: x.rating, status: x.status, notes: x.notes })));
-  await upsert("products", data.products.map((x) => ({ id: x.id, title: x.title, brand: x.brand, category: x.category, tags: x.tags, default_supplier_id: x.supplierId, source_url: x.sourceUrl, status: x.status, created_at: x.createdAt, updated_at: x.updatedAt })));
+  await upsert("products", data.products.map((x) => ({ id: x.id, title: x.title, brand: x.brand, category: x.category, tags: x.tags, default_supplier_id: x.supplierId, source_url: x.sourceUrl, cover_image_id: x.coverImageId, status: x.status, created_at: x.createdAt, updated_at: x.updatedAt })));
   const imageRows = data.products.flatMap((product) => {
     const existing = new Map((data.productImages || []).filter((image) => image.productId === product.id).map((image) => [image.url, image]));
     return productGallery(data, product).map((url, position) => {
       const image = existing.get(url);
-      return { id: image?.id || crypto.randomUUID(), product_id: product.id, url, position, is_cover: position === 0, purpose: image?.purpose || (position === 0 ? "cover" : "source"), source_type: image?.sourceType || "supplier", original_url: image?.originalUrl || url, crop: image?.crop || {}, alt_text: image?.altText, created_at: image?.createdAt || product.createdAt, updated_at: image?.updatedAt || product.updatedAt };
+      return { id: image?.id || crypto.randomUUID(), product_id: product.id, url, position, is_cover: image?.id === product.coverImageId || (!product.coverImageId && position === 0), purpose: image?.purpose || (position === 0 ? "cover" : "source"), source_type: image?.sourceType || "supplier", original_url: image?.originalUrl || url, crop: image?.crop || {}, alt_text: image?.altText, created_at: image?.createdAt || product.createdAt, updated_at: image?.updatedAt || product.updatedAt };
     });
   });
   const deleteImages = await client.from("product_images").delete().eq("business_id", businessId);

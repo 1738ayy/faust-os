@@ -22,7 +22,7 @@ import { approveAutomation, archiveAutomationRule, cancelAutomationRun, createAu
 import { ensureAiCollections, generateAiRecommendations, mutateAiCenterData, type AiCenterActionInput } from "@/lib/ai-center";
 import { applyExtensionAction, type ExtensionAction } from "@/lib/browser-extension";
 import { canonicalListingIdentity, markImportQueueItemCompleted, removeImportQueueItems as removeImportQueueItemsFromData } from "@/lib/import-queue";
-import { ensureProductImageOwnership, normalizeProductImageUrls, productGallery, setProductImages } from "@/lib/product-images";
+import { ensureProductImageOwnership, normalizeProductImageUrls, productCoverRecord as canonicalProductCoverRecord, productGallery, setProductImages } from "@/lib/product-images";
 
 const file = path.join(process.cwd(), ".faust", "operating-system.json");
 const now = () => new Date().toISOString();
@@ -56,13 +56,10 @@ function defaultOrderViews(): SavedOrderView[] { const time = now(); return ["Al
 function ensureOrderCollections(data: OperatingData) { data.orderImportReviews ||= []; data.orderImportBatches ||= []; data.savedOrderViews ||= defaultOrderViews(); }
 function orderNotice(data: OperatingData, title: string, detail: string, href: string, entityType: string, entityId: string, severity: "critical" | "warning" | "info" = "warning") { const existing = data.notices.find((notice) => !notice.resolved && !notice.archived && notice.category === "orders" && notice.entityType === entityType && notice.entityId === entityId && notice.title === title); if (existing) return existing; const notice = { id: id(), severity, title, detail, actionLabel: "Review", href, createdAt: now(), category: "orders" as const, entityType, entityId, read: false }; data.notices.unshift(notice); return notice; }
 function ensureProductDigitalTwinCollections(data: OperatingData) { data.productDigitalTwins ||= []; }
-function productCoverRecord(data: OperatingData, productId: string) {
- const records = (data.productImages || []).filter((entry) => entry.productId === productId).sort((a, b) => a.position - b.position);
- return records.find((entry) => entry.isCover) || records[0];
-}
 function markProductDigitalTwinSourceChanged(data: OperatingData, productId: string) {
  ensureProductDigitalTwinCollections(data);
- const cover = productCoverRecord(data, productId);
+ const product = data.products.find((entry) => entry.id === productId);
+ const cover = product ? canonicalProductCoverRecord(data, product) : undefined;
  for (const twin of data.productDigitalTwins!.filter((entry) => entry.productId === productId)) {
   const stillCurrent = cover ? twin.sourceImageId === cover.id && twin.sourceImageUrl === cover.url : false;
   if (!stillCurrent && twin.processingStatus === "ready") {
@@ -117,7 +114,7 @@ export async function duplicateCatalogProduct(variantId: string) {
  const sourceProduct = data.products.find((entry) => entry.id === sourceVariant.productId); if (!sourceProduct) throw new Error("Product not found.");
  const createdAt = now(); const productId = id(); const newVariantId = id();
  const sourceImages = productGallery(data, sourceProduct);
- const product = { ...sourceProduct, id: productId, title: nextCopyTitle(data, sourceProduct.title), sourceUrl: undefined, status: "draft" as const, image: sourceImages[0], images: sourceImages, createdAt, updatedAt: createdAt };
+ const product = { ...sourceProduct, id: productId, title: nextCopyTitle(data, sourceProduct.title), sourceUrl: undefined, status: "draft" as const, image: sourceImages[0], images: sourceImages, coverImageId: null, createdAt, updatedAt: createdAt };
  const variant = { ...sourceVariant, id: newVariantId, productId, sku: nextCopySku(data, sourceVariant.sku), active: true };
  data.products.unshift(product); data.variants.unshift(variant); data.balances.unshift({ id: id(), variantId: newVariantId, onHand: 0, reserved: 0, incoming: 0, damaged: 0, returned: 0, lost: 0, quarantined: 0 });
  setProductImages(data, product, sourceImages, { now: createdAt, id, sourceType: "manual" });
@@ -189,7 +186,7 @@ export async function saveProductDigitalTwinAsset(input: {
  ensureProductDigitalTwinCollections(data);
  const product = data.products.find((entry) => entry.id === input.productId);
  if (!product) throw new Error("Product not found.");
- const cover = productCoverRecord(data, product.id);
+ const cover = canonicalProductCoverRecord(data, product);
  const sourceImageId = cover?.url === input.sourceImageUrl ? cover.id : cover?.id || `cover:${product.id}`;
  const time = now();
  const existing = data.productDigitalTwins!.find((entry) => entry.productId === product.id && entry.sourceImageId === sourceImageId && entry.processorVersion === input.processorVersion);
@@ -220,7 +217,7 @@ export async function saveProductDigitalTwinAsset(input: {
  base.failureCode = input.failureCode ?? null;
  base.updatedAt = time;
  data.productDigitalTwins = [base, ...data.productDigitalTwins!.filter((entry) => entry.id !== base.id)];
- activity(data, input.processingStatus === "ready" ? "Digital twin generated" : "Digital twin updated", "product", product.id, `${product.title} digital twin is ${input.processingStatus}.`);
+ activity(data, input.processingStatus === "ready" ? "Product profile active" : "Product image analysis updated", "product", product.id, `${product.title} product profile is ${input.processingStatus}.`);
  return write(data);
 }
 export async function deleteCatalogProduct(variantId: string) {

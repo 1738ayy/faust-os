@@ -108,7 +108,7 @@ export function ProductWorkspace({ item }: { item: ProductExperience }) {
       <section className="grid items-start gap-6 xl:grid-cols-[1.05fr_0.95fr]">
         <div className="space-y-6">
           <Panel title="Business summary">
-            <div className="grid gap-3 md:grid-cols-3">
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               <MiniMetric label="Selling price" value={money(item.finance.sellingPrice)} />
               <MiniMetric label="ROI" value={`${item.finance.roi.toFixed(1)}%`} />
               <MiniMetric label="Average selling price" value={money(item.finance.averageSellingPrice)} />
@@ -145,17 +145,19 @@ export function ProductWorkspace({ item }: { item: ProductExperience }) {
             </div>
             <p className="mt-4 text-sm text-muted-foreground">{live} marketplace(s) live. {needsReview} marketplace(s) need review.</p>
           </Panel>
-          <Panel title="Inventory and purchasing">
-            <div className="grid gap-3 md:grid-cols-3">
+          <Panel title="Inventory plan">
+            <p className="mb-4 text-sm leading-6 text-muted-foreground">Track this SKU from Superbuy order to incoming stock, available units, customer commitments, and the next buying move.</p>
+            <div className="grid gap-3 md:grid-cols-2">
               <MiniMetric label="On hand" value={String(item.inventory.onHand)} />
-              <MiniMetric label="Incoming" value={String(item.inventory.incoming)} />
-              <MiniMetric label="Reserved" value={String(item.inventory.reserved)} />
-              <MiniMetric label="Damaged" value={String(item.inventory.damaged)} />
-              <MiniMetric label="Quarantine" value={String(item.inventory.quarantined)} />
+              <MiniMetric label="Ordered / incoming" value={String(item.inventory.incoming)} />
+              <MiniMetric label="Committed to orders" value={String(item.inventory.reserved)} />
+              <MiniMetric label="Available to sell" value={String(item.inventory.available)} />
+              <MiniMetric label="Needs review" value={String(item.inventory.damaged + item.inventory.quarantined + item.inventory.lost)} />
               <MiniMetric label="Inventory value" value={money(item.inventory.value)} />
             </div>
             <div className="mt-4 rounded-2xl border border-slate-700/35 bg-black/35 p-4 text-sm text-muted-foreground">
-              Supplier: <span className="text-foreground">{item.supplierName}</span> · Lead time {item.purchasing.leadTime} · Reorder point {item.purchasing.reorderPoint} · Suggested reorder {item.purchasing.recommendedReorderQuantity}
+              Next inventory move: <span className="text-foreground">{item.inventory.incoming ? "Receive incoming units when they arrive." : item.inventory.available <= item.purchasing.reorderPoint ? `Order ${item.purchasing.recommendedReorderQuantity} more from ${item.supplierName}.` : "Keep selling and watch reorder timing."}</span>
+              <span className="block pt-2">Supplier: <span className="text-foreground">{item.supplierName}</span> · Lead time {item.purchasing.leadTime} · Reorder point {item.purchasing.reorderPoint}</span>
             </div>
           </Panel>
           <Panel title="Related products">
@@ -207,7 +209,7 @@ function ProductDnaCapsule({ item }: { item: ProductExperience }) {
     item.timeline.length > 3 ? 1 : 0,
     item.supplierName !== "Supplier not linked" ? 1 : 0,
   ].reduce((sum, value) => sum + value, 0);
-  const growth = knowledgeSignals <= 2 ? "Dormant" : knowledgeSignals <= 4 ? "Awake" : "Evolving";
+  const growth = knowledgeSignals <= 1 ? "New" : knowledgeSignals <= 3 ? "Developing" : knowledgeSignals <= 5 ? "Active" : "Established";
   const strongestTrait = dnaTags[0];
   const marketPosition = item.finance.margin >= 55 ? "Premium margin profile" : item.finance.margin >= 35 ? "Competitive resale profile" : item.finance.revenue ? "Margin needs review" : "Market position still forming";
   const opportunity = item.inventory.available <= 0 ? "Receive inventory" : item.readiness.score < 80 ? item.readiness.nextAction : liveChannels < 3 ? "Cross-list to more channels" : "Watch pricing and velocity";
@@ -235,7 +237,7 @@ function ProductDnaCapsule({ item }: { item: ProductExperience }) {
           <DnaInsightTile icon={<Atom size={16} />} title="Product fingerprint" value={dnaTags.slice(0, 5).map((dna) => dna.tag).join(" · ")} />
         </div>
 
-        <DigitalTwinChamber item={item} sourceImage={twinImage} twinPose={twinPose} growth={growth} />
+        <DigitalTwinChamber key={`${item.product.id}:${item.product.coverImageId || twinImage || "no-cover"}`} item={item} sourceImage={twinImage} twinPose={twinPose} growth={growth} />
 
         <div className="space-y-4">
           <DnaInsightTile icon={<GitBranch size={16} />} title="Market position" value={`${marketPosition}. ${item.analytics.bestMarketplace} is ${item.analytics.unitsSold ? "supported by order history" : "the current best candidate"} for early learning.`} />
@@ -378,25 +380,26 @@ function ProductDnaCapsule({ item }: { item: ProductExperience }) {
 const digitalTwinProcessorVersion = "faust-canvas-segmentation-v1";
 
 function DigitalTwinChamber({ item, sourceImage, twinPose, growth }: { item: ProductExperience; sourceImage: string; twinPose: string; growth: string }) {
-  const sourceMatches = Boolean(sourceImage && item.digitalTwin?.sourceImageUrl === sourceImage && item.digitalTwin.processorVersion === digitalTwinProcessorVersion);
+  const expectedSourceId = item.product.coverImageId || "";
+  const sourceMatches = Boolean(sourceImage && item.digitalTwin?.processorVersion === digitalTwinProcessorVersion && (expectedSourceId ? item.digitalTwin.sourceImageId === expectedSourceId : item.digitalTwin.sourceImageUrl === sourceImage));
   const initialStatus = sourceMatches ? item.digitalTwin?.processingStatus || "not_started" : sourceImage ? "not_started" : "failed";
   const [status, setStatus] = useState(initialStatus);
   const [assetUrl, setAssetUrl] = useState(sourceMatches && item.digitalTwin?.processingStatus === "ready" ? item.digitalTwin.transparentImageUrl || "" : "");
-  const [message, setMessage] = useState(sourceImage ? "Digital Twin unavailable" : "Add a cover photo to generate a Digital Twin.");
+  const [message, setMessage] = useState(sourceImage ? (sourceMatches ? "Product profile can be built from this cover." : "Refreshing Product Representation") : "Add a cover photo to build the Product Profile.");
   const [busy, setBusy] = useState(false);
 
   async function generateTwin() {
     if (!sourceImage || busy) return;
     setBusy(true);
     setStatus("processing");
-    setMessage("Reconstructing product");
+    setMessage("Analyzing Product Image");
     try {
       const result = await generateTransparentProductCutout(sourceImage, item.product.category);
       const file = new File([result.blob], `${item.product.id}-digital-twin.png`, { type: "image/png" });
       const form = new FormData();
       form.append("file", file);
       const upload = await fetch("/api/import-image", { method: "POST", body: form }).then((response) => response.json());
-      if (!upload.ok || !upload.url) throw new Error(upload.message || "Digital Twin asset could not be uploaded.");
+      if (!upload.ok || !upload.url) throw new Error(upload.message || "Product image analysis could not be saved.");
       const processingStatus = result.confidence >= 0.42 ? "ready" : "needs_review";
       const save = await fetch("/api/products/actions", {
         method: "POST",
@@ -416,13 +419,13 @@ function DigitalTwinChamber({ item, sourceImage, twinPose, growth }: { item: Pro
           failureCode: processingStatus === "needs_review" ? "low_confidence" : null,
         }),
       }).then((response) => response.json());
-      if (!save.ok) throw new Error(save.message || "Digital Twin metadata could not be saved.");
+      if (!save.ok) throw new Error(save.message || "Product profile could not be saved.");
       setAssetUrl(upload.url);
       setStatus(processingStatus);
-      setMessage(processingStatus === "ready" ? "Digital Twin ready" : "Cutout needs review");
+      setMessage(processingStatus === "ready" ? "Product Profile Active" : "Review Product Cutout");
     } catch (error) {
       setStatus("failed");
-      setMessage(error instanceof Error ? error.message : "Digital Twin could not be generated.");
+      setMessage(error instanceof Error ? error.message : "Product Image Analysis Needs Attention");
       await fetch("/api/products/actions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -456,9 +459,9 @@ function DigitalTwinChamber({ item, sourceImage, twinPose, growth }: { item: Pro
       <div className="dna-capsule relative h-[286px] w-[176px] rounded-[5rem] border border-slate-400/35 bg-[linear-gradient(90deg,rgba(200,210,230,.08),rgba(200,210,230,.22),rgba(40,48,65,.2))] shadow-[0_0_50px_rgba(102,112,141,.22),inset_0_0_30px_rgba(200,210,230,.12)]">
         <div className="absolute inset-3 rounded-[5rem] border border-slate-200/10 bg-black/30 backdrop-blur-sm" />
         <div className="absolute inset-6 rounded-[5rem] bg-[radial-gradient(circle_at_50%_45%,rgba(237,243,255,.18),rgba(102,112,141,.1)_42%,transparent_72%)]" />
-        <div className={`digital-twin ${twinPose} absolute left-1/2 top-1/2 h-[188px] w-[132px] -translate-x-1/2 -translate-y-1/2`} aria-label={`${item.product.title} digital twin`}>
+        <div className={`digital-twin ${twinPose} absolute left-1/2 top-1/2 h-[188px] w-[132px] -translate-x-1/2 -translate-y-1/2`} aria-label={`${item.product.title} product profile`}>
           {ready ? (
-            <ProductImage src={assetUrl} alt={`${item.product.title} transparent Digital Twin`} className="twin-artifact" fallbackClassName="twin-placeholder" />
+            <ProductImage src={assetUrl} alt={`${item.product.title} product cutout`} className="twin-artifact" fallbackClassName="twin-placeholder" />
           ) : (
             <div className="twin-placeholder" aria-hidden="true">
               <Atom size={42} />
@@ -484,9 +487,9 @@ function DigitalTwinChamber({ item, sourceImage, twinPose, growth }: { item: Pro
         <div className="absolute inset-x-[-18px] bottom-7 h-5 rounded-full border border-slate-400/25 bg-slate-950/70" />
       </div>
       <div className="absolute bottom-2 rounded-full border border-slate-600/45 bg-black/55 px-4 py-2 text-center shadow-lg shadow-black/40">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{ready ? "Knowledge state" : status === "processing" ? "Reconstructing" : "Twin state"}</p>
-        <p className="font-heading text-xl font-semibold text-[#f6f8ff]">{ready ? growth : status === "needs_review" ? "Review" : status === "failed" ? "Dormant" : "Processing"}</p>
-        {!ready ? <button type="button" disabled={!sourceImage || busy} onClick={generateTwin} className="mt-2 text-[11px] font-semibold text-[#c8d2e6] transition hover:text-[#f6f8ff] disabled:opacity-50">{status === "failed" ? "Retry" : "Generate Twin"}</button> : null}
+        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{ready ? "Product Profile" : status === "processing" ? "Analyzing Product Image" : "Product Profile"}</p>
+        <p className="font-heading text-xl font-semibold text-[#f6f8ff]">{ready ? growth : status === "needs_review" ? "Review" : status === "failed" ? "Needs Attention" : "Updating"}</p>
+        {!ready ? <button type="button" disabled={!sourceImage || busy} onClick={generateTwin} className="mt-2 text-[11px] font-semibold text-[#c8d2e6] transition hover:text-[#f6f8ff] disabled:opacity-50">{status === "failed" ? "Retry Analysis" : sourceMatches ? "Build Product Profile" : "Refresh Product Profile"}</button> : null}
       </div>
     </div>
   );

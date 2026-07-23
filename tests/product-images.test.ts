@@ -24,6 +24,7 @@ test("product images are first-class owned records and reject temporary browser 
 
   assert.deepEqual(product.images, ["https://cdn.example.test/one.jpg", "/api/import-image?key=product-images/2026-07-22/uploaded.jpg", "/api/import-image?storageKey=product-images%2Fproducts%2Fbusiness-1%2F2026-07-22%2Fuploaded.png", "https://cdn.example.test/two.jpg"]);
   assert.equal(product.image, "https://cdn.example.test/one.jpg");
+  assert.equal(product.coverImageId, "image-1");
   assert.equal(data.productImages?.length, 4);
   assert.ok(data.productImages?.every((image) => !image.url.startsWith("data:image/") && !image.url.startsWith("blob:")));
   assert.equal(data.productImages?.[0].isCover, true);
@@ -43,11 +44,26 @@ test("owned image records hydrate product image caches after reload", () => {
   assert.deepEqual(productGallery(data, data.products[0]), ["https://cdn.example.test/a.jpg", "https://cdn.example.test/b.jpg"]);
   assert.deepEqual(data.products[0].images, ["https://cdn.example.test/a.jpg", "https://cdn.example.test/b.jpg"]);
   assert.equal(data.products[0].image, "https://cdn.example.test/a.jpg");
+  assert.equal(data.products[0].coverImageId, "image-a");
 });
 
-test("digital twin assets hydrate separately from the original cover image", () => {
+test("reordering product images updates the canonical cover image id", () => {
   const data = fixture();
-  const product: Product = { id: "product-twin", title: "Twin hoodie", category: "T-shirt", tags: [], status: "active", createdAt: time, updatedAt: time };
+  const product: Product = { id: "product-cover-change", title: "Cover change", category: "T-shirt", tags: [], status: "draft", createdAt: time, updatedAt: time };
+  data.products.push(product);
+
+  setProductImages(data, product, ["https://cdn.example.test/front.jpg", "https://cdn.example.test/back.jpg"], { now: time, id, sourceType: "manual" });
+  const originalCoverId = product.coverImageId;
+  setProductImages(data, product, ["https://cdn.example.test/back.jpg", "https://cdn.example.test/front.jpg"], { now: time, id, sourceType: "manual" });
+
+  assert.notEqual(product.coverImageId, originalCoverId);
+  assert.equal(productCoverImage(data, product), "https://cdn.example.test/back.jpg");
+  assert.equal(data.productImages?.filter((entry) => entry.productId === product.id && entry.isCover).length, 1);
+});
+
+test("digital twin assets follow the canonical cover image id", () => {
+  const data = fixture();
+  const product: Product = { id: "product-twin", title: "Twin hoodie", category: "T-shirt", tags: [], coverImageId: "cover-current", status: "active", createdAt: time, updatedAt: time };
   data.products.push(product);
   data.variants.push({ id: "variant-twin", productId: product.id, sku: "TWIN-HOOD-001", title: "Black / L", condition: "New", landedUnitCost: 12, defaultSalePrice: 48, reorderPoint: 2, reorderQuantity: 8, active: true });
   data.productImages = [
@@ -85,6 +101,7 @@ test("extension import persists product images and reuses them for five channel 
   const product = data.products.find((entry) => entry.id === result.productId);
   assert.ok(product);
   assert.deepEqual(product?.images, ["https://cbu01.alicdn.com/img/import-cover.jpg", "https://cbu01.alicdn.com/img/import-detail.jpg"]);
+  assert.equal(product?.coverImageId, data.productImages?.find((entry) => entry.productId === product?.id && entry.isCover)?.id);
   assert.equal(data.productImages?.filter((entry) => entry.productId === product?.id).length, 2);
   assert.equal(result.drafts.length, 5);
   assert.ok(result.drafts.every((draft) => draft.imageUrls[0] === "https://cbu01.alicdn.com/img/import-cover.jpg"));
