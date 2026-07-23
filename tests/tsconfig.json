@@ -11,5 +11,5 @@
     "isolatedModules": false,
     "types": ["node"]
   },
-  "include": ["*.test.ts", "../lib/business-calculations.ts", "../lib/business-access.ts", "../lib/operational-workflows.ts", "../lib/inventory-actions.ts", "../lib/wholesale-core.ts", "../lib/listings-core.ts", "../lib/purchasing-core.ts", "../lib/finance.ts", "../lib/analytics.ts", "../domain/business.ts", "../services/adapters/shipping.ts", "../services/adapters/marketplace.ts"]
+  "include": ["*.test.ts", "../lib/business-calculations.ts", "../lib/business-access.ts", "../lib/operational-workflows.ts", "../lib/inventory-actions.ts", "../lib/product-deletion.ts", "../lib/wholesale-core.ts", "../lib/listings-core.ts", "../lib/purchasing-core.ts", "../lib/finance.ts", "../lib/analytics.ts", "../domain/business.ts", "../services/adapters/shipping.ts", "../services/adapters/marketplace.ts"]
 }

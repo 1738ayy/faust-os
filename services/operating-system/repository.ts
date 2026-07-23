@@ -23,6 +23,7 @@ import { ensureAiCollections, generateAiRecommendations, mutateAiCenterData, typ
 import { applyExtensionAction, type ExtensionAction } from "@/lib/browser-extension";
 import { canonicalListingIdentity, markImportQueueItemCompleted, removeImportQueueItems as removeImportQueueItemsFromData } from "@/lib/import-queue";
 import { ensureProductImageOwnership, normalizeProductImageUrls, productCoverRecord as canonicalProductCoverRecord, productGallery, productImageRevision, setProductImages } from "@/lib/product-images";
+import { archiveProductGraph, hardDeleteProductGraph, productDeleteDependencySummary } from "@/lib/product-deletion";
 
 const file = path.join(process.cwd(), ".faust", "operating-system.json");
 const now = () => new Date().toISOString();
@@ -250,53 +251,15 @@ export async function saveProductDigitalTwinAsset(input: {
 export async function deleteCatalogProduct(variantId: string) {
  const data = await read(); const variant = data.variants.find((entry) => entry.id === variantId); if (!variant) throw new Error("Product variant not found.");
  const product = data.products.find((entry) => entry.id === variant.productId); if (!product) throw new Error("Product not found.");
- const hasOrderHistory = data.orders.some((order) => order.items.some((item) => item.variantId === variant.id));
- const hasPurchaseHistory = data.purchaseOrders.some((order) => order.items.some((item) => item.variantId === variant.id)) || data.parcels.some((parcel) => parcel.items.some((item) => item.variantId === variant.id));
- const hasInventoryHistory = data.stockMovements.some((movement) => movement.variantId === variant.id) || data.balances.some((balance) => balance.variantId === variant.id && (balance.onHand || balance.reserved || balance.incoming || balance.damaged || balance.returned || balance.lost || balance.quarantined));
- const hasFinanceOrLotHistory = (data.inventoryLots || []).some((lot) => lot.variantId === variant.id) || (data.orderItemCostAllocations || []).some((allocation) => allocation.variantId === variant.id);
- const hasListingHistory = data.listings.some((listing) => listing.variantId === variant.id && ["active", "sold"].includes(listing.status)) || (data.channelListingDrafts || []).some((draft) => draft.variantId === variant.id && draft.externalListingId);
- const shouldArchive = hasOrderHistory || hasPurchaseHistory || hasInventoryHistory || hasFinanceOrLotHistory || hasListingHistory;
- if (!shouldArchive) {
-  const draftIds = new Set((data.channelListingDrafts || []).filter((entry) => entry.variantId === variant.id).map((entry) => entry.id));
-  const listingIds = new Set(data.listings.filter((entry) => entry.variantId === variant.id).map((entry) => entry.id));
-  data.variants = data.variants.filter((entry) => entry.id !== variant.id);
-  data.products = data.products.filter((entry) => entry.id !== product.id);
-  data.balances = data.balances.filter((entry) => entry.variantId !== variant.id);
-  data.listings = data.listings.filter((entry) => entry.variantId !== variant.id);
-  data.channelListingDrafts = (data.channelListingDrafts || []).filter((entry) => entry.variantId !== variant.id);
-  data.listingSyncJobs = (data.listingSyncJobs || []).filter((entry) => !draftIds.has(entry.channelDraftId));
-  data.listingReviewItems = (data.listingReviewItems || []).filter((entry) => !entry.channelDraftId || !draftIds.has(entry.channelDraftId));
-  data.channelSyncStates = (data.channelSyncStates || []).filter((entry) => entry.variantId !== variant.id && !listingIds.has(entry.listingId));
-  data.productImages = (data.productImages || []).filter((entry) => entry.productId !== product.id);
-  data.productDigitalTwins = (data.productDigitalTwins || []).filter((entry) => entry.productId !== product.id);
-  data.physicalSkuMappings = (data.physicalSkuMappings || []).filter((entry) => entry.variantId !== variant.id);
-  data.inventoryRiskLocks = (data.inventoryRiskLocks || []).filter((entry) => entry.variantId !== variant.id);
-  data.notices = data.notices.filter((notice) => notice.entityId !== product.id && notice.entityId !== variant.id);
-  activity(data, "Product deleted", "product", product.id, `${product.title} had no operating history, so Faust removed it completely.`);
+ const variants = data.variants.filter((entry) => entry.productId === product.id);
+ const dependencySummary = productDeleteDependencySummary(data, product);
+ if (!dependencySummary.shouldArchive) {
+  hardDeleteProductGraph(data, product);
+  activity(data, "Product deleted", "product", product.id, `${product.title} had no operating history, so Faust removed ${dependencySummary.variantIds.length} SKU variant(s), ${dependencySummary.listingCount} listing record(s), ${dependencySummary.channelDraftCount} draft(s), ${dependencySummary.imageCount} image(s), and ${dependencySummary.digitalTwinCount} Product Profile asset(s).`);
   return write(data);
  }
- variant.active = false;
- product.status = "paused";
- product.updatedAt = now();
- for (const listing of data.listings.filter((entry) => entry.variantId === variant.id)) {
-  listing.status = "paused";
-  listing.quantity = 0;
- }
- for (const draft of data.channelListingDrafts?.filter((entry) => entry.variantId === variant.id) || []) {
-  draft.status = "paused";
-  draft.quantity = 0;
-  draft.updatedAt = now();
- }
- for (const mapping of data.physicalSkuMappings?.filter((entry) => entry.variantId === variant.id) || []) {
-  mapping.status = "archived";
-  mapping.updatedAt = now();
- }
- for (const lock of data.inventoryRiskLocks?.filter((entry) => entry.variantId === variant.id && entry.status === "active") || []) {
-  lock.status = "released";
-  lock.releasedAt = now();
-  lock.notes = lock.notes ? `${lock.notes} Product removed from catalog.` : "Product removed from catalog.";
- }
- activity(data, "Product archived", "product", product.id, hasOrderHistory ? `${product.title} has order history, so Faust hid it from active operations while preserving records.` : `${product.title} has dependent operating records, so Faust archived it instead of deleting history.`);
+ archiveProductGraph(data, product, variants, now());
+ activity(data, "Product archived", "product", product.id, dependencySummary.orderReferenceCount ? `${product.title} has order history, so Faust hid all ${dependencySummary.variantIds.length} SKU variant(s) from active operations while preserving records.` : `${product.title} has dependent operating records, so Faust archived all ${dependencySummary.variantIds.length} SKU variant(s) instead of deleting history.`);
  return write(data);
 }
 export async function restoreCatalogProduct(variantId: string) {

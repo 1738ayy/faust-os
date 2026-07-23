@@ -212,6 +212,7 @@ export async function writeNormalizedOperatingData(data: OperatingData) {
   await deleteMissing("channel_inventory_sync_states", "id", (data.channelSyncStates || []).map((entry) => entry.id));
   await deleteMissing("listings", "id", listingIds);
   await deleteMissing("inventory_balances", "id", data.balances.map((entry) => entry.id));
+  await deleteMissing("product_digital_twin_assets", "product_id", productIds);
   await deleteMissing("product_images", "product_id", productIds);
   await deleteMissing("product_variants", "id", variantIds);
   await deleteMissing("products", "id", productIds);
