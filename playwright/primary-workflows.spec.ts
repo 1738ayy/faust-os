@@ -368,7 +368,13 @@ test("product lifecycle stays synchronized across active views, archive, restore
   await expect(appMain.getByRole("link", { name: new RegExp(title) })).toBeVisible();
   await page.goto("/inventory");
   appMain = page.getByTestId("app-main");
-  await expect(appMain.getByRole("heading", { name: variant.sku, exact: true })).toBeVisible();
+  const inventoryCenter = appMain.getByRole("region", { name: "Inventory operations center" });
+  await expect(inventoryCenter).toBeVisible();
+  await expect(
+    inventoryCenter.getByRole("article").filter({
+      has: page.getByText(variant.sku, { exact: true }),
+    }),
+  ).toBeVisible();
   await page.goto("/listings");
   appMain = page.getByTestId("app-main");
   await expect(appMain.getByRole("cell", { name: variant.sku, exact: true })).toHaveCount(5);
