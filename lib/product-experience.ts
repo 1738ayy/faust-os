@@ -1,7 +1,7 @@
 import type { Activity, Marketplace, OperatingData, Product, Variant } from "@/domain/business";
 import { availableUnits, money, orderProfit } from "@/lib/business-calculations";
 import { buildProductIntelligence, type ProductIntelligence } from "@/lib/product-intelligence";
-import { currentProductDigitalTwin, productCoverImage, productCoverRecord, productImageRevision } from "@/lib/product-images";
+import { productCoverImage, productCoverRecord, productImageRevision } from "@/lib/product-images";
 import { getProductReadiness } from "@/lib/product-readiness";
 import { activeVariants, isActiveProduct, isActiveVariant } from "./product-state";
 
@@ -18,7 +18,6 @@ export type ProductExperience = {
   href: string;
   image?: string;
   coverImage?: { id: string; url: string; revision: string | null };
-  digitalTwin?: ReturnType<typeof currentProductDigitalTwin>;
   supplierName: string;
   supplierDetail: string;
   readiness: ReturnType<typeof getProductReadiness>;
@@ -135,7 +134,6 @@ export function buildProductExperience(data: OperatingData, product: Product, va
   const timeline = buildTimeline(data.activity, product, variant, movements);
   const coverRecord = productCoverRecord(data, product);
   const coverImage = coverRecord?.url || productCoverImage(data, product) || drafts.find((draft) => draft.imageUrls.length)?.imageUrls[0];
-  const digitalTwin = currentProductDigitalTwin(data, product, "faust-canvas-segmentation-v1");
   const margin = revenue ? profit / revenue * 100 : variant.defaultSalePrice ? (variant.defaultSalePrice - variant.landedUnitCost) / variant.defaultSalePrice * 100 : 0;
   const roi = variant.landedUnitCost ? (variant.defaultSalePrice - variant.landedUnitCost) / variant.landedUnitCost * 100 : 0;
   const finance = {
@@ -166,7 +164,6 @@ export function buildProductExperience(data: OperatingData, product: Product, va
     href: `/catalog/${variant.id}`,
     image: coverImage,
     coverImage: coverRecord ? { id: coverRecord.id, url: coverRecord.url, revision: productImageRevision(coverRecord) } : undefined,
-    digitalTwin,
     supplierName: supplier?.name || "Supplier not linked",
     supplierDetail: supplier ? `${supplier.sourcePlatform}${supplier.leadDays ? ` · ${supplier.leadDays} day lead time` : ""}` : "Link supplier before purchasing.",
     readiness,

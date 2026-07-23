@@ -6,6 +6,7 @@ import "./inventory-actions.test";
 import "./inventory-contracts.test";
 import "./product-state.test";
 import "./product-images.test";
+import "./product-dna.test";
 import "./product-deletion.test";
 import "./orders-deepening.test";
 import "./fulfillment-workflows.test";

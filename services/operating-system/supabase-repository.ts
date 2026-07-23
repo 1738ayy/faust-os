@@ -153,8 +153,11 @@ export async function readNormalizedOperatingData(): Promise<OperatingData> {
   const productImageRecords = productImages.map((x) => ({ id: x.id as string, productId: x.product_id as string, url: x.url as string, position: number(x.position ?? x.sort_order), isCover: Boolean(x.is_cover) || number(x.position ?? x.sort_order) === 0, purpose: text(x.purpose) as NonNullable<OperatingData["productImages"]>[number]["purpose"] || (number(x.position ?? x.sort_order) === 0 ? "cover" : "source"), sourceType: text(x.source_type) as NonNullable<OperatingData["productImages"]>[number]["sourceType"] || "supplier", originalUrl: text(x.original_url), crop: (x.crop as Record<string, unknown>) || {}, altText: text(x.alt_text), createdAt: text(x.created_at) || new Date().toISOString(), updatedAt: text(x.updated_at) }));
   const productRows = products.map((x) => {
     const gallery = productImageRecords.filter((image) => image.productId === x.id).sort((a, b) => a.position - b.position).map((image) => image.url);
-    const coverImageId = text(x.cover_image_id) || productImageRecords.find((image) => image.productId === x.id && image.isCover)?.id || productImageRecords.find((image) => image.productId === x.id)?.id || null;
-    const coverUrl = coverImageId ? productImageRecords.find((image) => image.id === coverImageId)?.url : gallery[0];
+    const ownedCoverImage = productImageRecords.find((image) => image.productId === x.id && image.id === text(x.cover_image_id))
+      || productImageRecords.find((image) => image.productId === x.id && image.isCover)
+      || productImageRecords.find((image) => image.productId === x.id);
+    const coverImageId = ownedCoverImage?.id || null;
+    const coverUrl = ownedCoverImage?.url || gallery[0];
     return { id: x.id as string, title: x.title as string, brand: text(x.brand), category: text(x.category) || "Uncategorized", tags: (x.tags as string[]) || [], supplierId: text(x.default_supplier_id), sourceUrl: text(x.source_url), image: coverUrl || gallery[0], images: gallery, coverImageId, status: x.status as "draft", createdAt: x.created_at as string, updatedAt: x.updated_at as string };
   });
   return { version: 1, mode: products.length || orders.length ? "local" : "empty", updatedAt: new Date().toISOString(),

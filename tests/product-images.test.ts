@@ -61,6 +61,67 @@ test("reordering product images updates the canonical cover image id", () => {
   assert.equal(data.productImages?.filter((entry) => entry.productId === product.id && entry.isCover).length, 1);
 });
 
+test("updating one product image never changes another product cover or gallery", () => {
+  const data = fixture();
+  const productA: Product = { id: "product-a", title: "Product A", category: "T-shirt", tags: [], status: "draft", createdAt: time, updatedAt: time };
+  const productB: Product = { id: "product-b", title: "Product B", category: "T-shirt", tags: [], status: "draft", createdAt: time, updatedAt: time };
+  data.products.push(productA, productB);
+
+  setProductImages(data, productA, ["https://cdn.example.test/a-cover.jpg", "https://cdn.example.test/a-back.jpg"], { now: time, id, sourceType: "manual" });
+  setProductImages(data, productB, ["https://cdn.example.test/b-cover.jpg", "https://cdn.example.test/b-back.jpg"], { now: time, id, sourceType: "manual" });
+  const productBCoverId = productB.coverImageId;
+  const productBGallery = [...(productB.images || [])];
+
+  setProductImages(data, productA, ["https://cdn.example.test/a-cover-v2.jpg", "https://cdn.example.test/a-back.jpg"], { now: "2026-07-23T12:00:00.000Z", id, sourceType: "crop" });
+  ensureProductImageOwnership(data, { now: "2026-07-23T12:00:00.000Z", id });
+
+  assert.equal(productCoverImage(data, productA), "https://cdn.example.test/a-cover-v2.jpg");
+  assert.equal(productA.images?.[0], "https://cdn.example.test/a-cover-v2.jpg");
+  assert.equal(productB.coverImageId, productBCoverId);
+  assert.deepEqual(productB.images, productBGallery);
+  assert.equal(productCoverImage(data, productB), "https://cdn.example.test/b-cover.jpg");
+  assert.ok(data.productImages?.filter((entry) => entry.productId === productA.id).every((entry) => entry.url.includes("/a-")));
+  assert.ok(data.productImages?.filter((entry) => entry.productId === productB.id).every((entry) => entry.url.includes("/b-")));
+});
+
+test("canonical cover cannot point at another product image", () => {
+  const data = fixture();
+  const productA: Product = { id: "product-cover-a", title: "Cover A", category: "T-shirt", tags: [], coverImageId: "image-b-cover", status: "draft", createdAt: time, updatedAt: time };
+  const productB: Product = { id: "product-cover-b", title: "Cover B", category: "T-shirt", tags: [], coverImageId: "image-b-cover", status: "draft", createdAt: time, updatedAt: time };
+  data.products.push(productA, productB);
+  data.productImages = [
+    { id: "image-a-cover", productId: productA.id, url: "https://cdn.example.test/a.jpg", position: 0, isCover: true, createdAt: time },
+    { id: "image-b-cover", productId: productB.id, url: "https://cdn.example.test/b.jpg", position: 0, isCover: true, createdAt: time },
+  ];
+
+  ensureProductImageOwnership(data, { now: time, id });
+
+  assert.equal(productA.coverImageId, "image-a-cover");
+  assert.equal(productCoverImage(data, productA), "https://cdn.example.test/a.jpg");
+  assert.equal(productB.coverImageId, "image-b-cover");
+  assert.equal(productCoverImage(data, productB), "https://cdn.example.test/b.jpg");
+});
+
+test("large product galleries stay isolated across many products", () => {
+  const data = fixture();
+  for (let index = 1; index <= 20; index += 1) {
+    const product: Product = { id: `bulk-product-${index}`, title: `Bulk Product ${index}`, category: "Accessories", tags: [], status: "draft", createdAt: time, updatedAt: time };
+    data.products.push(product);
+    setProductImages(data, product, [`https://cdn.example.test/product-${index}-cover.jpg`, `https://cdn.example.test/product-${index}-detail.jpg`], { now: time, id, sourceType: "manual" });
+  }
+
+  const first = data.products[0];
+  setProductImages(data, first, ["https://cdn.example.test/product-1-cover-v2.jpg", "https://cdn.example.test/product-1-detail.jpg"], { now: "2026-07-23T12:00:00.000Z", id, sourceType: "crop" });
+  ensureProductImageOwnership(data, { now: "2026-07-23T12:00:00.000Z", id });
+
+  assert.equal(productCoverImage(data, first), "https://cdn.example.test/product-1-cover-v2.jpg");
+  for (const product of data.products.slice(1)) {
+    const number = product.id.replace("bulk-product-", "");
+    assert.equal(productCoverImage(data, product), `https://cdn.example.test/product-${number}-cover.jpg`);
+    assert.deepEqual(productGallery(data, product), [`https://cdn.example.test/product-${number}-cover.jpg`, `https://cdn.example.test/product-${number}-detail.jpg`]);
+  }
+});
+
 test("image revisions remain stable unless cover order or content changes", () => {
   const data = fixture();
   const product: Product = { id: "product-revision", title: "Revision product", category: "T-shirt", tags: [], status: "draft", createdAt: time, updatedAt: time };

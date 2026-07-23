@@ -66,18 +66,11 @@ function syncProductCoverAndDna(data: OperatingData, productId: string, detail =
   const stillCurrent = cover ? twin.sourceImageId === cover.id && twin.sourceImageUrl === cover.url && (twin.sourceImageRevision || null) === coverRevision : false;
   if (!stillCurrent && ["ready", "queued", "processing"].includes(twin.processingStatus)) {
    twin.processingStatus = "needs_review";
-   twin.failureCode = "source_image_changed";
+   twin.failureCode = "retired_product_dna_image_pipeline";
    twin.updatedAt = now();
   }
  }
- if (product && cover) {
-  const existingCurrent = data.productDigitalTwins!.find((entry) => entry.productId === product.id && entry.sourceImageId === cover.id && (entry.sourceImageRevision || null) === coverRevision && entry.processorVersion === "faust-canvas-segmentation-v1");
-  if (!existingCurrent) {
-   const time = now();
-   data.productDigitalTwins!.unshift({ id: id(), productId: product.id, sourceImageId: cover.id, sourceImageUrl: cover.url, sourceImageRevision: coverRevision, processingStatus: "queued", segmentationConfidence: null, bounds: null, generatedAt: null, processorVersion: "faust-canvas-segmentation-v1", failureCode: null, createdAt: time, updatedAt: time });
-   activity(data, "Product image queued for analysis", "product", product.id, `${product.title} cover image changed (${detail}). Faust is preparing the Product Profile.`);
-  }
- }
+ if (product) activity(data, "Product cover updated", "product", product.id, `${product.title} product photos changed (${detail}). Product DNA now derives from operating signals, not image cutouts.`);
 }
 function summarizeBatch(batch: OrderImportBatch) { batch.acceptedRows = batch.rows.filter((row) => ["accepted", "resolved", "imported"].includes(row.status)).length; batch.rejectedRows = batch.rows.filter((row) => row.status === "rejected").length; batch.unresolvedRows = batch.rows.filter((row) => row.status === "review_required").length; batch.failedRows = batch.rows.filter((row) => row.status === "failed").length; batch.importedOrders = batch.createdOrderIds.length; batch.status = batch.archivedAt ? "archived" : batch.failedRows ? "partially_failed" : batch.importedOrders ? "completed" : batch.unresolvedRows ? "review_required" : "ready"; batch.updatedAt = now(); }
 function ensureFulfillmentCollections(data: OperatingData) { data.fulfillmentShipments ||= []; data.fulfillmentPickLists ||= []; data.fulfillmentExceptions ||= []; data.fulfillmentManifests ||= []; }
