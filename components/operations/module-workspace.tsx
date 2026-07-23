@@ -131,7 +131,7 @@ function DecisionSummary({ module, snapshot }: { module: ModuleName; snapshot: R
 function Content({ module, snapshot }: { module: ModuleName; snapshot: ReturnTypeSnapshot }) {
   const { data, metrics } = snapshot;
 
-  if (module === "inventory") return <InventoryTable snapshot={snapshot} />;
+  if (module === "inventory") return null;
   if (module === "orders") return <OrdersTable snapshot={snapshot} />;
   if (module === "listings") return <ListingsTable snapshot={snapshot} />;
   if (module === "sourcing") return <SourcingSummary />;
@@ -144,11 +144,6 @@ function Content({ module, snapshot }: { module: ModuleName; snapshot: ReturnTyp
   if (module === "automations") return <section className="grid gap-4 md:grid-cols-2"><Rule title="Low-stock review" description="Creates a review task when available units reach the reorder point." /><Rule title="Late-shipment escalation" description="Creates a priority task when an unshipped order passes its ship-by date." /></section>;
   if (module === "ai") return <section className="grid gap-4 md:grid-cols-2">{data.insights.map((item) => <DataCard key={item.id}><StatusBadge value={item.type} /><h2 className="mt-3 font-semibold">{item.title}</h2><p className="mt-2 text-sm text-muted-foreground">{item.summary}</p><p className="mt-3 text-xs text-muted-foreground">Evidence: {item.evidence}</p></DataCard>)}</section>;
   return <TasksTable snapshot={snapshot} />;
-}
-
-function InventoryTable({ snapshot }: { snapshot: ReturnTypeSnapshot }) {
-  const { data } = snapshot;
-  return <DataTable headers={["SKU", "Location", "On hand", "Reserved", "Available", "Incoming", "Cost"]}>{activeVariants(data).map((variant) => { const balance = data.balances.find((x) => x.variantId === variant.id); const location = data.locations.find((x) => x.id === balance?.locationId); return <tr key={variant.id}><TableCell primary={variant.sku} secondary={variant.title} /><td className="px-5 py-3">{location?.label || "Unassigned"}</td><td className="px-5 py-3">{balance?.onHand || 0}</td><td className="px-5 py-3">{balance?.reserved || 0}</td><td className="px-5 py-3">{balance ? availableUnits(balance) : 0}</td><td className="px-5 py-3">{balance?.incoming || 0}</td><td className="px-5 py-3">{money(variant.landedUnitCost)}</td></tr>; })}</DataTable>;
 }
 
 function OrdersTable({ snapshot }: { snapshot: ReturnTypeSnapshot }) {

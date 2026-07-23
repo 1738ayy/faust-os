@@ -61,7 +61,7 @@ export function InventoryMutationPanel({ balances, locations }: { balances: Stoc
     }
   }
 
-  return <section className="rounded-3xl border border-slate-700/45 bg-zinc-950/55 p-5 shadow-lg shadow-black/20 backdrop-blur" aria-label="Inventory actions">
+  return <section id="inventory-actions" className="rounded-3xl border border-slate-700/45 bg-zinc-950/55 p-5 shadow-lg shadow-black/20 backdrop-blur scroll-mt-24" aria-label="Inventory actions">
     <div><p className="text-xs font-medium uppercase tracking-[0.16em] text-[#c8d2e6]">Inventory action</p><h2 className="mt-2 text-xl font-semibold">{selected.label}</h2><p className="mt-2 text-sm leading-6 text-muted-foreground">{selected.description}</p></div>
     <div className="mt-5 flex flex-wrap gap-2">{actions.map((entry) => <button key={entry.id} type="button" className={`${actionButton} ${action === entry.id ? "border-slate-400/50 bg-[#66708d]/10 text-[#f6f8ff]" : ""}`} onClick={() => { setAction(entry.id); setMessage(""); }}>{entry.label}</button>)}</div>
     <form className="mt-5 grid gap-3 md:grid-cols-3" onSubmit={submit}>
