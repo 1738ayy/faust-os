@@ -37,7 +37,7 @@ export const productionEnvSchema = z.object({
   AUTOMATION_WORKER_CONCURRENCY: z.coerce.number().int().min(1).max(25).default(4),
   AUTOMATION_WORKER_POLL_MS: z.coerce.number().int().min(250).max(60000).default(5000),
   AUTOMATION_WORKER_LEASE_MS: z.coerce.number().int().min(1000).max(300000).default(30000),
-  FAUST_ALLOWED_EXTENSION_ORIGINS: z.string().trim().default("chrome-extension://*,http://localhost:3000,https://*.faust.local"),
+  FAUST_ALLOWED_EXTENSION_ORIGINS: z.string().trim().default("chrome-extension://*,http://localhost:3000,https://faust-os-staging.vercel.app,https://*.faust.local"),
   FAUST_EXTENSION_TOKEN_TTL_SECONDS: z.coerce.number().int().min(300).max(86400).default(3600),
   STAGING_APP_URL: optionalUrl,
   AI_PROVIDER: z.enum(["deterministic", "openai", "anthropic", "gemini"]).default("deterministic"),

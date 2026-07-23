@@ -1,8 +1,10 @@
 (() => {
   window.FaustSend = async function send(path, body) {
-    const response = await fetch(`http://localhost:3000${path}`, {
+    const settings = await chrome.storage.sync.get({ faustBaseUrl: "https://faust-os-staging.vercel.app", extensionVersion: "2.0.1-runtime" });
+    const baseUrl = new URL(settings.faustBaseUrl).origin;
+    const response = await fetch(`${baseUrl}${path}`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "X-Faust-Extension-Version": "1.0.0" },
+      headers: { "Content-Type": "application/json", "X-Faust-Extension-Version": settings.extensionVersion },
       body: JSON.stringify(body),
     });
     const result = await response.json();

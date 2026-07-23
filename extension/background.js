@@ -1,4 +1,4 @@
-const DEFAULTS = { faustBaseUrl: "http://localhost:3000", environment: "local", extensionVersion: "2.0.0-ux", deviceName: "Faust Chrome Extension" };
+const DEFAULTS = { faustBaseUrl: "https://faust-os-staging.vercel.app", environment: "staging", extensionVersion: "2.0.1-runtime", deviceName: "Faust Chrome Extension" };
 
 async function settings() {
   const stored = await chrome.storage.sync.get(DEFAULTS);
@@ -7,9 +7,10 @@ async function settings() {
 
 async function callFaust(path, body) {
   const config = await settings();
+  const baseUrl = new URL(config.faustBaseUrl).origin;
   const session = await chrome.storage.local.get(["deviceId", "extensionToken", "tokenExpiresAt"]);
   const nonce = crypto.randomUUID();
-  const response = await fetch(`${config.faustBaseUrl}${path}`, {
+  const response = await fetch(`${baseUrl}${path}`, {
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json", "X-Faust-Extension-Version": config.extensionVersion, ...(session.deviceId ? { "X-Faust-Device-Id": session.deviceId } : {}), ...(session.extensionToken ? { "X-Faust-Extension-Token": session.extensionToken } : {}), "X-Faust-Nonce": nonce },
@@ -18,6 +19,10 @@ async function callFaust(path, body) {
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.message || `Faust request failed: ${response.status}`);
   return data;
+}
+
+function requestId(message) {
+  return message?.requestId || crypto.randomUUID();
 }
 
 function waitForTabComplete(tabId) {
@@ -38,7 +43,8 @@ function waitForTabComplete(tabId) {
 
 async function openAnalyzerWithHandoff(product, scan, analysis, warnings = []) {
   const config = await settings();
-  const tab = await chrome.tabs.create({ url: `${config.faustBaseUrl}/opportunity-analyzer?source=extension-import&handoff=extension` });
+  const baseUrl = new URL(config.faustBaseUrl).origin;
+  const tab = await chrome.tabs.create({ url: `${baseUrl}/opportunity-analyzer?source=extension-import&handoff=extension` });
   if (!tab.id) return;
   await waitForTabComplete(tab.id);
   await chrome.scripting.executeScript({
@@ -53,7 +59,8 @@ async function openAnalyzerWithHandoff(product, scan, analysis, warnings = []) {
 
 async function registerDevice() {
   const config = await settings();
-  const response = await fetch(`${config.faustBaseUrl}/api/extension/register`, {
+  const baseUrl = new URL(config.faustBaseUrl).origin;
+  const response = await fetch(`${baseUrl}/api/extension/register`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-Faust-Extension-Version": config.extensionVersion },
     body: JSON.stringify({ deviceName: config.deviceName, browser: navigator.userAgent, environment: config.environment, version: config.extensionVersion, permissions: chrome.runtime.getManifest().permissions || [], idempotencyKey: crypto.randomUUID() }),
@@ -74,7 +81,7 @@ async function scanActiveSourceProduct() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   await ensureSourceScanner(tab);
   const product = await chrome.tabs.sendMessage(tab.id, { action: "scan-current-product" });
-  await chrome.storage.session.set({ lastProduct: product });
+  await chrome.storage.session.set({ lastProduct: product, lastProductSavedAt: new Date().toISOString() });
   return product;
 }
 
@@ -122,9 +129,21 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   (async () => {
     if (message.type === "FAUST_STATUS") {
       const config = await settings();
+      const baseUrl = new URL(config.faustBaseUrl).origin;
       const local = await chrome.storage.local.get(["deviceId", "tokenExpiresAt"]);
-      const response = await fetch(`${config.faustBaseUrl}/api/extension/actions`, { credentials: "include" }).then((item) => item.json());
+      const response = await fetch(`${baseUrl}/api/extension/health`, { credentials: "include" }).then((item) => item.json());
       sendResponse({ ok: true, config, local, response });
+      return;
+    }
+    if (message.type === "PING") {
+      sendResponse({ ok: true, awake: true, extensionVersion: (await settings()).extensionVersion });
+      return;
+    }
+    if (message.type === "FAUST_EXTENSION_HEALTH") {
+      const config = await settings();
+      const baseUrl = new URL(config.faustBaseUrl).origin;
+      const response = await fetch(`${baseUrl}/api/extension/health`, { credentials: "include" }).then((item) => item.json());
+      sendResponse({ ok: true, config, response });
       return;
     }
     if (message.type === "FAUST_REGISTER_DEVICE") {
@@ -141,8 +160,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return;
     }
     if (message.type === "FAUST_IMPORT_TO_ANALYZER") {
-      const product = message.product || await scanActiveSourceProduct();
-      await chrome.storage.session.set({ lastProduct: product });
+      const stored = await chrome.storage.session.get("lastProduct");
+      const product = message.product || stored.lastProduct || await scanActiveSourceProduct();
+      await chrome.storage.session.set({ lastProduct: product, lastProductSavedAt: new Date().toISOString(), lastAnalyzerRequestId: requestId(message) });
       const warnings = [];
       let scan = null;
       let analysis = null;
@@ -162,10 +182,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return;
     }
     if (message.type === "FAUST_IMPORT_LAST_PRODUCT") {
-      const { lastProduct } = await chrome.storage.session.get("lastProduct");
+      const { lastProduct, lastImportRequestId } = await chrome.storage.session.get(["lastProduct", "lastImportRequestId"]);
       if (!lastProduct) throw new Error("Scan a source product before importing.");
-      const result = await callFaust("/api/extension/import", { product: lastProduct, approved: true, idempotencyKey: crypto.randomUUID() });
-      await chrome.storage.session.set({ lastImport: result });
+      const importRequestId = message.requestId || lastImportRequestId || crypto.randomUUID();
+      const result = await callFaust("/api/extension/import", { product: message.product || lastProduct, approved: true, idempotencyKey: importRequestId });
+      await chrome.storage.session.set({ lastImport: result, lastImportRequestId: importRequestId });
       sendResponse({ ok: true, result });
       return;
     }

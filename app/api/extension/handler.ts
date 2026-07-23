@@ -14,8 +14,8 @@ export const extensionCorsHeaders = {
 
 function cors(request?: Request) {
   const origin = request?.headers.get("origin") || "";
-  const allowed = origin === "http://localhost:3000" || origin.startsWith("chrome-extension://") || /^https:\/\/([\w-]+\.)?faust\.local$/.test(origin);
-  return { ...extensionCorsHeaders, "Access-Control-Allow-Origin": allowed ? origin : "http://localhost:3000", "Vary": "Origin" };
+  const allowed = origin === "http://localhost:3000" || origin === "https://faust-os-staging.vercel.app" || origin.startsWith("chrome-extension://") || /^https:\/\/([\w-]+\.)?faust\.local$/.test(origin);
+  return { ...extensionCorsHeaders, "Access-Control-Allow-Origin": allowed ? origin : "https://faust-os-staging.vercel.app", "Vary": "Origin" };
 }
 
 export function extensionOptions(request?: Request) {

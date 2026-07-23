@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { assertNoServerSecretsInPublicEnv, providerReadiness, readProductionEnv, storageBuckets, validateProductionReadiness } from "../lib/production-config";
 import { migrationInventory, productionHealth, workerReadiness } from "../lib/production-health";
@@ -14,6 +15,15 @@ const baseEnv = {
   AUTOMATION_WORKER_URL: "https://faust.example.test/api/automations/actions",
   STAGING_APP_URL: "https://faust-staging.example.test",
 };
+
+test("repository pins the Vercel runtime to Node 22 and npm 11", () => {
+  const manifest = JSON.parse(readFileSync("package.json", "utf8")) as { engines?: { node?: string }; packageManager?: string };
+  const lockfile = JSON.parse(readFileSync("package-lock.json", "utf8")) as { packages?: { "": { engines?: { node?: string } } } };
+  assert.equal(manifest.engines?.node, "22.x");
+  assert.equal(manifest.packageManager, "npm@11.6.2");
+  assert.equal(lockfile.packages?.[""].engines?.node, "22.x");
+  assert.equal(readFileSync(".nvmrc", "utf8").trim(), "22");
+});
 
 test("production environment validation separates local, staging, and production safely", () => {
   const local = validateProductionReadiness(readProductionEnv({ FAUST_ENV: "local", NEXT_PUBLIC_FAUST_AUTH_ENABLED: "false" }));

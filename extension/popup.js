@@ -12,11 +12,28 @@ const history = document.getElementById("history");
 
 let lastProduct = null;
 let debugVisible = false;
+let currentImportRequestId = null;
 
 const money = (value) => Number.isFinite(Number(value)) ? `$${Number(value).toFixed(2)}` : "Review";
 
-function send(message) {
-  return chrome.runtime.sendMessage(message);
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isWakeableRuntimeError(error) {
+  return /Receiving end does not exist|Extension context invalidated|message channel closed/i.test(error?.message || "");
+}
+
+async function send(message, attempts = 2) {
+  for (let attempt = 0; attempt <= attempts; attempt += 1) {
+    try {
+      if (message.type !== "PING") await chrome.runtime.sendMessage({ type: "PING" }).catch(() => undefined);
+      return await chrome.runtime.sendMessage(message);
+    } catch (error) {
+      if (attempt >= attempts || !isWakeableRuntimeError(error)) throw error;
+      await wait(150 * (attempt + 1));
+    }
+  }
 }
 
 function writeDetails(value) {
@@ -93,16 +110,18 @@ async function scan() {
 }
 
 async function quickImport() {
-  setBusy(true, "Importing to Faust...");
+  currentImportRequestId ||= crypto.randomUUID();
+  setBusy(true, "Connecting to Faust...");
   try {
-    const response = await send({ type: "FAUST_IMPORT_TO_ANALYZER", product: lastProduct });
+    const response = await send({ type: "FAUST_IMPORT_TO_ANALYZER", product: lastProduct, requestId: currentImportRequestId });
     writeDetails(response);
     if (!response?.ok) throw new Error(response?.error || "Import failed.");
     renderPreview(response.product || lastProduct, response.analysis);
     setStatus("Imported successfully · Added to Queue", true);
+    currentImportRequestId = null;
     await refreshState();
   } catch (error) {
-    setStatus("Import needs attention", false);
+    setStatus(isWakeableRuntimeError(error) ? "Import interrupted · Retry" : "Import needs attention", false);
     writeDetails({ ok: false, error: error.message });
   } finally {
     setBusy(false);

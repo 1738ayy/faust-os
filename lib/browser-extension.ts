@@ -9,7 +9,7 @@ import { normalizeProductImageUrls, setProductImages } from "./product-images";
 
 const now = () => new Date().toISOString();
 const id = () => crypto.randomUUID();
-export const extensionVersion = "1.1.0-phase2";
+export const extensionVersion = "2.0.1-runtime";
 
 export type ExtensionAction =
   | { action: "register-device"; deviceName: string; browser: string; environment: "local" | "staging" | "production"; version: string; permissions: string[]; deviceId?: string; idempotencyKey?: string }

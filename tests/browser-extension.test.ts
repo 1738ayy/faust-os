@@ -218,6 +218,9 @@ test("extension side panel exposes safe fill without publishing", () => {
   assert.doesNotMatch(script, /\.submit\(/);
   assert.doesNotMatch(script, /\.click\(/);
   assert.match(script, /Number\(draft\.quantity\) > 0/);
+  assert.match(script, /PING/);
+  assert.match(script, /isWakeableRuntimeError/);
+  assert.match(script, /https:\/\/faust-os-staging\.vercel\.app/);
 });
 
 test("extension import opens the web analyzer instead of leaving the user in the extension", () => {
@@ -227,6 +230,31 @@ test("extension import opens the web analyzer instead of leaving the user in the
   assert.match(script, /\/api\/extension\/analyze/);
   assert.match(script, /opportunity-analyzer\?source=extension-import/);
   assert.match(script, /chrome\.tabs\.create/);
+  assert.match(script, /FAUST_EXTENSION_HEALTH/);
+  assert.match(script, /\/api\/extension\/health/);
+  assert.match(script, /lastProductSavedAt/);
+  assert.match(script, /lastImportRequestId/);
+  assert.match(script, /2\.0\.1-runtime/);
+});
+
+test("extension runtime defaults to staging and keeps the service worker wakeable", () => {
+  const manifest = JSON.parse(readFileSync(join(process.cwd(), "extension", "manifest.json"), "utf8")) as { manifest_version: number; background?: { service_worker?: string; type?: string }; host_permissions?: string[] };
+  const background = readFileSync(join(process.cwd(), "extension", "background.js"), "utf8");
+  const popup = readFileSync(join(process.cwd(), "extension", "popup.js"), "utf8");
+  const sidepanel = readFileSync(join(process.cwd(), "extension", "sidepanel.js"), "utf8");
+  const options = readFileSync(join(process.cwd(), "extension", "options.js"), "utf8");
+  const utility = readFileSync(join(process.cwd(), "extension", "utils", "send.js"), "utf8");
+  assert.equal(manifest.manifest_version, 3);
+  assert.equal(manifest.background?.service_worker, "background.js");
+  assert.equal(manifest.background?.type, "module");
+  assert.ok(manifest.host_permissions?.includes("https://faust-os-staging.vercel.app/*"));
+  assert.ok(!manifest.host_permissions?.includes("<all_urls>"));
+  for (const source of [background, popup, sidepanel, options, utility]) {
+    assert.match(source, /https:\/\/faust-os-staging\.vercel\.app|PING|chrome\.storage\.sync/);
+  }
+  assert.doesNotMatch(background, /http:\/\/localhost:3000/);
+  assert.doesNotMatch(options, /http:\/\/localhost:3000/);
+  assert.doesNotMatch(utility, /http:\/\/localhost:3000/);
 });
 
 test("extension marketplace filler avoids pretending complex controls are filled", () => {

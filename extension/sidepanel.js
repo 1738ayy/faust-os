@@ -20,6 +20,7 @@ const elements = {
 
 const steps = ["Detect listing", "Extract photos", "Read product details", "Estimate profit", "Ready to import"];
 let state = { product: null, analysis: null, selectedImages: [], coverIndex: 0, busy: false, debug: false, compact: false, modalIndex: 0, cropMode: false, crop: { x: 15, y: 12, width: 70, height: 76 }, cropDrag: null, dragIndex: null };
+let currentImportRequestId = null;
 
 const money = (value) => Number.isFinite(Number(value)) ? `$${Number(value).toFixed(2)}` : "Needs review";
 const first = (...values) => values.find((value) => value !== undefined && value !== null && String(value).trim() !== "");
@@ -40,8 +41,24 @@ const readinessScore = () => {
   return Math.round((checks.filter(Boolean).length / checks.length) * 100);
 };
 
-function send(message) {
-  return chrome.runtime.sendMessage(message);
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isWakeableRuntimeError(error) {
+  return /Receiving end does not exist|Extension context invalidated|message channel closed/i.test(error?.message || "");
+}
+
+async function send(message, attempts = 2) {
+  for (let attempt = 0; attempt <= attempts; attempt += 1) {
+    try {
+      if (message.type !== "PING") await chrome.runtime.sendMessage({ type: "PING" }).catch(() => undefined);
+      return await chrome.runtime.sendMessage(message);
+    } catch (error) {
+      if (attempt >= attempts || !isWakeableRuntimeError(error)) throw error;
+      await wait(150 * (attempt + 1));
+    }
+  }
 }
 
 function setBusy(busy, label = "Working...") {
@@ -260,7 +277,7 @@ function reorderPhoto(from, to) {
 }
 
 async function imagePreviewUrl(src) {
-  const config = await chrome.storage.sync.get({ faustBaseUrl: "http://localhost:3000" });
+  const config = await chrome.storage.sync.get({ faustBaseUrl: "https://faust-os-staging.vercel.app" });
   const base = config.faustBaseUrl.replace(/\/$/, "");
   const url = src.startsWith("/api/") ? `${base}${src}` : /^https?:\/\//i.test(src) ? `${base}/api/import-image?url=${encodeURIComponent(src)}` : src;
   const response = await fetch(url);
@@ -367,7 +384,7 @@ function canvasBlob(canvas) {
 }
 
 async function uploadCroppedImage(blob) {
-  const config = await chrome.storage.sync.get({ faustBaseUrl: "http://localhost:3000" });
+  const config = await chrome.storage.sync.get({ faustBaseUrl: "https://faust-os-staging.vercel.app" });
   const form = new FormData();
   form.set("file", blob, "faust-extension-crop.jpg");
   const response = await fetch(`${config.faustBaseUrl.replace(/\/$/, "")}/api/import-image`, { method: "POST", body: form });
@@ -456,9 +473,10 @@ async function quickImport() {
   if (!state.product) await scanProduct(true);
   const product = productWithSelectedImages();
   if (!product) return;
-  setBusy(true, "Importing to Faust...");
+  currentImportRequestId ||= crypto.randomUUID();
+  setBusy(true, "Connecting to Faust...");
   try {
-    const response = await send({ type: "FAUST_IMPORT_TO_ANALYZER", product });
+    const response = await send({ type: "FAUST_IMPORT_TO_ANALYZER", product, requestId: currentImportRequestId });
     writeDetails(response);
     if (!response?.ok) throw new Error(response?.error || "Import failed.");
     state.product = response.product || product;
@@ -466,10 +484,11 @@ async function quickImport() {
     await persistDraftState();
     elements.success.classList.add("show");
     setConnection(true, "Imported successfully · Product added to Queue");
+    currentImportRequestId = null;
     await checkConnection(true);
     setTimeout(() => elements.success.classList.remove("show"), 6500);
   } catch (error) {
-    setConnection(false, "Import needs attention · Retry or open Debug");
+    setConnection(false, isWakeableRuntimeError(error) ? "Import interrupted · Retry or open Debug" : "Import needs attention · Retry or open Debug");
     writeDetails({ ok: false, error: error.message });
   } finally {
     setBusy(false);
@@ -501,7 +520,7 @@ async function guidedPublish(dryRun) {
 document.getElementById("quick-import").addEventListener("click", quickImport);
 document.getElementById("scan-button").addEventListener("click", () => scanProduct(false));
 document.getElementById("open-faust").addEventListener("click", async () => {
-  const config = await chrome.storage.sync.get({ faustBaseUrl: "http://localhost:3000" });
+  const config = await chrome.storage.sync.get({ faustBaseUrl: "https://faust-os-staging.vercel.app" });
   chrome.tabs.create({ url: `${config.faustBaseUrl}/opportunity-analyzer` });
 });
 document.getElementById("dry-run-button").addEventListener("click", () => guidedPublish(true));
@@ -561,6 +580,7 @@ document.addEventListener("keydown", (event) => {
 });
 
 (async function boot() {
+  await send({ type: "PING" }).catch(() => undefined);
   const stored = await chrome.storage.sync.get({ extensionViewMode: "expanded" });
   state.compact = stored.extensionViewMode === "compact";
   const draft = await chrome.storage.session.get("faustSidePanelDraft");
