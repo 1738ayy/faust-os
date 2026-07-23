@@ -58,13 +58,18 @@ test("storage descriptors cover every required production artifact boundary", ()
 test("migration inventory is ordered and includes the production connection prerequisites", () => {
   const inventory = migrationInventory();
   assert.equal(inventory.ready, true);
-  assert.equal(inventory.latest, "026_product_digital_twin_source_revision.sql");
+  assert.equal(inventory.latest, "027_product_cover_dna_schema_guard.sql");
   assert.ok(inventory.files.includes("001_core_auth_and_tenancy.sql"));
   assert.ok(inventory.files.includes("022_browser_extension_phase2.sql"));
   assert.ok(inventory.files.includes("023_product_image_ownership.sql"));
   assert.ok(inventory.files.includes("024_product_digital_twins.sql"));
   assert.ok(inventory.files.includes("025_product_cover_image_id.sql"));
   assert.ok(inventory.files.includes("026_product_digital_twin_source_revision.sql"));
+  assert.ok(inventory.files.includes("027_product_cover_dna_schema_guard.sql"));
+  const guard = readFileSync("supabase/migrations/027_product_cover_dna_schema_guard.sql", "utf8");
+  assert.match(guard, /add column if not exists cover_image_id uuid/);
+  assert.match(guard, /create table if not exists public\.product_digital_twin_assets/);
+  assert.match(guard, /notify pgrst, 'reload schema'/);
 });
 
 test("production health reports database, worker, storage, migrations, extension, and provider status", () => {
