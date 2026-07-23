@@ -13,7 +13,9 @@ const productActionSchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("save-digital-twin"),
     productId: z.string().uuid(),
+    sourceImageId: z.string().trim().min(1).max(200).optional(),
     sourceImageUrl: z.string().trim().min(1).max(5000),
+    sourceImageRevision: z.string().trim().max(120).nullable().optional(),
     transparentImageUrl: z.string().trim().min(1).max(5000).optional(),
     storageKey: z.string().trim().min(1).max(1000).optional(),
     processingStatus: z.enum(["not_started", "queued", "processing", "ready", "failed", "needs_review"]),

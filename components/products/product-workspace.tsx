@@ -237,7 +237,7 @@ function ProductDnaCapsule({ item }: { item: ProductExperience }) {
           <DnaInsightTile icon={<Atom size={16} />} title="Product fingerprint" value={dnaTags.slice(0, 5).map((dna) => dna.tag).join(" · ")} />
         </div>
 
-        <DigitalTwinChamber key={`${item.product.id}:${item.product.coverImageId || twinImage || "no-cover"}`} item={item} sourceImage={twinImage} twinPose={twinPose} growth={growth} />
+        <DigitalTwinChamber key={`${item.product.id}:${item.coverImage?.id || item.product.coverImageId || twinImage || "no-cover"}:${item.coverImage?.revision || "no-revision"}`} item={item} sourceImage={twinImage} twinPose={twinPose} growth={growth} />
 
         <div className="space-y-4">
           <DnaInsightTile icon={<GitBranch size={16} />} title="Market position" value={`${marketPosition}. ${item.analytics.bestMarketplace} is ${item.analytics.unitsSold ? "supported by order history" : "the current best candidate"} for early learning.`} />
@@ -381,18 +381,19 @@ const digitalTwinProcessorVersion = "faust-canvas-segmentation-v1";
 
 function DigitalTwinChamber({ item, sourceImage, twinPose, growth }: { item: ProductExperience; sourceImage: string; twinPose: string; growth: string }) {
   const expectedSourceId = item.product.coverImageId || "";
-  const sourceMatches = Boolean(sourceImage && item.digitalTwin?.processorVersion === digitalTwinProcessorVersion && (expectedSourceId ? item.digitalTwin.sourceImageId === expectedSourceId : item.digitalTwin.sourceImageUrl === sourceImage));
+  const expectedRevision = item.coverImage?.revision || null;
+  const sourceMatches = Boolean(sourceImage && item.digitalTwin?.processorVersion === digitalTwinProcessorVersion && (expectedSourceId ? item.digitalTwin.sourceImageId === expectedSourceId && (item.digitalTwin.sourceImageRevision || null) === expectedRevision : item.digitalTwin.sourceImageUrl === sourceImage));
   const initialStatus = sourceMatches ? item.digitalTwin?.processingStatus || "not_started" : sourceImage ? "not_started" : "failed";
   const [status, setStatus] = useState(initialStatus);
   const [assetUrl, setAssetUrl] = useState(sourceMatches && item.digitalTwin?.processingStatus === "ready" ? item.digitalTwin.transparentImageUrl || "" : "");
-  const [message, setMessage] = useState(sourceImage ? (sourceMatches ? "Product profile can be built from this cover." : "Refreshing Product Representation") : "Add a cover photo to build the Product Profile.");
+  const [message, setMessage] = useState(sourceImage ? (sourceMatches ? "Product profile can be built from this cover." : "Updating Product Image") : "Add a cover photo to build the Product Profile.");
   const [busy, setBusy] = useState(false);
 
   async function generateTwin() {
     if (!sourceImage || busy) return;
     setBusy(true);
     setStatus("processing");
-    setMessage("Analyzing Product Image");
+    setMessage("Updating Product Image");
     try {
       const result = await generateTransparentProductCutout(sourceImage, item.product.category);
       const file = new File([result.blob], `${item.product.id}-digital-twin.png`, { type: "image/png" });
@@ -407,7 +408,9 @@ function DigitalTwinChamber({ item, sourceImage, twinPose, growth }: { item: Pro
         body: JSON.stringify({
           action: "save-digital-twin",
           productId: item.product.id,
+          sourceImageId: item.coverImage?.id || item.product.coverImageId,
           sourceImageUrl: sourceImage,
+          sourceImageRevision: item.coverImage?.revision || null,
           transparentImageUrl: upload.url,
           storageKey: upload.storageKey,
           processingStatus,
@@ -432,7 +435,9 @@ function DigitalTwinChamber({ item, sourceImage, twinPose, growth }: { item: Pro
         body: JSON.stringify({
           action: "save-digital-twin",
           productId: item.product.id,
+          sourceImageId: item.coverImage?.id || item.product.coverImageId,
           sourceImageUrl: sourceImage,
+          sourceImageRevision: item.coverImage?.revision || null,
           processingStatus: "failed",
           segmentationConfidence: null,
           processorVersion: digitalTwinProcessorVersion,
@@ -487,9 +492,9 @@ function DigitalTwinChamber({ item, sourceImage, twinPose, growth }: { item: Pro
         <div className="absolute inset-x-[-18px] bottom-7 h-5 rounded-full border border-slate-400/25 bg-slate-950/70" />
       </div>
       <div className="absolute bottom-2 rounded-full border border-slate-600/45 bg-black/55 px-4 py-2 text-center shadow-lg shadow-black/40">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{ready ? "Product Profile" : status === "processing" ? "Analyzing Product Image" : "Product Profile"}</p>
+        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{ready ? "Product Image Active" : status === "processing" ? "Updating Product Image" : "Product Profile"}</p>
         <p className="font-heading text-xl font-semibold text-[#f6f8ff]">{ready ? growth : status === "needs_review" ? "Review" : status === "failed" ? "Needs Attention" : "Updating"}</p>
-        {!ready ? <button type="button" disabled={!sourceImage || busy} onClick={generateTwin} className="mt-2 text-[11px] font-semibold text-[#c8d2e6] transition hover:text-[#f6f8ff] disabled:opacity-50">{status === "failed" ? "Retry Analysis" : sourceMatches ? "Build Product Profile" : "Refresh Product Profile"}</button> : null}
+        {!ready ? <button type="button" disabled={!sourceImage || busy} onClick={generateTwin} className="mt-2 text-[11px] font-semibold text-[#c8d2e6] transition hover:text-[#f6f8ff] disabled:opacity-50">{status === "failed" ? "Retry Image Processing" : sourceMatches ? "Analyze Current Cover" : "Refresh Product Image"}</button> : null}
       </div>
     </div>
   );

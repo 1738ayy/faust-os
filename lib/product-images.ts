@@ -30,21 +30,28 @@ export function productImageRecordsFor(productId: string, urls: string[], option
   const byUrl = new Map((options.existing || []).filter((entry) => entry.productId === productId).map((entry) => [entry.url, entry]));
   return normalizeProductImageUrls(urls).map((url, position) => {
     const existing = byUrl.get(url);
+    const nextIsCover = position === 0;
+    const nextPurpose = nextIsCover ? "cover" : existing?.purpose || "source";
+    const changed = !existing || existing.position !== position || existing.isCover !== nextIsCover || existing.purpose !== nextPurpose || existing.sourceType !== (existing.sourceType || options.sourceType || "supplier");
     return {
       id: existing?.id || options.id(),
       productId,
       url,
       position,
-      isCover: position === 0,
-      purpose: position === 0 ? "cover" : existing?.purpose || "source",
+      isCover: nextIsCover,
+      purpose: nextPurpose,
       sourceType: existing?.sourceType || options.sourceType || "supplier",
       originalUrl: existing?.originalUrl || url,
       crop: existing?.crop || {},
       altText: existing?.altText,
       createdAt: existing?.createdAt || options.now,
-      updatedAt: options.now,
+      updatedAt: changed ? options.now : existing?.updatedAt,
     };
   });
+}
+
+export function productImageRevision(image: ProductImageRecord | undefined): string | null {
+  return image?.updatedAt || image?.createdAt || null;
 }
 
 export function productCoverRecord(data: OperatingData, product: Product): ProductImageRecord | undefined {
@@ -99,7 +106,10 @@ export function setProductCoverImage(data: OperatingData, product: Product, imag
   if (!cover) throw new Error("Cover image was not found for this product.");
   product.coverImageId = cover.id;
   product.updatedAt = options.now;
-  syncCanonicalCover(data, product);
+  const canonical = syncCanonicalCover(data, product);
+  for (const entry of records) {
+    if (entry.id === canonical?.id || entry.isCover !== (entry.id === canonical?.id)) entry.updatedAt = options.now;
+  }
   return cover;
 }
 
@@ -118,13 +128,11 @@ export function productCoverImage(data: OperatingData, product: Product): string
 
 export function currentProductDigitalTwin(data: OperatingData, product: Product, processorVersion: string): ProductDigitalTwinAsset | undefined {
   const coverRecord = productCoverRecord(data, product);
-  const coverImage = coverRecord?.url || productCoverImage(data, product);
+  if (!coverRecord) return undefined;
+  const coverRevision = productImageRevision(coverRecord);
   return (data.productDigitalTwins || [])
-    .filter((entry) => entry.productId === product.id && entry.processorVersion === processorVersion)
+    .filter((entry) => entry.productId === product.id && entry.processorVersion === processorVersion && entry.sourceImageId === coverRecord.id && (entry.sourceImageRevision || null) === coverRevision)
     .sort((a, b) => {
-      const aCurrent = coverRecord ? a.sourceImageId === coverRecord.id : a.sourceImageUrl === coverImage;
-      const bCurrent = coverRecord ? b.sourceImageId === coverRecord.id : b.sourceImageUrl === coverImage;
-      if (aCurrent !== bCurrent) return aCurrent ? -1 : 1;
       return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
     })[0];
 }

@@ -22,7 +22,7 @@ import { approveAutomation, archiveAutomationRule, cancelAutomationRun, createAu
 import { ensureAiCollections, generateAiRecommendations, mutateAiCenterData, type AiCenterActionInput } from "@/lib/ai-center";
 import { applyExtensionAction, type ExtensionAction } from "@/lib/browser-extension";
 import { canonicalListingIdentity, markImportQueueItemCompleted, removeImportQueueItems as removeImportQueueItemsFromData } from "@/lib/import-queue";
-import { ensureProductImageOwnership, normalizeProductImageUrls, productCoverRecord as canonicalProductCoverRecord, productGallery, setProductImages } from "@/lib/product-images";
+import { ensureProductImageOwnership, normalizeProductImageUrls, productCoverRecord as canonicalProductCoverRecord, productGallery, productImageRevision, setProductImages } from "@/lib/product-images";
 
 const file = path.join(process.cwd(), ".faust", "operating-system.json");
 const now = () => new Date().toISOString();
@@ -56,16 +56,25 @@ function defaultOrderViews(): SavedOrderView[] { const time = now(); return ["Al
 function ensureOrderCollections(data: OperatingData) { data.orderImportReviews ||= []; data.orderImportBatches ||= []; data.savedOrderViews ||= defaultOrderViews(); }
 function orderNotice(data: OperatingData, title: string, detail: string, href: string, entityType: string, entityId: string, severity: "critical" | "warning" | "info" = "warning") { const existing = data.notices.find((notice) => !notice.resolved && !notice.archived && notice.category === "orders" && notice.entityType === entityType && notice.entityId === entityId && notice.title === title); if (existing) return existing; const notice = { id: id(), severity, title, detail, actionLabel: "Review", href, createdAt: now(), category: "orders" as const, entityType, entityId, read: false }; data.notices.unshift(notice); return notice; }
 function ensureProductDigitalTwinCollections(data: OperatingData) { data.productDigitalTwins ||= []; }
-function markProductDigitalTwinSourceChanged(data: OperatingData, productId: string) {
+function syncProductCoverAndDna(data: OperatingData, productId: string, detail = "cover_changed") {
  ensureProductDigitalTwinCollections(data);
  const product = data.products.find((entry) => entry.id === productId);
  const cover = product ? canonicalProductCoverRecord(data, product) : undefined;
+ const coverRevision = productImageRevision(cover);
  for (const twin of data.productDigitalTwins!.filter((entry) => entry.productId === productId)) {
-  const stillCurrent = cover ? twin.sourceImageId === cover.id && twin.sourceImageUrl === cover.url : false;
-  if (!stillCurrent && twin.processingStatus === "ready") {
+  const stillCurrent = cover ? twin.sourceImageId === cover.id && twin.sourceImageUrl === cover.url && (twin.sourceImageRevision || null) === coverRevision : false;
+  if (!stillCurrent && ["ready", "queued", "processing"].includes(twin.processingStatus)) {
    twin.processingStatus = "needs_review";
    twin.failureCode = "source_image_changed";
    twin.updatedAt = now();
+  }
+ }
+ if (product && cover) {
+  const existingCurrent = data.productDigitalTwins!.find((entry) => entry.productId === product.id && entry.sourceImageId === cover.id && (entry.sourceImageRevision || null) === coverRevision && entry.processorVersion === "faust-canvas-segmentation-v1");
+  if (!existingCurrent) {
+   const time = now();
+   data.productDigitalTwins!.unshift({ id: id(), productId: product.id, sourceImageId: cover.id, sourceImageUrl: cover.url, sourceImageRevision: coverRevision, processingStatus: "queued", segmentationConfidence: null, bounds: null, generatedAt: null, processorVersion: "faust-canvas-segmentation-v1", failureCode: null, createdAt: time, updatedAt: time });
+   activity(data, "Product image queued for analysis", "product", product.id, `${product.title} cover image changed (${detail}). Faust is preparing the Product Profile.`);
   }
  }
 }
@@ -137,7 +146,7 @@ export async function updateCatalogProduct(input: { variantId: string; title?: s
  if (input.sourceUrl !== undefined) product.sourceUrl = input.sourceUrl.trim() || product.sourceUrl;
  if (images) {
   setProductImages(data, product, images, { now: updatedAt, id, sourceType: "manual" });
-  markProductDigitalTwinSourceChanged(data, product.id);
+  syncProductCoverAndDna(data, product.id, "photos_updated");
  }
  if (input.sku !== undefined) {
   const sku = input.sku.trim();
@@ -171,7 +180,9 @@ export async function updateCatalogProduct(input: { variantId: string; title?: s
 }
 export async function saveProductDigitalTwinAsset(input: {
  productId: string;
+ sourceImageId?: string;
  sourceImageUrl: string;
+ sourceImageRevision?: string | null;
  transparentImageUrl?: string;
  storageKey?: string;
  processingStatus: ProductDigitalTwinAsset["processingStatus"];
@@ -187,14 +198,29 @@ export async function saveProductDigitalTwinAsset(input: {
  const product = data.products.find((entry) => entry.id === input.productId);
  if (!product) throw new Error("Product not found.");
  const cover = canonicalProductCoverRecord(data, product);
- const sourceImageId = cover?.url === input.sourceImageUrl ? cover.id : cover?.id || `cover:${product.id}`;
+ if (!cover) throw new Error("Choose a cover image before preparing the Product Profile.");
+ const coverRevision = productImageRevision(cover);
+ const requestedSourceId = input.sourceImageId || (cover.url === input.sourceImageUrl ? cover.id : "");
+ const sourceIsCurrent = requestedSourceId === cover.id && input.sourceImageUrl === cover.url && (input.sourceImageRevision || null) === coverRevision;
  const time = now();
- const existing = data.productDigitalTwins!.find((entry) => entry.productId === product.id && entry.sourceImageId === sourceImageId && entry.processorVersion === input.processorVersion);
+ if (!sourceIsCurrent) {
+  const stale = data.productDigitalTwins!.find((entry) => entry.productId === product.id && entry.sourceImageId === requestedSourceId && entry.processorVersion === input.processorVersion);
+  if (stale) {
+   stale.processingStatus = "needs_review";
+   stale.failureCode = "superseded_by_new_cover";
+   stale.updatedAt = time;
+  }
+  activity(data, "Product image analysis superseded", "product", product.id, `${product.title} changed cover before an older Product Profile job finished.`);
+  return write(data);
+ }
+ const sourceImageId = cover.id;
+ const existing = data.productDigitalTwins!.find((entry) => entry.productId === product.id && entry.sourceImageId === sourceImageId && (entry.sourceImageRevision || null) === coverRevision && entry.processorVersion === input.processorVersion);
  const base: ProductDigitalTwinAsset = existing || {
   id: id(),
   productId: product.id,
   sourceImageId,
   sourceImageUrl: input.sourceImageUrl,
+  sourceImageRevision: coverRevision,
   processingStatus: "not_started",
   segmentationConfidence: null,
   bounds: null,
@@ -205,6 +231,7 @@ export async function saveProductDigitalTwinAsset(input: {
   updatedAt: time,
  };
  base.sourceImageUrl = input.sourceImageUrl;
+ base.sourceImageRevision = coverRevision;
  base.transparentImageUrl = input.transparentImageUrl;
  base.storageKey = input.storageKey;
  base.processingStatus = input.processingStatus;

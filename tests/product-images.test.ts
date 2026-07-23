@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { OperatingData, Product } from "../domain/business";
 import { importExtensionProduct } from "../lib/browser-extension";
-import { currentProductDigitalTwin, ensureProductImageOwnership, productCoverImage, productGallery, setProductImages } from "../lib/product-images";
+import { currentProductDigitalTwin, ensureProductImageOwnership, productCoverImage, productGallery, productImageRevision, setProductImages } from "../lib/product-images";
 
 const time = "2026-07-21T00:00:00.000Z";
 const ids = ["image-1", "image-2", "image-3", "image-4"];
@@ -61,6 +61,24 @@ test("reordering product images updates the canonical cover image id", () => {
   assert.equal(data.productImages?.filter((entry) => entry.productId === product.id && entry.isCover).length, 1);
 });
 
+test("image revisions remain stable unless cover order or content changes", () => {
+  const data = fixture();
+  const product: Product = { id: "product-revision", title: "Revision product", category: "T-shirt", tags: [], status: "draft", createdAt: time, updatedAt: time };
+  data.products.push(product);
+
+  setProductImages(data, product, ["https://cdn.example.test/front.jpg", "https://cdn.example.test/back.jpg"], { now: time, id, sourceType: "manual" });
+  const front = data.productImages?.find((entry) => entry.url.endsWith("/front.jpg"));
+  assert.equal(productImageRevision(front), time);
+
+  ensureProductImageOwnership(data, { now: "2026-07-22T00:00:00.000Z", id });
+  const stableFront = data.productImages?.find((entry) => entry.url.endsWith("/front.jpg"));
+  assert.equal(productImageRevision(stableFront), time);
+
+  setProductImages(data, product, ["https://cdn.example.test/cropped-front.jpg", "https://cdn.example.test/back.jpg"], { now: "2026-07-23T00:00:00.000Z", id, sourceType: "crop" });
+  const cropped = data.productImages?.find((entry) => entry.url.endsWith("/cropped-front.jpg"));
+  assert.equal(productImageRevision(cropped), "2026-07-23T00:00:00.000Z");
+});
+
 test("digital twin assets follow the canonical cover image id", () => {
   const data = fixture();
   const product: Product = { id: "product-twin", title: "Twin hoodie", category: "T-shirt", tags: [], coverImageId: "cover-current", status: "active", createdAt: time, updatedAt: time };
@@ -71,8 +89,8 @@ test("digital twin assets follow the canonical cover image id", () => {
     { id: "cover-old", productId: product.id, url: "https://cdn.example.test/cover-old.jpg", position: 1, isCover: false, sourceType: "supplier", createdAt: time, updatedAt: time },
   ];
   data.productDigitalTwins = [
-    { id: "twin-old", productId: product.id, sourceImageId: "cover-old", sourceImageUrl: "https://cdn.example.test/cover-old.jpg", transparentImageUrl: "/api/import-image?key=digital-twins/old.png", storageKey: "digital-twins/old.png", processingStatus: "ready", segmentationConfidence: 0.91, bounds: { x: 10, y: 20, width: 300, height: 400 }, sourceDimensions: { width: 800, height: 900 }, transparentDimensions: { width: 1024, height: 1024 }, generatedAt: time, processorVersion: "faust-canvas-segmentation-v1", failureCode: null, createdAt: time, updatedAt: "2026-07-21T00:00:00.000Z" },
-    { id: "twin-current", productId: product.id, sourceImageId: "cover-current", sourceImageUrl: "https://cdn.example.test/cover-current.jpg", transparentImageUrl: "/api/import-image?key=digital-twins/current.png", storageKey: "digital-twins/current.png", processingStatus: "ready", segmentationConfidence: 0.88, bounds: { x: 12, y: 30, width: 320, height: 420 }, sourceDimensions: { width: 800, height: 900 }, transparentDimensions: { width: 1024, height: 1024 }, generatedAt: time, processorVersion: "faust-canvas-segmentation-v1", failureCode: null, createdAt: time, updatedAt: "2026-07-20T00:00:00.000Z" },
+    { id: "twin-old", productId: product.id, sourceImageId: "cover-old", sourceImageUrl: "https://cdn.example.test/cover-old.jpg", sourceImageRevision: time, transparentImageUrl: "/api/import-image?key=digital-twins/old.png", storageKey: "digital-twins/old.png", processingStatus: "ready", segmentationConfidence: 0.91, bounds: { x: 10, y: 20, width: 300, height: 400 }, sourceDimensions: { width: 800, height: 900 }, transparentDimensions: { width: 1024, height: 1024 }, generatedAt: time, processorVersion: "faust-canvas-segmentation-v1", failureCode: null, createdAt: time, updatedAt: "2026-07-21T00:00:00.000Z" },
+    { id: "twin-current", productId: product.id, sourceImageId: "cover-current", sourceImageUrl: "https://cdn.example.test/cover-current.jpg", sourceImageRevision: time, transparentImageUrl: "/api/import-image?key=digital-twins/current.png", storageKey: "digital-twins/current.png", processingStatus: "ready", segmentationConfidence: 0.88, bounds: { x: 12, y: 30, width: 320, height: 420 }, sourceDimensions: { width: 800, height: 900 }, transparentDimensions: { width: 1024, height: 1024 }, generatedAt: time, processorVersion: "faust-canvas-segmentation-v1", failureCode: null, createdAt: time, updatedAt: "2026-07-20T00:00:00.000Z" },
   ];
 
   const twin = currentProductDigitalTwin(data, product, "faust-canvas-segmentation-v1");
@@ -81,6 +99,20 @@ test("digital twin assets follow the canonical cover image id", () => {
   assert.equal(twin?.id, "twin-current");
   assert.equal(twin?.transparentImageUrl, "/api/import-image?key=digital-twins/current.png");
   assert.equal(product.image, undefined);
+});
+
+test("digital twin ignores stale assets when the current cover revision changes", () => {
+  const data = fixture();
+  const product: Product = { id: "product-stale-revision", title: "Stale revision", category: "T-shirt", tags: [], coverImageId: "cover-current", status: "active", createdAt: time, updatedAt: time };
+  data.products.push(product);
+  data.productImages = [
+    { id: "cover-current", productId: product.id, url: "https://cdn.example.test/cover-current.jpg", position: 0, isCover: true, sourceType: "supplier", createdAt: time, updatedAt: "2026-07-22T00:00:00.000Z" },
+  ];
+  data.productDigitalTwins = [
+    { id: "twin-stale", productId: product.id, sourceImageId: "cover-current", sourceImageUrl: "https://cdn.example.test/cover-current.jpg", sourceImageRevision: time, transparentImageUrl: "/api/import-image?key=digital-twins/stale.png", storageKey: "digital-twins/stale.png", processingStatus: "ready", segmentationConfidence: 0.91, bounds: { x: 10, y: 20, width: 300, height: 400 }, generatedAt: time, processorVersion: "faust-canvas-segmentation-v1", failureCode: null, createdAt: time, updatedAt: "2026-07-21T00:00:00.000Z" },
+  ];
+
+  assert.equal(currentProductDigitalTwin(data, product, "faust-canvas-segmentation-v1"), undefined);
 });
 
 test("extension import persists product images and reuses them for five channel drafts", () => {
