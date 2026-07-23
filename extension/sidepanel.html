@@ -30,6 +30,14 @@
       .dot { width:9px; height:9px; border-radius:999px; background:#f59e0b; box-shadow:0 0 18px rgba(245,158,11,.36); }
       .dot.ok { background:#75d39f; box-shadow:0 0 18px rgba(117,211,159,.3); }
       .content { display:grid; gap:12px; padding-top:12px; }
+      body.compact .content { gap:8px; padding-top:8px; }
+      body.compact .expanded-only { display:none !important; }
+      body.compact .section { padding:10px; }
+      body.compact .hero { padding:10px 12px; }
+      body.compact .hero img { width:48px; height:34px; }
+      body.compact h1 { font-size:17px; }
+      body.compact .sub { font-size:11px; }
+      body.compact .toolbar { padding:0 10px 10px; }
       .section { padding:14px; }
       .section h2 { margin:0 0 9px; font-size: 13px; letter-spacing:-.01em; }
       .timeline { display:grid; gap:7px; }
@@ -54,14 +62,22 @@
       button:disabled { opacity:.55; cursor:wait; transform:none; }
       button.primary { background:linear-gradient(180deg, #7782a1, #45506b); border-color:rgba(200,210,230,.32); box-shadow:0 14px 34px rgba(102,112,141,.25); }
       button.full { grid-column:1 / -1; }
-      .photo-tools { display:flex; gap:8px; margin-bottom:9px; }
+      .photo-tools { display:flex; gap:8px; margin-bottom:9px; flex-wrap:wrap; }
       .photo-tools button { padding:8px 10px; border-radius:13px; font-size:12px; }
-      .photos { display:flex; gap:9px; overflow-x:auto; padding-bottom:8px; scrollbar-color: var(--quartz) rgba(255,255,255,.08); }
-      .thumb { position:relative; flex:0 0 78px; height:78px; border:1px solid rgba(200,210,230,.14); border-radius:17px; overflow:hidden; background:#080a0f; cursor:pointer; transition:transform .16s ease, border-color .16s ease; }
+      .photos { display:grid; grid-template-columns: repeat(auto-fill, minmax(54px, 1fr)); gap:8px; padding-bottom:2px; }
+      body.compact .photos { grid-template-columns: repeat(6, minmax(0, 1fr)); gap:6px; }
+      .thumb { position:relative; height:62px; border:1px solid rgba(200,210,230,.14); border-radius:16px; overflow:hidden; background:#080a0f; cursor:pointer; transition:transform .16s ease, border-color .16s ease, box-shadow .16s ease; padding:0; box-shadow:none; }
       .thumb:hover { transform:scale(1.04); border-color:rgba(200,210,230,.42); }
       .thumb.selected { border-color:var(--quartz-2); box-shadow:0 0 0 2px rgba(200,210,230,.16); }
       .thumb img { width:100%; height:100%; object-fit:cover; display:block; }
       .thumb .badge { position:absolute; left:5px; top:5px; border-radius:999px; background:rgba(0,0,0,.72); padding:2px 6px; font-size:10px; font-weight:800; }
+      .thumb .corner { position:absolute; right:5px; top:5px; width:21px; height:21px; display:grid; place-items:center; border:1px solid rgba(200,210,230,.22); border-radius:999px; background:rgba(0,0,0,.76); opacity:0; padding:0; font-size:13px; line-height:1; }
+      .thumb:hover .corner, .thumb:focus-within .corner { opacity:1; }
+      .thumb .tools { position:absolute; inset-inline:5px; bottom:5px; display:flex; gap:4px; opacity:0; transition:opacity .16s ease; }
+      .thumb:hover .tools, .thumb:focus-within .tools { opacity:1; }
+      .thumb .tools button { padding:3px 5px; border-radius:999px; font-size:10px; background:rgba(0,0,0,.78); box-shadow:none; }
+      .thumb.dragging { opacity:.55; transform:scale(.96); }
+      .thumb.drop-target { border-color:var(--quartz-2); box-shadow:0 0 22px rgba(200,210,230,.22); }
       .summary-grid { display:grid; grid-template-columns: repeat(3, 1fr); gap:7px; }
       .check { border:1px solid rgba(200,210,230,.12); border-radius:14px; padding:8px; background:rgba(0,0,0,.22); font-size:11px; color:var(--muted); }
       .check b { display:block; color:#fff; font-size:12px; }
@@ -77,6 +93,22 @@
       pre { margin:10px 0 0; white-space:pre-wrap; max-height:220px; overflow:auto; color:#dbe6ff; font-size:11px; }
       .debug-hidden { display:none; }
       .empty { padding:18px; text-align:center; color:var(--muted); }
+      .modal { position:fixed; inset:0; z-index:10; display:grid; place-items:center; padding:14px; background:rgba(0,0,0,.7); backdrop-filter:blur(10px); }
+      .modal[hidden] { display:none; }
+      .modal-card { width:min(100%, 380px); border:1px solid var(--line); border-radius:24px; background:#0b0e14; box-shadow:0 28px 90px rgba(0,0,0,.65); overflow:hidden; }
+      .modal-head { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:12px 14px; border-bottom:1px solid var(--line); }
+      .modal-head h2 { margin:0; font-size:14px; }
+      .modal-head button { width:auto; padding:6px 9px; border-radius:12px; }
+      .preview-stage { position:relative; height:310px; background:#050609; display:grid; place-items:center; overflow:hidden; touch-action:none; }
+      .preview-stage img { max-width:100%; max-height:100%; object-fit:contain; user-select:none; }
+      .crop-box { position:absolute; border:2px solid var(--quartz-2); box-shadow:0 0 0 999px rgba(0,0,0,.48), 0 0 18px rgba(200,210,230,.38); cursor:move; }
+      .crop-box span { position:absolute; width:14px; height:14px; border-radius:999px; border:2px solid #050609; background:var(--quartz-2); }
+      .crop-box .nw { left:-7px; top:-7px; cursor:nwse-resize; }
+      .crop-box .ne { right:-7px; top:-7px; cursor:nesw-resize; }
+      .crop-box .sw { left:-7px; bottom:-7px; cursor:nesw-resize; }
+      .crop-box .se { right:-7px; bottom:-7px; cursor:nwse-resize; }
+      .modal-actions { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; padding:12px; }
+      .modal-actions button { padding:9px; border-radius:14px; font-size:12px; }
     </style>
   </head>
   <body>
@@ -100,7 +132,7 @@
       </section>
 
       <section class="content">
-        <section class="card section">
+        <section class="card section expanded-only">
           <h2>Import progress</h2>
           <div id="timeline" class="timeline"></div>
         </section>
@@ -120,7 +152,7 @@
           <div id="photos" class="photos" role="listbox" aria-label="Product photos"></div>
         </section>
 
-        <section class="card section">
+        <section class="card section expanded-only">
           <h2>Ready check</h2>
           <div id="summary" class="summary-grid"></div>
         </section>
@@ -141,7 +173,7 @@
           <button id="import-another" type="button">Import Another</button>
         </section>
 
-        <section class="card section">
+        <section class="card section expanded-only">
           <h2>Recent imports</h2>
           <div id="history" class="history"></div>
         </section>
@@ -152,6 +184,26 @@
         </details>
       </section>
     </main>
+    <div id="image-modal" class="modal" hidden>
+      <section class="modal-card" role="dialog" aria-modal="true" aria-label="Image preview and crop">
+        <div class="modal-head">
+          <h2 id="modal-title">Image preview</h2>
+          <button id="modal-close" type="button">Close</button>
+        </div>
+        <div id="preview-stage" class="preview-stage">
+          <img id="modal-image" alt="Selected product image" />
+          <div id="crop-box" class="crop-box" hidden><span class="nw"></span><span class="ne"></span><span class="sw"></span><span class="se"></span></div>
+        </div>
+        <div class="modal-actions">
+          <button id="modal-prev" type="button">Previous</button>
+          <button id="modal-crop" type="button">Crop</button>
+          <button id="modal-next" type="button">Next</button>
+          <button id="modal-cover" type="button">Make cover</button>
+          <button id="modal-reset" type="button">Reset</button>
+          <button id="modal-save" class="primary" type="button">Save</button>
+        </div>
+      </section>
+    </div>
     <script src="sidepanel.js"></script>
   </body>
 </html>
