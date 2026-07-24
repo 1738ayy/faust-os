@@ -1,3 +1,5 @@
+import { getMarketplaceProfile, marketplaceForSlug, marketplaceSlugs, type MarketplaceSlug } from "../../lib/marketplace-intelligence";
+
 export type MarketplaceDraft = { listingId: string; title: string; description: string; price: number; quantity: number; imageUrls: string[]; category?: string; condition?: string };
 export type MarketplacePublishResult = { externalId: string; externalUrl: string; status: "active" | "pending"; warnings?: string[] };
 export interface MarketplaceAdapter { readonly provider: string; validate(draft: MarketplaceDraft): string[]; publish(draft: MarketplaceDraft): Promise<MarketplacePublishResult>; endListing(externalId: string): Promise<void>; importOrders?(cursor?: string): Promise<{ cursor?: string; records: unknown[] }>; }
@@ -5,11 +7,18 @@ export class ManualMarketplaceAdapter implements MarketplaceAdapter { readonly p
 export class MockMarketplaceAdapter implements MarketplaceAdapter {
   constructor(readonly provider: string) {}
   validate(draft: MarketplaceDraft) {
-    const errors = new ManualMarketplaceAdapter().validate(draft);
-    if (draft.title.length > 80 && ["depop", "poshmark"].includes(this.provider)) errors.push(`${this.provider} title must be 80 characters or fewer.`);
-    if (draft.description.length < 20) errors.push("Description should include material, condition, measurements, and shipping notes.");
+    const slug = this.provider.toLowerCase() as MarketplaceSlug;
+    if (!marketplaceSlugs.includes(slug)) return new ManualMarketplaceAdapter().validate(draft);
+    const profile = getMarketplaceProfile(slug);
+    const errors = [];
+    if (!draft.title.trim()) errors.push("Title is required.");
+    if (draft.title.length > profile.contentRules.titleMaxLength) errors.push(`${profile.displayName} title must be ${profile.contentRules.titleMaxLength} characters or fewer.`);
+    if (draft.description.length < profile.contentRules.descriptionMinLength) errors.push("Description should include material, condition, measurements, and shipping notes.");
     if (!draft.category) errors.push("Category is required.");
-    if (!draft.imageUrls.length) errors.push("At least one image is required.");
+    if (draft.imageUrls.length < profile.imageRules.minImages) errors.push(`At least ${profile.imageRules.minImages} image is required.`);
+    if (draft.quantity < 0) errors.push("Quantity cannot be negative.");
+    const minimum = profile.fieldDefinitions.find((field) => field.key === "price")?.minimum || 0;
+    if (draft.price < minimum) errors.push(`Price must be at least $${minimum}.`);
     return errors;
   }
   async publish(draft: MarketplaceDraft): Promise<MarketplacePublishResult> {
@@ -21,5 +30,7 @@ export class MockMarketplaceAdapter implements MarketplaceAdapter {
   async endListing(externalId: string) { void externalId; }
 }
 export function getMarketplaceAdapter(provider: string) {
-  return ["depop", "ebay"].includes(provider.toLowerCase()) ? new MockMarketplaceAdapter(provider.toLowerCase()) : new ManualMarketplaceAdapter();
+  const slug = provider.toLowerCase() as MarketplaceSlug;
+  if (!marketplaceSlugs.includes(slug)) return new ManualMarketplaceAdapter();
+  return getMarketplaceProfile(marketplaceForSlug(slug)).capabilities.publishing === "adapter" ? new MockMarketplaceAdapter(slug) : new ManualMarketplaceAdapter();
 }

@@ -2,13 +2,11 @@ import type { ChannelListingDraft, DurableJob, Listing, ListingReviewItem, Listi
 import { availableUnits } from "./business-calculations";
 import { isActiveVariant } from "./product-state";
 import { getMarketplaceAdapter } from "../services/adapters/marketplace";
+import { MarketplaceEngine, getMarketplaceProfile } from "./marketplace-intelligence";
 
 const now = () => new Date().toISOString();
 const id = () => crypto.randomUUID();
 export const crossListingChannels = ["Depop", "eBay", "Etsy", "Mercari", "Poshmark"] as const;
-type Channel = typeof crossListingChannels[number];
-const supportsApiPublish = (marketplace: Channel) => ["Depop", "eBay"].includes(marketplace);
-const supportsExtension = (marketplace: Channel) => ["Etsy", "Mercari", "Poshmark"].includes(marketplace);
 const providerId = (marketplace: Marketplace) => marketplace === "eBay" ? "ebay" : marketplace.toLowerCase();
 
 export type CreateCrossListingInput = { variantId: string; physicalSku?: string; basePrice?: number; imageUrls?: string[]; idempotencyKey?: string };
@@ -30,11 +28,32 @@ export function ensureListingsCollections(data: OperatingData) {
 export function seedMarketplaceAccountsAndTemplates(data: OperatingData) {
   ensureListingsCollections(data);
   for (const marketplace of crossListingChannels) {
+    const profile = getMarketplaceProfile(marketplace);
     if (!data.marketplaceAccounts!.some((account) => account.marketplace === marketplace)) {
-      data.marketplaceAccounts!.push({ id: id(), marketplace, displayName: `${marketplace} default`, status: supportsApiPublish(marketplace) ? "adapter_ready" : "extension_assisted", supportsApiPublish: supportsApiPublish(marketplace), supportsExtension: supportsExtension(marketplace), createdAt: now() });
+      data.marketplaceAccounts!.push({
+        id: id(),
+        marketplace,
+        displayName: `${marketplace} default`,
+        status: profile.capabilities.publishing === "adapter" ? "adapter_ready" : profile.capabilities.publishing === "extension" ? "extension_assisted" : "manual",
+        supportsApiPublish: profile.capabilities.publishing === "adapter",
+        supportsExtension: profile.capabilities.publishing === "extension",
+        createdAt: now(),
+      });
     }
     if (!data.listingTemplates!.some((template) => template.marketplace === marketplace)) {
-      data.listingTemplates!.push({ id: id(), name: `${marketplace} streetwear template`, marketplace, category: marketplace === "Etsy" ? "Clothing" : "Menswear", titleFormat: "{title} - {sku}", descriptionFormat: "{title}\n\nCondition: {condition}\nPhysical SKU: {physicalSku}\nShips from Faust OS inventory.", priceAdjustmentPercent: marketplace === "Poshmark" ? 12 : marketplace === "eBay" ? 8 : 0, defaultAttributes: { brand: "Unbranded", style: "Streetwear", condition: "New with tags" }, imagePolicy: marketplace === "Poshmark" ? "square_crop" : "all", shippingProfile: "Standard seller-paid shipping", createdAt: now() });
+      data.listingTemplates!.push({
+        id: id(),
+        name: `${marketplace} profile-backed template`,
+        marketplace,
+        category: profile.categories.find((entry) => entry.universalCategoryId === "apparel.tops.hoodies")?.categoryPath.join(" > ") || "Clothing",
+        titleFormat: "{title} - {sku}",
+        descriptionFormat: "{title}\n\nCondition: {condition}\nPhysical SKU: {physicalSku}\nShips from Faust OS inventory.",
+        priceAdjustmentPercent: profile.pricingRules.defaultAdjustmentPercent,
+        defaultAttributes: { condition: profile.enums.condition[profile.accountDefaults.defaultCondition].label, shippingService: profile.accountDefaults.shippingService },
+        imagePolicy: profile.imageRules.preferredAspectRatio === "1:1" ? "square_crop" : profile.imageRules.maxImages <= 4 ? "first_four" : "all",
+        shippingProfile: profile.shippingRules.defaultService,
+        createdAt: now(),
+      });
     }
   }
 }
@@ -71,32 +90,8 @@ function renderTemplate(template: ListingTemplate, values: Record<string, string
   return { title: replace(template.titleFormat), description: replace(template.descriptionFormat) };
 }
 
-function compactTitle(value: string, limit: number) {
-  const normalized = value.replace(/\s+/g, " ").trim();
-  if (normalized.length <= limit) return normalized;
-  return `${normalized.slice(0, Math.max(limit - 3, 0)).trimEnd()}...`;
-}
-
-function marketplaceTitle(marketplace: Channel, sourceTitle: string, sku: string) {
-  const limit = ["Depop", "eBay", "Mercari", "Poshmark"].includes(marketplace) ? 80 : 140;
-  const normalizedTitle = sourceTitle.replace(/\s+/g, " ").trim();
-  const suffix = ` - ${sku}`;
-  const full = `${normalizedTitle}${suffix}`;
-  if (full.length <= limit) return full;
-  if (suffix.length < limit - 12) return `${compactTitle(normalizedTitle, limit - suffix.length)}${suffix}`;
-  return compactTitle(full, limit);
-}
-
 export function validateChannelDraft(draft: ChannelListingDraft) {
-  const errors: string[] = [];
-  if (!draft.title.trim()) errors.push("Title is required.");
-  if (draft.title.length > 80 && ["Depop", "Poshmark"].includes(draft.marketplace)) errors.push(`${draft.marketplace} title must be 80 characters or fewer.`);
-  if (draft.description.trim().length < 20) errors.push("Description must include condition and shipping detail.");
-  if (draft.price <= 0) errors.push("Price must be greater than zero.");
-  if (!draft.category) errors.push("Category is required.");
-  if (!draft.imageUrls.length) errors.push("At least one image is required.");
-  if (!draft.physicalSku) errors.push("Physical SKU mapping is required.");
-  return errors;
+  return MarketplaceEngine.validateDraft(draft);
 }
 
 export function createFiveChannelDrafts(data: OperatingData, input: CreateCrossListingInput) {
@@ -112,13 +107,25 @@ export function createFiveChannelDrafts(data: OperatingData, input: CreateCrossL
   for (const marketplace of crossListingChannels) {
     const account = data.marketplaceAccounts!.find((entry) => entry.marketplace === marketplace);
     const template = data.listingTemplates!.find((entry) => entry.marketplace === marketplace)!;
-    const rendered = renderTemplate(template, { title: product?.title || variant.title, sku: variant.sku, physicalSku, condition: variant.condition });
-    rendered.title = marketplaceTitle(marketplace, product?.title || variant.title, variant.sku);
+    const draftPlan = MarketplaceEngine.generateDraft({
+      product: product || { id: variant.productId, title: variant.title, category: "Clothing", tags: [], status: "active", createdAt: now(), updatedAt: now() },
+      variant,
+      physicalSku,
+      quantity,
+      basePrice: input.basePrice,
+      imageUrls: input.imageUrls,
+    }, marketplace);
+    const rendered = renderTemplate(template, { title: draftPlan.title, sku: variant.sku, physicalSku, condition: draftPlan.attributes.condition || variant.condition });
+    rendered.title = draftPlan.title;
+    rendered.description = draftPlan.description || rendered.description;
     const existingDraft = data.channelListingDrafts!.find((draft) => draft.variantId === variant.id && draft.marketplace === marketplace);
     if (existingDraft) {
       existingDraft.title = rendered.title;
       existingDraft.description ||= rendered.description;
-      existingDraft.imageUrls = existingDraft.imageUrls.length ? existingDraft.imageUrls : input.imageUrls?.length ? input.imageUrls : [product?.image || "/placeholder-product.png"];
+      existingDraft.category = draftPlan.category;
+      existingDraft.attributes = { ...draftPlan.attributes, ...existingDraft.attributes };
+      existingDraft.publishMode = draftPlan.publishMode;
+      existingDraft.imageUrls = existingDraft.imageUrls.length ? existingDraft.imageUrls.slice(0, getMarketplaceProfile(marketplace).imageRules.maxImages) : draftPlan.imageUrls;
       existingDraft.validationErrors = validateChannelDraft(existingDraft);
       if (existingDraft.validationErrors.length) {
         existingDraft.status = "failed";
@@ -132,18 +139,19 @@ export function createFiveChannelDrafts(data: OperatingData, input: CreateCrossL
       existingDraft.updatedAt = now();
       continue;
     }
-    const price = Math.round((input.basePrice ?? variant.defaultSalePrice) * (1 + template.priceAdjustmentPercent / 100) * 100) / 100;
+    const price = draftPlan.price;
     const listing: Listing = { id: id(), variantId: variant.id, marketplace, title: rendered.title, price, quantity, status: "draft", syncState: "manual", createdAt: now() };
     const mapping: PhysicalSkuMapping = { id: id(), variantId: variant.id, physicalSku, channelListingId: listing.id, channel: marketplace, externalSku: physicalSku, status: "active", confidence: 1, createdAt: now() };
-    const draft: ChannelListingDraft = { id: id(), listingId: listing.id, variantId: variant.id, physicalSku, marketplace, accountId: account?.id, templateId: template.id, title: rendered.title, description: rendered.description, price, category: template.category, attributes: template.defaultAttributes, imageUrls: input.imageUrls?.length ? input.imageUrls : [product?.image || "/placeholder-product.png"], quantity, status: "draft", validationErrors: [], publishMode: supportsApiPublish(marketplace) ? "adapter" : supportsExtension(marketplace) ? "extension" : "manual", syncState: "pending", idempotencyKey: input.idempotencyKey, createdAt: now() };
+    const draft: ChannelListingDraft = { id: id(), listingId: listing.id, variantId: variant.id, physicalSku, marketplace, accountId: account?.id, templateId: template.id, title: rendered.title, description: rendered.description, price, category: draftPlan.category, attributes: draftPlan.attributes, imageUrls: draftPlan.imageUrls, quantity, status: "draft", validationErrors: [], publishMode: draftPlan.publishMode, syncState: "pending", idempotencyKey: input.idempotencyKey, createdAt: now() };
     draft.validationErrors = validateChannelDraft(draft);
     draft.status = draft.validationErrors.length ? "failed" : "validated";
     data.listings.push(listing);
     data.physicalSkuMappings!.push(mapping);
     data.channelListingDrafts!.push(draft);
     addOutboxJob(data, "listing.publish_requested", draft, "publish", { draftId: draft.id, marketplace, physicalSku }, input.idempotencyKey);
-    if (draft.publishMode !== "adapter") review(data, { channelDraftId: draft.id, marketplace, severity: "info", reason: "manual_publish_required", detail: `${marketplace} requires extension/manual publishing until live credentials are connected.`, actionLabel: "Open manual workflow" });
+    if (draft.publishMode !== "adapter") review(data, { channelDraftId: draft.id, marketplace, severity: "info", reason: "manual_publish_required", detail: `${marketplace} uses ${draft.publishMode === "extension" ? "extension-assisted" : "manual"} publishing until live credentials are connected.`, actionLabel: "Open manual workflow" });
     if (draft.validationErrors.length) review(data, { channelDraftId: draft.id, marketplace, severity: "warning", reason: "validation_error", detail: draft.validationErrors.join(" ") });
+    for (const warning of draftPlan.warnings) review(data, { channelDraftId: draft.id, marketplace, severity: "info", reason: "validation_error", detail: warning });
   }
   activity(data, "Five channel drafts created", "variant", variant.id, `${physicalSku} generated drafts for Depop, eBay, Etsy, Mercari, and Poshmark.`);
   return data;

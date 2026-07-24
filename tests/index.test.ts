@@ -12,6 +12,7 @@ import "./orders-deepening.test";
 import "./fulfillment-workflows.test";
 import "./finance.test";
 import "./wholesale-core.test";
+import "./marketplace-intelligence.test";
 import "./listings-core.test";
 import "./purchasing-core.test";
 import "./analytics.test";

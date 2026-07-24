@@ -19,6 +19,7 @@ export default async function SettingsPage() {
     <DataCard title="System Health" description="Extension devices, service readiness, failed actions, and developer diagnostics are grouped here so they stay out of normal operating pages.">
       <div className="mb-5 flex flex-wrap gap-3">
         <SecondaryButton href="/settings">Connections</SecondaryButton>
+        <SecondaryButton href="/settings/marketplaces">Marketplace Registry</SecondaryButton>
         <SecondaryButton href="/settings">Developer Tools</SecondaryButton>
       </div>
       <ExtensionConnections data={data} />
