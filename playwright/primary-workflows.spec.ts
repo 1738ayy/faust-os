@@ -22,7 +22,7 @@ test("primary operations pages render their operational page titles", async ({ r
     ["/orders", "Orders"],
     ["/purchasing", "Purchasing & inbound"],
     ["/shipping", "Warehouse fulfillment center"],
-    ["/listings", "Marketplace drafts, validation, and delist coordination"],
+    ["/listings", "Cross-listing publishing workspace"],
     ["/finance", "Ledger, payout reconciliation, cash, and planning"],
     ["/analytics", "Business trends and drill-down comparisons"],
     ["/automations", "Rule builder, run logs, retries, and failures"],
@@ -377,7 +377,10 @@ test("product lifecycle stays synchronized across active views, archive, restore
   ).toBeVisible();
   await page.goto("/listings");
   appMain = page.getByTestId("app-main");
-  await expect(appMain.getByRole("cell", { name: variant.sku, exact: true })).toHaveCount(5);
+  await expect(appMain.getByRole("heading", { name: title, exact: true })).toBeVisible();
+  await expect(appMain.getByText(`SKU ${variant.sku}`, { exact: false })).toBeVisible();
+  await expect(appMain.getByText(/Depop · published/i)).toBeVisible();
+  await expect(appMain.getByRole("heading", { name: "Published Listings", exact: true })).toBeVisible();
   await page.goto("/analytics");
   appMain = page.getByTestId("app-main");
   await expect(appMain.getByRole("link", { name: variant.sku, exact: true })).toBeVisible();
