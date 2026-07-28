@@ -180,6 +180,18 @@ export async function saveProductKnowledgeDecision(input: { productId: string; f
  if (product) activity(data, "Product knowledge reviewed", "product", product.id, `${input.fieldKey.replaceAll("_", " ")} ${field.status}.`);
  return write(data);
 }
+export async function manageProductKnowledgeMemory(input: { memoryId: string; action: "suspend" | "restore" | "delete" | "narrow-scope"; scope?: "business" | "supplier" | "source_platform" | "universal_category" }) {
+ const data = await read();
+ ensureProductKnowledgeCollections(data);
+ const memory = data.productKnowledgeMemory!.find((entry) => entry.id === input.memoryId);
+ if (!memory) throw new Error("Product Knowledge memory rule not found.");
+ if (input.action === "delete") data.productKnowledgeMemory = data.productKnowledgeMemory!.filter((entry) => entry.id !== input.memoryId);
+ else if (input.action === "suspend") { memory.status = "suspended"; memory.updatedAt = now(); }
+ else if (input.action === "restore") { memory.status = "active"; memory.updatedAt = now(); }
+ else if (input.action === "narrow-scope" && input.scope) { memory.scope = input.scope; memory.updatedAt = now(); }
+ activity(data, "Product Knowledge memory updated", "product_knowledge_memory", input.memoryId, `${input.action.replace("-", " ")} memory rule ${memory.pattern}.`);
+ return write(data);
+}
 export async function saveProductDigitalTwinAsset(input: {
  productId: string;
  sourceImageId?: string;

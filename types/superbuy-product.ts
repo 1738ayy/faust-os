@@ -22,7 +22,10 @@ export type SuperbuyProduct = {
   stock?: number;
   minimumOrderQuantity?: number;
   price?: number;
+  priceCurrency?: "RMB" | "USD" | "CNY";
+  priceTiers?: { minimumQuantity: number; price: number; currency?: "RMB" | "USD" | "CNY" }[];
   domesticShipping?: number;
+  domesticShippingCurrency?: "RMB" | "USD" | "CNY";
   internationalShipping?: number;
   dimensionsParsed?: { lengthCm?: number; widthCm?: number; heightCm?: number };
   sellerRating?: number;
@@ -32,9 +35,23 @@ export type SuperbuyProduct = {
   pageTimestamp?: string;
   priceRange?: { min: number; max: number };
   images: string[];
-  variantOptions?: { colors?: string[]; sizes?: string[] };
+  variantOptions?: { colors?: string[]; sizes?: string[]; groups?: SuperbuyVariantGroup[]; combinations?: SuperbuyVariantCombination[] };
   variants: SuperbuyVariant[];
   storeStats?: StoreStats;
+};
+
+export type SuperbuyVariantGroup = {
+  label: string;
+  translatedLabel?: string;
+  options: { id?: string; label: string; translatedLabel?: string; image?: string; price?: number; stock?: number; available?: boolean }[];
+};
+
+export type SuperbuyVariantCombination = {
+  optionIds: string[];
+  labels: string[];
+  price?: number;
+  stock?: number;
+  available?: boolean;
 };
 
 export type SuperbuyVariant = {

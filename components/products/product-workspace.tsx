@@ -203,9 +203,13 @@ export function ProductWorkspace({ item }: { item: ProductExperience }) {
 function ProductKnowledgePanel({ item }: { item: ProductExperience }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const priority = ["universal_category", "material", "supplier_shop", "price", "domestic_shipping", "variant_groups", "suggested_title", "suggested_description", "image_set"];
+  const priority = ["universal_category", "product_type", "material", "fabric_composition", "supplier_shop", "price", "domestic_shipping", "minimum_order_quantity", "variant_groups", "variant_options", "suggested_title", "suggested_description", "image_set"];
   const fields = [...item.productKnowledge.fields]
-    .sort((a, b) => priority.indexOf(a.fieldKey) - priority.indexOf(b.fieldKey))
+    .sort((a, b) => {
+      const aIndex = priority.indexOf(a.fieldKey);
+      const bIndex = priority.indexOf(b.fieldKey);
+      return (aIndex === -1 ? 999 : aIndex) - (bIndex === -1 ? 999 : bIndex);
+    })
     .slice(0, 8);
 
   const decide = (field: ProductKnowledgeField, decision: "confirmed" | "corrected" | "rejected", value?: ProductKnowledgeField["value"]) => {
@@ -265,7 +269,9 @@ function KnowledgeFieldRow({ field, disabled, onDecide }: { field: ProductKnowle
         <StatusBadge value={`${statusLabel} · ${Math.round(field.confidence * 100)}%`} />
       </div>
       <p className="mt-2 text-sm leading-6 text-muted-foreground">{field.explanation}</p>
-      <p className="mt-1 text-xs text-muted-foreground">Evidence: {field.supportingEvidenceIds.length || 0} source record(s)</p>
+      <p className="mt-1 text-xs text-muted-foreground">Evidence: {field.supportingEvidenceIds.length || 0} source record(s){field.conflictingEvidenceIds?.length ? ` · ${field.conflictingEvidenceIds.length} conflict(s)` : ""}</p>
+      {field.reviewRequired ? <p className="mt-2 rounded-2xl border border-amber-400/25 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">Review recommended before this value is used broadly.</p> : null}
+      {field.alternatives?.length ? <p className="mt-2 text-xs text-muted-foreground">Alternatives: {field.alternatives.map(valueLabel).filter(Boolean).join(" · ")}</p> : null}
       {editing ? (
         <div className="mt-3 flex flex-col gap-2 sm:flex-row">
           <input value={value} onChange={(event) => setValue(event.target.value)} className="min-h-10 flex-1 rounded-full border border-slate-700/60 bg-zinc-950/70 px-4 text-sm text-[#f6f8ff] outline-none transition focus:border-[#66708d]" aria-label={`Correct ${field.fieldKey.replaceAll("_", " ")}`} />
@@ -287,7 +293,7 @@ function valueLabel(value: ProductKnowledgeField["value"]) {
   if (value === null || value === undefined) return "";
   if (Array.isArray(value)) return value.join(", ");
   if (typeof value === "object") {
-    const variants = Array.isArray(value.variants) ? value.variants.length : undefined;
+    const variants = Array.isArray(value.variants) ? value.variants.length : Array.isArray(value.rows) ? value.rows.length : undefined;
     if (variants !== undefined) return `${variants} variant option(s)`;
     return Object.entries(value).map(([key, entry]) => `${key}: ${Array.isArray(entry) ? entry.join(", ") : String(entry)}`).join(" · ");
   }
@@ -354,55 +360,6 @@ function ProductDnaCapsule({ item }: { item: ProductExperience }) {
           </div>
         </div>
       </div>
-      <style jsx>{`
-        .dna-capsule::before {
-          content: "";
-          position: absolute;
-          inset: 14px 28px;
-          border-radius: 999px;
-          background: linear-gradient(90deg, transparent, rgba(255,255,255,.16), transparent);
-          transform: translateX(-24px);
-          animation: capsule-sheen 7s ease-in-out infinite;
-        }
-        .dna-core {
-          animation: core-float 7.5s ease-in-out infinite;
-          transition: filter .5s ease, transform .5s ease;
-        }
-        .dna-core-stage:hover .dna-core,
-        .dna-core:focus-visible {
-          transform: translateY(-2px) scale(1.018);
-          filter: brightness(1.08) drop-shadow(0 0 30px rgba(200,210,230,.34));
-        }
-        .core-particle {
-          position: absolute;
-          left: var(--particle-left);
-          top: var(--particle-top);
-          height: 2px;
-          width: 2px;
-          border-radius: 999px;
-          background: rgba(237,243,255,.72);
-          box-shadow: 0 0 10px rgba(200,210,230,.8);
-          animation: particle-drift 8s ease-in-out infinite;
-          animation-delay: calc(var(--particle-index) * -.42s);
-        }
-        @keyframes capsule-sheen {
-          0%, 64%, 100% { opacity: .28; transform: translateX(-24px); }
-          76% { opacity: .68; transform: translateX(28px); }
-        }
-        @keyframes core-float {
-          0%, 100% { transform: translateY(0) scale(1); }
-          50% { transform: translateY(-5px) scale(1.006); }
-        }
-        @keyframes particle-drift {
-          0%, 100% { opacity: .25; transform: translate3d(0, 0, 0); }
-          50% { opacity: .78; transform: translate3d(6px, -8px, 0); }
-        }
-        @media (prefers-reduced-motion: reduce) {
-          .dna-capsule::before,
-          .dna-core,
-          .core-particle { animation: none; }
-        }
-      `}</style>
     </section>
   );
 }

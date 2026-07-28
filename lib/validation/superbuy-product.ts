@@ -37,7 +37,29 @@ function asVariantOptions(value: unknown): SuperbuyProduct["variantOptions"] {
   const input = value as Record<string, unknown>;
   const colors = Array.isArray(input.colors) ? input.colors.filter((option): option is string => typeof option === "string" && option.trim().length > 0) : undefined;
   const sizes = Array.isArray(input.sizes) ? input.sizes.filter((option): option is string => typeof option === "string" && option.trim().length > 0) : undefined;
-  return colors?.length || sizes?.length ? { colors, sizes } : undefined;
+  const groups = Array.isArray(input.groups) ? input.groups.flatMap((group) => {
+    if (!group || typeof group !== "object") return [];
+    const record = group as Record<string, unknown>;
+    const label = asText(record.label);
+    const options = Array.isArray(record.options)
+      ? record.options.flatMap((option) => {
+          if (!option || typeof option !== "object") return [];
+          const optionRecord = option as Record<string, unknown>;
+          const optionLabel = asText(optionRecord.label);
+          if (!optionLabel) return [];
+          return [{ id: asText(optionRecord.id), label: optionLabel, translatedLabel: asText(optionRecord.translatedLabel), image: asText(optionRecord.image), price: asNumber(optionRecord.price), stock: asNumber(optionRecord.stock), available: typeof optionRecord.available === "boolean" ? optionRecord.available : undefined }];
+        })
+      : [];
+    return label && options.length ? [{ label, translatedLabel: asText(record.translatedLabel), options }] : [];
+  }) : undefined;
+  const combinations = Array.isArray(input.combinations) ? input.combinations.flatMap((combo) => {
+    if (!combo || typeof combo !== "object") return [];
+    const record = combo as Record<string, unknown>;
+    const optionIds = Array.isArray(record.optionIds) ? record.optionIds.filter((entry): entry is string => typeof entry === "string") : [];
+    const labels = Array.isArray(record.labels) ? record.labels.filter((entry): entry is string => typeof entry === "string") : [];
+    return optionIds.length || labels.length ? [{ optionIds, labels, price: asNumber(record.price), stock: asNumber(record.stock), available: typeof record.available === "boolean" ? record.available : undefined }] : [];
+  }) : undefined;
+  return colors?.length || sizes?.length || groups?.length || combinations?.length ? { colors, sizes, groups, combinations } : undefined;
 }
 
 function asRawAttributes(value: unknown): SuperbuyProduct["rawAttributes"] {
@@ -92,7 +114,18 @@ export function parseSuperbuyProduct(value: unknown): SuperbuyProduct {
     stock: asNumber(input.stock),
     minimumOrderQuantity: asNumber(input.minimumOrderQuantity),
     price: asNumber(input.price),
+    priceCurrency: asText(input.priceCurrency) === "USD" ? "USD" : asText(input.priceCurrency) === "CNY" ? "CNY" : asText(input.priceCurrency) === "RMB" ? "RMB" : undefined,
+    priceTiers: Array.isArray(input.priceTiers) ? input.priceTiers.flatMap((tier) => {
+      if (!tier || typeof tier !== "object") return [];
+      const record = tier as Record<string, unknown>;
+      const minimumQuantity = asNumber(record.minimumQuantity);
+      const price = asNumber(record.price);
+      if (minimumQuantity === undefined || price === undefined) return [];
+      const currency = asText(record.currency) === "USD" ? "USD" : asText(record.currency) === "CNY" ? "CNY" : asText(record.currency) === "RMB" ? "RMB" : undefined;
+      return [{ minimumQuantity, price, currency }];
+    }) : undefined,
     domesticShipping: asNumber(input.domesticShipping),
+    domesticShippingCurrency: asText(input.domesticShippingCurrency) === "USD" ? "USD" : asText(input.domesticShippingCurrency) === "CNY" ? "CNY" : asText(input.domesticShippingCurrency) === "RMB" ? "RMB" : undefined,
     internationalShipping: asNumber(input.internationalShipping),
     dimensionsParsed: typeof input.dimensionsParsed === "object" && input.dimensionsParsed ? input.dimensionsParsed as SuperbuyProduct["dimensionsParsed"] : undefined,
     sellerRating: asNumber(input.sellerRating),

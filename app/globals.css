@@ -319,4 +319,83 @@
   .faust-scrollbar::-webkit-scrollbar-thumb:hover {
     background: oklch(0.6 0.055 262 / 0.86);
   }
+
+  .dna-capsule::before {
+    content: "";
+    position: absolute;
+    inset: 14px 28px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.16), transparent);
+    transform: translateX(-24px);
+    animation: capsule-sheen 7s ease-in-out infinite;
+  }
+
+  .dna-core {
+    animation: core-float 7.5s ease-in-out infinite;
+    transition:
+      filter 0.5s ease,
+      transform 0.5s ease;
+  }
+
+  .dna-core-stage:hover .dna-core,
+  .dna-core:focus-visible {
+    transform: translateY(-2px) scale(1.018);
+    filter: brightness(1.08) drop-shadow(0 0 30px rgb(200 210 230 / 0.34));
+  }
+
+  .core-particle {
+    position: absolute;
+    left: var(--particle-left);
+    top: var(--particle-top);
+    height: 2px;
+    width: 2px;
+    border-radius: 999px;
+    background: rgb(237 243 255 / 0.72);
+    box-shadow: 0 0 10px rgb(200 210 230 / 0.8);
+    animation: particle-drift 8s ease-in-out infinite;
+    animation-delay: calc(var(--particle-index) * -0.42s);
+  }
+
+  @keyframes capsule-sheen {
+    0%,
+    64%,
+    100% {
+      opacity: 0.28;
+      transform: translateX(-24px);
+    }
+    76% {
+      opacity: 0.68;
+      transform: translateX(28px);
+    }
+  }
+
+  @keyframes core-float {
+    0%,
+    100% {
+      transform: translateY(0) scale(1);
+    }
+    50% {
+      transform: translateY(-5px) scale(1.006);
+    }
+  }
+
+  @keyframes particle-drift {
+    0%,
+    100% {
+      opacity: 0.25;
+      transform: translate3d(0, 0, 0);
+    }
+    50% {
+      opacity: 0.78;
+      transform: translate3d(6px, -8px, 0);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .dna-capsule::before,
+    .dna-core,
+    .core-particle {
+      animation: none;
+    }
+  }
 }

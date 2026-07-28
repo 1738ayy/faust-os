@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createPerformanceTimer, serverTimingHeader } from "@/lib/performance";
 import type { ProductKnowledgeFieldKey } from "@/domain/business";
-import { deleteCatalogProduct, duplicateCatalogProduct, getOperatingData, restoreCatalogProduct, saveProductDigitalTwinAsset, saveProductKnowledgeDecision, snapshot, updateCatalogProduct } from "@/services/operating-system/repository";
+import { deleteCatalogProduct, duplicateCatalogProduct, getOperatingData, manageProductKnowledgeMemory, restoreCatalogProduct, saveProductDigitalTwinAsset, saveProductKnowledgeDecision, snapshot, updateCatalogProduct } from "@/services/operating-system/repository";
 
 const skuSchema = z.string().trim().min(1).max(120).regex(/^[A-Za-z0-9_-]+$/, "SKU can only use letters, numbers, hyphens, and underscores.");
 
@@ -28,6 +28,7 @@ const productActionSchema = z.discriminatedUnion("action", [
     failureCode: z.string().trim().max(120).nullable().optional(),
   }),
   z.object({ action: z.literal("review-knowledge"), productId: z.string().uuid(), fieldKey: z.string().trim().min(1).max(80), decision: z.enum(["confirmed", "corrected", "rejected", "overridden"]), value: z.union([z.string(), z.number(), z.boolean(), z.array(z.string()), z.record(z.string(), z.unknown()), z.null()]).optional(), reason: z.string().trim().max(500).optional() }),
+  z.object({ action: z.literal("manage-knowledge-memory"), memoryId: z.string().uuid(), memoryAction: z.enum(["suspend", "restore", "delete", "narrow-scope"]), scope: z.enum(["business", "supplier", "source_platform", "universal_category"]).optional() }),
   z.object({ action: z.literal("delete-many"), variantIds: z.array(z.string().uuid()).min(1) }),
 ]);
 
@@ -69,6 +70,8 @@ export async function POST(request: Request) {
                 ? await saveProductDigitalTwinAsset(body)
                 : body.action === "review-knowledge"
                   ? await saveProductKnowledgeDecision({ ...body, fieldKey: body.fieldKey as ProductKnowledgeFieldKey })
+                  : body.action === "manage-knowledge-memory"
+                    ? await manageProductKnowledgeMemory({ memoryId: body.memoryId, action: body.memoryAction, scope: body.scope })
                 : await body.variantIds.reduce(async (previous, variantId) => {
               await previous;
               return deleteCatalogProduct(variantId);
