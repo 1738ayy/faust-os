@@ -73,6 +73,7 @@ test("Listings 2.0 publish jobs are idempotent, partial, retryable, and risk-loc
   const key = crypto.randomUUID();
   createCrossListingPublishJob(data, { productId: data.products[0].id, marketplaces: ["Depop", "Etsy", "Poshmark"], idempotencyKey: key });
   createCrossListingPublishJob(data, { productId: data.products[0].id, marketplaces: ["Depop", "Etsy", "Poshmark"], idempotencyKey: key });
+  createCrossListingPublishJob(data, { productId: data.products[0].id, marketplaces: ["Depop", "Etsy", "Poshmark"], idempotencyKey: crypto.randomUUID() });
   assert.equal(data.crossListingJobs?.length, 1);
   assert.ok(data.marketplacePublishTasks!.some((task) => task.status === "published"));
   assert.ok(data.marketplacePublishTasks!.some((task) => task.status === "queued"));
@@ -91,6 +92,21 @@ test("Listings 2.0 publish jobs are idempotent, partial, retryable, and risk-loc
   riskData.inventoryRiskLocks = [{ id: crypto.randomUUID(), variantId: riskData.variants[0].id, reason: "oversell_risk", status: "active", lockedQuantity: 1, createdAt: new Date().toISOString() }];
   createCrossListingPublishJob(riskData, { productId: riskData.products[0].id, marketplaces: ["Depop"], idempotencyKey: crypto.randomUUID() });
   assert.equal(riskData.marketplacePublishTasks?.[0].failureCode, "risk_lock");
+});
+
+test("Listings 2.0 composer can edit legacy drafts before editable fields are materialized", () => {
+  const data = fixture();
+  seedMarketplaceAccountsAndTemplates(data);
+  createFiveChannelDrafts(data, { variantId: data.variants[0].id, imageUrls: data.products[0].images });
+  const draft = data.channelListingDrafts!.find((entry) => entry.marketplace === "Depop")!;
+  data.marketplaceListingDraftFields = data.marketplaceListingDraftFields!.filter((field) => field.draftId !== draft.id);
+
+  const saved = saveMarketplaceDraftField(data, { draftId: draft.id, fieldKey: "title", currentValue: "Legacy draft edited from composer", actor: "tester" });
+
+  assert.equal(saved.generatedValue, "Vintage wash heavyweight hoodie - FST-HOOD-001");
+  assert.equal(saved.currentValue, "Legacy draft edited from composer");
+  assert.equal(draft.title, "Legacy draft edited from composer");
+  assert.equal(data.marketplaceListingDraftFields!.filter((field) => field.draftId === draft.id && field.fieldKey === "title").length, 1);
 });
 
 test("Listings 2.0 creates controlled sync reviews instead of overwriting published marketplace values", () => {

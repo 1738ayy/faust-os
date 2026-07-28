@@ -571,13 +571,22 @@ test("wholesale core API persists lots, FIFO allocations, journals, jobs, and ch
   expect(state.deadLetters.length).toBeGreaterThan(0);
 });
 
-test("listings API creates five channel drafts and coordinates publish, sync, manual fallback, and sold delists", async ({ request }) => {
+test("listings API creates five channel drafts and coordinates publish, sync, manual fallback, and sold delists", async ({ request, page }) => {
   await resetDemo(request);
   let state = (await (await request.get("/api/operating-system")).json()).data;
   const variant = state.variants[0];
   const create = await request.post("/api/listings/actions", { data: { action: "create-five-drafts", variantId: variant.id, physicalSku: "PW-HOOD-L", basePrice: 90, imageUrls: ["/hoodie.png"], idempotencyKey: crypto.randomUUID() } });
   expect(create.ok(), await create.text()).toBeTruthy(); state = (await create.json()).data;
   expect(state.channelListingDrafts.length).toBe(5); expect(state.physicalSkuMappings.filter((entry: { physicalSku: string }) => entry.physicalSku === "PW-HOOD-L").length).toBe(5);
+  await page.goto("/listings");
+  const composer = page.getByRole("region", { name: "Full Cross-Listing Composer" });
+  await expect(composer).toBeVisible();
+  await expect(composer.getByText("Full composer", { exact: true })).toBeVisible();
+  await expect(composer.getByRole("tab", { name: /Depop/i })).toBeVisible();
+  await expect(composer.getByRole("button", { name: "Generate drafts", exact: true })).toBeVisible();
+  await expect(composer.getByRole("button", { name: "Publish ready listings", exact: true })).toBeVisible();
+  await expect(composer.getByRole("heading", { name: "Readiness & economics", exact: true })).toBeVisible();
+  await expect(composer.getByRole("heading", { name: "Final review", exact: true })).toBeVisible();
   const depop = state.channelListingDrafts.find((entry: { marketplace: string }) => entry.marketplace === "Depop");
   const etsy = state.channelListingDrafts.find((entry: { marketplace: string }) => entry.marketplace === "Etsy");
   const published = await request.post("/api/listings/actions", { data: { action: "publish-draft", draftId: depop.id, idempotencyKey: crypto.randomUUID() } });

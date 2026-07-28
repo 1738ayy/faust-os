@@ -403,6 +403,8 @@ export function createCrossListingPublishJob(data: OperatingData, input: CrossLi
   }
   const product = data.products.find((entry) => entry.id === input.productId);
   if (!product) throw new Error("Product not found for cross-listing publish.");
+  const activeExistingJob = data.crossListingJobs!.find((job) => job.productId === product.id && ["queued", "running", "partially_completed"].includes(job.status));
+  if (activeExistingJob) return data;
   const variant = data.variants.find((entry) => entry.productId === product.id && isActiveVariant(data, entry));
   if (!variant) throw new Error("Product needs an active SKU before publishing.");
   createFiveChannelDrafts(data, { variantId: variant.id, imageUrls: productImageUrls(data, product.id), idempotencyKey: input.idempotencyKey ? `${input.idempotencyKey.slice(0, 18)}00000000000000` : undefined });

@@ -79,8 +79,26 @@ export function saveListingDraftField(data: OperatingData, input: { draftId: str
   ensureDraftFieldCollections(data);
   const draft = data.channelListingDrafts?.find((entry) => entry.id === input.draftId);
   if (!draft) throw new Error("Listing draft not found.");
-  const existing = data.marketplaceListingDraftFields!.find((entry) => entry.draftId === input.draftId && entry.fieldKey === input.fieldKey);
-  if (!existing) throw new Error("Listing draft field not found. Regenerate the marketplace draft before editing.");
+  let existing = data.marketplaceListingDraftFields!.find((entry) => entry.draftId === input.draftId && entry.fieldKey === input.fieldKey);
+  if (!existing) {
+    const generatedValue = generatedValueFromDraft(draft, input.fieldKey);
+    existing = {
+      id: id(),
+      draftId: draft.id,
+      fieldKey: input.fieldKey,
+      generatedValue,
+      currentValue: generatedValue,
+      source: "mapping",
+      sourcePath: `channelListingDrafts.${input.fieldKey}`,
+      confidence: 0.85,
+      isOverridden: false,
+      validationState: generatedValue === null || generatedValue === "" ? "blocked" : "valid",
+      validationMessage: generatedValue === null || generatedValue === "" ? "This generated value is missing." : null,
+      createdAt: now(),
+      updatedAt: now(),
+    };
+    data.marketplaceListingDraftFields!.push(existing);
+  }
   existing.currentValue = input.currentValue;
   existing.source = "user_edit";
   existing.isOverridden = true;
@@ -98,6 +116,17 @@ export function saveListingDraftField(data: OperatingData, input: { draftId: str
     createdAt: now(),
   });
   return existing;
+}
+
+function generatedValueFromDraft(draft: ChannelListingDraft, fieldKey: string): ListingDraftEditableValue {
+  if (fieldKey === "title") return draft.title;
+  if (fieldKey === "description") return draft.description;
+  if (fieldKey === "price") return draft.price;
+  if (fieldKey === "category") return draft.category;
+  if (fieldKey === "quantity") return draft.quantity;
+  if (fieldKey === "images") return draft.imageUrls;
+  const value = draft.attributes[fieldKey];
+  return value === undefined ? null : value;
 }
 
 export function resetListingDraftField(data: OperatingData, input: { draftId: string; fieldKey: string; actor?: string }) {
