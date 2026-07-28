@@ -6,6 +6,7 @@ import { money } from "./business-calculations";
 import { adapterForMarketplace, adapterHealth, marketplaceAdapters } from "./extension-adapters";
 import { canonicalListingIdentity, upsertImportQueueScan } from "./import-queue";
 import { normalizeProductImageUrls, setProductImages } from "./product-images";
+import { buildProductKnowledgeFromSuperbuy, ensureProductKnowledgeCollections } from "./product-knowledge";
 
 const now = () => new Date().toISOString();
 const id = () => crypto.randomUUID();
@@ -48,6 +49,7 @@ function audit(data: OperatingData, action: string, entityType: string, entityId
 }
 
 export function ensureExtensionCollections(data: OperatingData) {
+  ensureProductKnowledgeCollections(data);
   data.extensionDevices ||= [];
   data.extensionSessions ||= [];
   data.extensionArtifacts ||= [];
@@ -186,6 +188,7 @@ export function importExtensionProduct(data: OperatingData, input: unknown, assu
   const productImages = normalizeProductImageUrls(product.images);
   if (existing) {
     if (productImages.length) setProductImages(data, existing, productImages, { now: now(), id, sourceType: "extension" });
+    buildProductKnowledgeFromSuperbuy(data, existing.id, product, existing.supplierId);
     const variants = data.variants.filter((entry) => entry.productId === existing.id);
     if (variants.length) {
       seedMarketplaceAccountsAndTemplates(data);
@@ -200,6 +203,7 @@ export function importExtensionProduct(data: OperatingData, input: unknown, assu
   const catalogProduct: Product = { id: id(), title: product.title, category: product.category || "Imported source product", tags: ["extension-import", product.source], supplierId: supplier.id, sourceUrl: product.superbuyUrl, image: productImages[0], images: productImages, status: "draft", createdAt, updatedAt: createdAt };
   data.products.push(catalogProduct);
   setProductImages(data, catalogProduct, productImages, { now: createdAt, id, sourceType: "extension" });
+  buildProductKnowledgeFromSuperbuy(data, catalogProduct.id, product, supplier.id);
   const createdVariants: Variant[] = [];
   for (const scannedVariant of scannedVariants(product)) {
     const landedUnitCost = variantLandedUnitCost(product, analysis, scannedVariant.price);

@@ -173,6 +173,20 @@
     );
   }
 
+  function rawSupplierAttributes(structured) {
+    const attributes = {};
+    const set = (label, value) => {
+      const cleaned = cleanText(value);
+      if (cleaned) attributes[label] = cleaned;
+    };
+    set("Product Category", labeledCategory(structured));
+    set("Main Fabric Composition", firstCleanMatch(/(?:Main\s*)?Fabric\s*Composition\s*:?\s*([^\n]+)/i) || valueAfterLabel(/(?:Main\s*)?Fabric\s*Composition/i));
+    set("Material", firstCleanMatch(/Material\s*:?\s*([^\n]+)/i) || valueAfterLabel(/Material/i));
+    set("Weight", firstCleanMatch(/(?:Item\s*)?Weight\s*[:ï¼š]?\s*([\d.]+\s*(?:g|kg|lb|lbs|oz))/i) || valueAfterLabel(/(?:Item\s*)?Weight/i));
+    set("Dimensions", firstCleanMatch(/(?:Dimensions?|Size)\s*:?\s*([^\n]+)/i));
+    return attributes;
+  }
+
   function productPrice(structured) {
     const structuredPrice = numberFrom(structured?.offers?.price);
     if (structuredPrice !== undefined) return structuredPrice;
@@ -338,6 +352,7 @@
     const visibleInternationalFreight = firstNumberMatch(/(?:International|Overseas|United States|US)\s*(?:shipping|freight)\s*[:：]?\s*(?:US\s*\$|USD|RMB|CNY|CN¥|¥)?\s*([\d,.]+)/i);
     const estimatedInternationalFreight = estimatedFreightToUnitedStates(shippingWeight || weight);
     const variantExtraction = extractVariants();
+    const rawAttributes = rawSupplierAttributes(structured);
 
     return {
       source: /1688\.com/i.test(location.hostname) ? "1688" : "superbuy",
@@ -351,6 +366,7 @@
       category: labeledCategory(structured),
       description: cleanText(structured?.description) || cleanText(document.querySelector('[class*="description" i]')?.textContent),
       material: firstCleanMatch(/(?:Main\s*)?Fabric\s*Composition\s*:?\s*([^\n]+)/i) || valueAfterLabel(/(?:Main\s*)?Fabric\s*Composition/i) || firstCleanMatch(/Material\s*:?\s*([^\n]+)/i) || valueAfterLabel(/Material/i),
+      rawAttributes,
       dimensions: firstCleanMatch(/(?:Dimensions?|Size)\s*:?\s*([^\n]+)/i),
       weight,
       shippingWeight,

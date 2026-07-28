@@ -24,6 +24,7 @@ function experience(overrides: Partial<ProductExperience> = {}): ProductExperien
     ],
     ai: { recommendation: "", confidence: 0, evidence: "", nextAction: "Complete product details" },
     intelligence: { faustScore: { score: 0, label: "New", explanation: "", components: [] }, health: [], dna: [], relationships: [], recommendation: { situation: "", reasoning: "", expectedOutcome: "", confidence: 0, confidenceBasis: [] } },
+    productKnowledge: { fields: [], evidence: [], decisions: [], completeness: [] },
     timeline: [],
   } satisfies ProductExperience;
   return { ...base, ...overrides } as ProductExperience;

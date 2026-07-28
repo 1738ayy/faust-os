@@ -3,6 +3,7 @@ import { availableUnits, money, orderProfit } from "@/lib/business-calculations"
 import { buildProductIntelligence, type ProductIntelligence } from "@/lib/product-intelligence";
 import { productCoverImage, productCoverRecord, productImageRevision } from "@/lib/product-images";
 import { getProductReadiness } from "@/lib/product-readiness";
+import { productKnowledgeSummary } from "@/lib/product-knowledge";
 import { activeVariants, isActiveProduct, isActiveVariant } from "./product-state";
 
 export type MarketplacePresence = {
@@ -67,6 +68,7 @@ export type ProductExperience = {
     nextAction: string;
   };
   intelligence: ProductIntelligence;
+  productKnowledge: ReturnType<typeof productKnowledgeSummary>;
   timeline: { id: string; title: string; detail: string; at: string }[];
 };
 
@@ -156,6 +158,7 @@ export function buildProductExperience(data: OperatingData, product: Product, va
     velocityLabel: unitsSold ? `${unitsSold} unit(s) sold from stored orders` : "No sales velocity yet",
   };
   const intelligence = buildProductIntelligence({ data, product, variant, supplier, readiness, marketplaces, inventory, finance, analytics });
+  const productKnowledge = productKnowledgeSummary(data, product.id);
   const recommended = productAiRecommendation(readiness.score, inventory.available, variant.reorderPoint, marketplaces, margin);
 
   return {
@@ -186,6 +189,7 @@ export function buildProductExperience(data: OperatingData, product: Product, va
       nextAction: readiness.nextAction,
     },
     intelligence,
+    productKnowledge,
     timeline,
   };
 }

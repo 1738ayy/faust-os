@@ -6,6 +6,7 @@ import { MarketplaceEngine, getMarketplaceProfile } from "./marketplace-intellig
 import type { ManagedMarketplace, MarketplaceDraftInspector } from "./marketplace-intelligence";
 import { materializeDraftFields, resetListingDraftField, saveListingDraftField, type ListingDraftEditableValue } from "./listings/draft-fields";
 import { imageUrlsForMarketplace, saveMarketplaceImageOrder } from "./listings/image-order";
+import { productWithKnowledge, variantWithKnowledge } from "./product-knowledge";
 
 const now = () => new Date().toISOString();
 const id = () => crypto.randomUUID();
@@ -124,7 +125,7 @@ function universalCategoryFor(data: OperatingData, productId: string, variantId:
   const product = data.products.find((entry) => entry.id === productId);
   const variant = data.variants.find((entry) => entry.id === variantId);
   if (!product || !variant) return null;
-  const inspector = MarketplaceEngine.inspectDraft({ product, variant, physicalSku: variant.sku, quantity: 0, productImages: productImagesFor(data, productId), imageUrls: productImageUrls(data, productId) }, marketplace);
+  const inspector = MarketplaceEngine.inspectDraft({ product: productWithKnowledge(data, product), variant: variantWithKnowledge(data, product.id, variant), physicalSku: variant.sku, quantity: 0, productImages: productImagesFor(data, productId), imageUrls: productImageUrls(data, productId) }, marketplace);
   return inspector.universalInput.identity.categoryId;
 }
 
@@ -197,9 +198,11 @@ export function inspectProductMarketplaceDraft(data: OperatingData, input: { var
   const defaults = account ? data.marketplaceAccountDefaults!.filter((entry) => entry.enabled && entry.marketplaceAccountId === account.id && (entry.universalCategoryId === null || entry.universalCategoryId === universalCategoryId)) : [];
   const overrides = overridesFor(data, product.id, variant.id, input.marketplace, account?.id);
   const balance = data.balances.find((entry) => entry.variantId === variant.id);
+  const knowledgeProduct = productWithKnowledge(data, product);
+  const knowledgeVariant = variantWithKnowledge(data, product.id, variant);
   const draft = MarketplaceEngine.inspectDraft({
-    product,
-    variant,
+    product: knowledgeProduct,
+    variant: knowledgeVariant,
     physicalSku: variant.sku,
     quantity: balance ? availableUnits(balance) : 0,
     productImages: productImagesFor(data, product.id),
@@ -209,8 +212,11 @@ export function inspectProductMarketplaceDraft(data: OperatingData, input: { var
   const enrichedFields = draft.mappingSources.map((field) => {
     const accountDefault = defaultForField(data, account?.id, universalCategoryId, field.fieldKey);
     const productOverride = overrides.find((entry) => entry.fieldKey === field.fieldKey);
+    const knowledgeKey = field.fieldKey === "title" ? "suggested_title" : field.fieldKey === "description" ? "suggested_description" : field.fieldKey === "category" ? "universal_category" : field.fieldKey === "condition" ? "condition" : undefined;
+    const knowledge = knowledgeKey ? data.productKnowledgeFields?.find((entry) => entry.productId === product.id && entry.fieldKey === knowledgeKey) : undefined;
     if (productOverride) return { ...field, value: productOverride.value, source: "user_override" as const, sourcePath: "productMarketplaceOverrides", confidence: 1 };
     if (accountDefault) return { ...field, value: accountDefault.value, source: "marketplace_default" as const, sourcePath: accountDefault.universalCategoryId ? "categoryAccountDefault" : "accountDefault", confidence: 0.96 };
+    if (knowledge && knowledge.status !== "missing" && knowledge.status !== "rejected") return { ...field, source: "product" as const, sourcePath: `productKnowledge.${knowledge.fieldKey}`, confidence: knowledge.confidence, warnings: [...field.warnings, ...(knowledge.status === "generated" && knowledge.confidence < 0.75 ? ["Product Knowledge needs user confirmation."] : [])] };
     return field;
   });
   return { ...draft, mappingSources: enrichedFields, defaultsApplied: enrichedFields.filter((field) => field.source === "marketplace_default"), overridesApplied: enrichedFields.filter((field) => field.source === "user_override") } satisfies MarketplaceDraftInspector;
@@ -296,6 +302,8 @@ export function createFiveChannelDrafts(data: OperatingData, input: CreateCrossL
   const variant = data.variants.find((entry) => entry.id === input.variantId);
   if (!variant || !isActiveVariant(data, variant)) throw new Error("Active variant not found for cross-listing.");
   const product = data.products.find((entry) => entry.id === variant.productId);
+  const knowledgeProduct = product ? productWithKnowledge(data, product) : undefined;
+  const knowledgeVariant = product ? variantWithKnowledge(data, product.id, variant) : variant;
   const balance = data.balances.find((entry) => entry.variantId === variant.id);
   const quantity = Math.max(balance ? availableUnits(balance) : 0, 0);
   const physicalSku = input.physicalSku || variant.sku;
@@ -303,8 +311,8 @@ export function createFiveChannelDrafts(data: OperatingData, input: CreateCrossL
     const account = data.marketplaceAccounts!.find((entry) => entry.marketplace === marketplace);
     const template = data.listingTemplates!.find((entry) => entry.marketplace === marketplace)!;
     const draftPlan = MarketplaceEngine.generateDraft({
-      product: product || { id: variant.productId, title: variant.title, category: "Clothing", tags: [], status: "active", createdAt: now(), updatedAt: now() },
-      variant,
+      product: knowledgeProduct || { id: variant.productId, title: variant.title, category: "Clothing", tags: [], status: "active", createdAt: now(), updatedAt: now() },
+      variant: knowledgeVariant,
       physicalSku,
       quantity,
       basePrice: input.basePrice,

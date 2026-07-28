@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createPerformanceTimer, serverTimingHeader } from "@/lib/performance";
-import { deleteCatalogProduct, duplicateCatalogProduct, getOperatingData, restoreCatalogProduct, saveProductDigitalTwinAsset, snapshot, updateCatalogProduct } from "@/services/operating-system/repository";
+import type { ProductKnowledgeFieldKey } from "@/domain/business";
+import { deleteCatalogProduct, duplicateCatalogProduct, getOperatingData, restoreCatalogProduct, saveProductDigitalTwinAsset, saveProductKnowledgeDecision, snapshot, updateCatalogProduct } from "@/services/operating-system/repository";
 
 const skuSchema = z.string().trim().min(1).max(120).regex(/^[A-Za-z0-9_-]+$/, "SKU can only use letters, numbers, hyphens, and underscores.");
 
@@ -26,6 +27,7 @@ const productActionSchema = z.discriminatedUnion("action", [
     processorVersion: z.string().trim().min(1).max(80),
     failureCode: z.string().trim().max(120).nullable().optional(),
   }),
+  z.object({ action: z.literal("review-knowledge"), productId: z.string().uuid(), fieldKey: z.string().trim().min(1).max(80), decision: z.enum(["confirmed", "corrected", "rejected", "overridden"]), value: z.union([z.string(), z.number(), z.boolean(), z.array(z.string()), z.record(z.string(), z.unknown()), z.null()]).optional(), reason: z.string().trim().max(500).optional() }),
   z.object({ action: z.literal("delete-many"), variantIds: z.array(z.string().uuid()).min(1) }),
 ]);
 
@@ -65,6 +67,8 @@ export async function POST(request: Request) {
               ? await updateCatalogProduct(body)
               : body.action === "save-digital-twin"
                 ? await saveProductDigitalTwinAsset(body)
+                : body.action === "review-knowledge"
+                  ? await saveProductKnowledgeDecision({ ...body, fieldKey: body.fieldKey as ProductKnowledgeFieldKey })
                 : await body.variantIds.reduce(async (previous, variantId) => {
               await previous;
               return deleteCatalogProduct(variantId);

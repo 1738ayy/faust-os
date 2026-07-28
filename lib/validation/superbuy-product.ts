@@ -40,6 +40,20 @@ function asVariantOptions(value: unknown): SuperbuyProduct["variantOptions"] {
   return colors?.length || sizes?.length ? { colors, sizes } : undefined;
 }
 
+function asRawAttributes(value: unknown): SuperbuyProduct["rawAttributes"] {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const attributes: NonNullable<SuperbuyProduct["rawAttributes"]> = {};
+  for (const [key, raw] of Object.entries(value as Record<string, unknown>)) {
+    if (!key.trim()) continue;
+    if (typeof raw === "string" || typeof raw === "number" || typeof raw === "boolean") attributes[key.trim()] = raw;
+    else if (Array.isArray(raw)) {
+      const values = raw.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0);
+      if (values.length) attributes[key.trim()] = values;
+    }
+  }
+  return Object.keys(attributes).length ? attributes : undefined;
+}
+
 /** Converts untrusted extension data into the one import model used by Faust. */
 export function parseSuperbuyProduct(value: unknown): SuperbuyProduct {
   if (!value || typeof value !== "object") throw new Error("Import payload must be an object.");
@@ -69,6 +83,7 @@ export function parseSuperbuyProduct(value: unknown): SuperbuyProduct {
     subcategory: asText(input.subcategory),
     description: asText(input.description),
     material: asText(input.material),
+    rawAttributes: asRawAttributes(input.rawAttributes) || asRawAttributes(input.attributes) || asRawAttributes(input.supplierAttributes),
     dimensions: asText(input.dimensions),
     weight: asText(input.weight),
     shippingWeight: asText(input.shippingWeight),

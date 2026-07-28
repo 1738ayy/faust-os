@@ -13,6 +13,7 @@ export type SuperbuyProduct = {
   subcategory?: string;
   description?: string;
   material?: string;
+  rawAttributes?: Record<string, string | number | boolean | string[]>;
   dimensions?: string;
   weight?: string;
   shippingWeight?: string;

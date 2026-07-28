@@ -112,6 +112,7 @@ test("Superbuy extractor prefers product facts over navigation text", () => {
       internationalShipping: number;
       internationalShippingEstimateSource: string;
       material: string;
+      rawAttributes: Record<string, string>;
       weight: string;
       variantOptions: { colors: string[]; sizes: string[] };
       variants: { name: string; options: string[] }[];
@@ -195,6 +196,8 @@ test("Superbuy extractor prefers product facts over navigation text", () => {
   assert.equal(product?.supplier, "Guangzhou Blank Apparel Co.");
   assert.equal(product?.category, "T-shirt");
   assert.equal(product?.material, "Cotton");
+  assert.equal(product?.rawAttributes["Product Category"], "T-shirt");
+  assert.equal(product?.rawAttributes["Main Fabric Composition"], "Cotton");
   assert.equal(product?.price, 4.5);
   assert.equal(product?.domesticShipping, 12);
   assert.equal(product?.weight, "650g");
