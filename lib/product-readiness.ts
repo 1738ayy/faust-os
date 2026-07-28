@@ -1,8 +1,8 @@
-import type { OperatingData, Product, Variant } from "@/domain/business";
-import { availableUnits } from "@/lib/business-calculations";
+import type { OperatingData, Product, Variant } from "../domain/business";
+import { availableUnits } from "./business-calculations";
 
 export type ReadinessStatus = "needs_work" | "incomplete" | "almost_ready" | "ready" | "published_everywhere" | "needs_details" | "waiting_for_inventory" | "needs_photos" | "needs_pricing_review" | "live";
-export type ReadinessDimensionKey = "photos" | "pricing" | "supplier" | "inventory" | "marketplace_category" | "seo" | "description" | "shipping_profile" | "cost_validation" | "margin_validation" | "marketplace_compliance";
+export type ReadinessDimensionKey = "photos" | "cover_image" | "pricing" | "supplier" | "inventory" | "marketplace_category" | "seo" | "description" | "shipping_profile" | "cost_validation" | "margin_validation" | "marketplace_compliance";
 export type ReadinessDimension = { key: ReadinessDimensionKey; label: string; ready: boolean; detail: string };
 
 export type ProductReadiness = {
@@ -21,8 +21,19 @@ export function getProductReadiness(data: OperatingData, variant: Variant, produ
   const marketplaces = new Set(listings.map((draft) => draft.marketplace));
   const supplier = data.suppliers.find((entry) => entry.id === product?.supplierId);
   const projectedMargin = variant.defaultSalePrice ? (variant.defaultSalePrice - variant.landedUnitCost) / variant.defaultSalePrice * 100 : 0;
-  const hasPhotos = Boolean(product?.image) || listings.some((draft) => draft.imageUrls.length);
-  const hasCategory = Boolean(product?.category) || listings.some((draft) => draft.category);
+  const productImages = (data.productImages || []).filter((image) => image.productId === product?.id);
+  const imageQuality = (data.productImageQuality || []).filter((quality) => quality.productId === product?.id);
+  const coverImageId = product?.coverImageId || productImages.find((image) => image.isCover)?.id;
+  const coverQuality = imageQuality.find((quality) => quality.imageId === coverImageId);
+  const hasPhotos = Boolean(product?.image) || productImages.length > 0 || listings.some((draft) => draft.imageUrls.length);
+  const hasUsableCover = hasPhotos && (!imageQuality.length || Boolean(coverQuality && !["size_chart", "detail", "excluded", "duplicate"].includes(coverQuality.role) && coverQuality.marketplaceSuitability >= 60));
+  const categoryConflict = Boolean(
+    product?.id
+    && (data.productKnowledgeFields || []).some((field) => field.productId === product.id && field.fieldKey === "universal_category" && field.source === "evidence")
+    && (data.productImageObservations || []).some((observation) => observation.productId === product.id && observation.observationType === "category_candidate")
+    && !(data.productImageReviewDecisions || []).some((decision) => decision.productId === product.id && ["approve_category_candidate", "reject_category_candidate"].includes(decision.action))
+  );
+  const hasCategory = (Boolean(product?.category) || listings.some((draft) => draft.category)) && !categoryConflict;
   const hasDescription = listings.some((draft) => draft.description.length > 40);
   const hasMarketplaceCompliance = listings.length > 0 && listings.every((draft) => draft.validationErrors.length === 0);
   const hasShippingProfile = Boolean(variant.weightOz) || listings.some((draft) => draft.attributes.shipping || draft.attributes.shippingProfile);
@@ -32,10 +43,11 @@ export function getProductReadiness(data: OperatingData, variant: Variant, produ
 
   const dimensions: ReadinessDimension[] = [
     { key: "photos", label: "Photos", ready: hasPhotos, detail: hasPhotos ? "Primary image or draft images are present." : "Add product and listing photos." },
+    { key: "cover_image", label: "Cover image", ready: hasUsableCover, detail: hasUsableCover ? "A publishable cover image is selected." : "Review the recommended cover image or choose a better photo." },
     { key: "pricing", label: "Pricing", ready: hasPrice, detail: hasPrice ? `Default price is $${variant.defaultSalePrice.toFixed(2)}.` : "Set the target selling price." },
     { key: "supplier", label: "Supplier", ready: Boolean(supplier), detail: supplier ? supplier.name : "Link the supplier." },
     { key: "inventory", label: "Inventory", ready: available > 0, detail: `${available} sellable unit(s) available.` },
-    { key: "marketplace_category", label: "Marketplace category", ready: hasCategory, detail: hasCategory ? "Product or draft category is present." : "Choose a marketplace-ready category." },
+    { key: "marketplace_category", label: "Marketplace category", ready: hasCategory, detail: categoryConflict ? "Supplier and image evidence disagree; review the category candidate." : hasCategory ? "Product or draft category is present." : "Choose a marketplace-ready category." },
     { key: "seo", label: "SEO", ready: hasSeo, detail: hasSeo ? "Draft title/description have enough marketplace detail." : "Improve title and description depth." },
     { key: "description", label: "Description", ready: hasDescription || Boolean(product?.title), detail: hasDescription ? "Marketplace description is ready." : "Complete product description." },
     { key: "shipping_profile", label: "Shipping profile", ready: hasShippingProfile, detail: hasShippingProfile ? "Weight or shipping profile exists." : "Add weight or shipping profile." },

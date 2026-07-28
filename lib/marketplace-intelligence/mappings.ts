@@ -2,12 +2,18 @@ import type { MarketplaceCategoryMapping, MarketplaceEnumMap, MarketplaceFieldDe
 
 export const universalCategoryIds = [
   "apparel.tops.tshirts",
+  "apparel.tops.general",
+  "apparel.tops.sweatshirts",
   "apparel.tops.hoodies",
   "apparel.bottoms.jeans",
+  "apparel.bottoms.shorts",
   "apparel.shoes.sneakers",
+  "jewelry.general",
   "jewelry.necklaces",
   "jewelry.bracelets",
+  "accessories.belts",
   "bags.handbags",
+  "accessories.general",
   "collectibles.general",
 ] as const;
 
@@ -15,25 +21,58 @@ export type UniversalCategoryId = typeof universalCategoryIds[number];
 
 export const universalCategoryLabels: Record<UniversalCategoryId, string> = {
   "apparel.tops.tshirts": "T-shirt",
+  "apparel.tops.general": "Tops",
+  "apparel.tops.sweatshirts": "Sweatshirt",
   "apparel.tops.hoodies": "Hoodie",
   "apparel.bottoms.jeans": "Jeans",
+  "apparel.bottoms.shorts": "Shorts",
   "apparel.shoes.sneakers": "Shoes",
+  "jewelry.general": "Jewelry",
   "jewelry.necklaces": "Necklace",
   "jewelry.bracelets": "Bracelet",
+  "accessories.belts": "Belt",
   "bags.handbags": "Handbag",
+  "accessories.general": "Accessories",
   "collectibles.general": "Collectible",
+};
+
+export type UniversalCategoryProfile = {
+  id: UniversalCategoryId;
+  displayName: string;
+  parent: string;
+  aliases: string[];
+  expectedAttributes: string[];
+  likelyVariantGroups: string[];
+  marketplaceMappingHooks: string[];
+  relatedCategories: UniversalCategoryId[];
+  disambiguationSignals: string[];
+  commonConfusions: UniversalCategoryId[];
+};
+
+export const universalCategoryProfiles: Record<UniversalCategoryId, UniversalCategoryProfile> = {
+  "apparel.tops.tshirts": { id: "apparel.tops.tshirts", displayName: "T-shirt", parent: "apparel.tops", aliases: ["t-shirt", "tee", "shirt", "short sleeve", "long sleeve tee", "短袖", "T恤"], expectedAttributes: ["material", "color", "size", "sleeve length"], likelyVariantGroups: ["Color", "Size"], marketplaceMappingHooks: ["clothing", "tops", "tshirt"], relatedCategories: ["apparel.tops.general", "apparel.tops.sweatshirts"], disambiguationSignals: ["pullover construction", "knit fabric", "no full front opening", "crew neck or graphic tee wording"], commonConfusions: ["apparel.tops.general", "apparel.tops.sweatshirts"] },
+  "apparel.tops.general": { id: "apparel.tops.general", displayName: "Tops", parent: "apparel.tops", aliases: ["top", "blouse", "camisole", "tank", "vest", "上衣"], expectedAttributes: ["material", "color", "size"], likelyVariantGroups: ["Color", "Size"], marketplaceMappingHooks: ["clothing", "tops"], relatedCategories: ["apparel.tops.tshirts", "apparel.tops.sweatshirts"], disambiguationSignals: ["top garment language without tee or sweatshirt evidence"], commonConfusions: ["apparel.tops.tshirts", "apparel.tops.sweatshirts"] },
+  "apparel.tops.sweatshirts": { id: "apparel.tops.sweatshirts", displayName: "Sweatshirt", parent: "apparel.tops", aliases: ["sweatshirt", "pullover", "crewneck", "fleece"], expectedAttributes: ["material", "color", "size"], likelyVariantGroups: ["Color", "Size"], marketplaceMappingHooks: ["clothing", "sweatshirt"], relatedCategories: ["apparel.tops.hoodies", "apparel.tops.tshirts"], disambiguationSignals: ["thicker fleece or sweatshirt wording", "no hood"], commonConfusions: ["apparel.tops.hoodies", "apparel.tops.tshirts"] },
+  "apparel.tops.hoodies": { id: "apparel.tops.hoodies", displayName: "Hoodie", parent: "apparel.tops", aliases: ["hoodie", "hooded sweatshirt", "sweater with hood", "连帽"], expectedAttributes: ["material", "color", "size"], likelyVariantGroups: ["Color", "Size"], marketplaceMappingHooks: ["clothing", "hoodie"], relatedCategories: ["apparel.tops.sweatshirts"], disambiguationSignals: ["hood visible or hood wording"], commonConfusions: ["apparel.tops.sweatshirts"] },
+  "apparel.bottoms.jeans": { id: "apparel.bottoms.jeans", displayName: "Jeans", parent: "apparel.bottoms", aliases: ["jeans", "denim pants", "牛仔裤"], expectedAttributes: ["waist", "inseam", "color", "denim"], likelyVariantGroups: ["Color", "Size"], marketplaceMappingHooks: ["clothing", "bottoms", "jeans"], relatedCategories: ["apparel.bottoms.shorts"], disambiguationSignals: ["long pants construction", "denim wording"], commonConfusions: ["apparel.bottoms.shorts"] },
+  "apparel.bottoms.shorts": { id: "apparel.bottoms.shorts", displayName: "Shorts", parent: "apparel.bottoms", aliases: ["shorts", "short pants", "jorts", "短裤"], expectedAttributes: ["waist", "inseam", "color"], likelyVariantGroups: ["Color", "Size"], marketplaceMappingHooks: ["clothing", "bottoms", "shorts"], relatedCategories: ["apparel.bottoms.jeans"], disambiguationSignals: ["short-leg bottom construction"], commonConfusions: ["apparel.bottoms.jeans"] },
+  "apparel.shoes.sneakers": { id: "apparel.shoes.sneakers", displayName: "Shoes", parent: "apparel.shoes", aliases: ["shoe", "sneaker", "boots", "鞋"], expectedAttributes: ["size", "color"], likelyVariantGroups: ["Color", "Shoe size"], marketplaceMappingHooks: ["shoes"], relatedCategories: ["accessories.general"], disambiguationSignals: ["pair footwear structure"], commonConfusions: ["accessories.general"] },
+  "jewelry.general": { id: "jewelry.general", displayName: "Jewelry", parent: "jewelry", aliases: ["jewelry", "jewellery", "饰品"], expectedAttributes: ["material", "color", "finish"], likelyVariantGroups: ["Color", "Style"], marketplaceMappingHooks: ["jewelry"], relatedCategories: ["jewelry.necklaces", "jewelry.bracelets"], disambiguationSignals: ["ornamental item but subtype unclear"], commonConfusions: ["jewelry.necklaces", "jewelry.bracelets", "accessories.general"] },
+  "jewelry.necklaces": { id: "jewelry.necklaces", displayName: "Necklace", parent: "jewelry", aliases: ["necklace", "chain", "pendant", "项链"], expectedAttributes: ["material", "length", "color"], likelyVariantGroups: ["Color", "Style"], marketplaceMappingHooks: ["jewelry", "necklace"], relatedCategories: ["jewelry.general", "jewelry.bracelets"], disambiguationSignals: ["chain or pendant worn around neck"], commonConfusions: ["jewelry.bracelets", "jewelry.general"] },
+  "jewelry.bracelets": { id: "jewelry.bracelets", displayName: "Bracelet", parent: "jewelry", aliases: ["bracelet", "bangle", "手链"], expectedAttributes: ["material", "color"], likelyVariantGroups: ["Color", "Style"], marketplaceMappingHooks: ["jewelry", "bracelet"], relatedCategories: ["jewelry.general", "jewelry.necklaces"], disambiguationSignals: ["wrist-worn chain or band"], commonConfusions: ["jewelry.necklaces", "jewelry.general"] },
+  "accessories.belts": { id: "accessories.belts", displayName: "Belt", parent: "accessories", aliases: ["belt", "waist belt", "腰带"], expectedAttributes: ["material", "length", "color"], likelyVariantGroups: ["Color", "Length"], marketplaceMappingHooks: ["accessories", "belt"], relatedCategories: ["accessories.general"], disambiguationSignals: ["strap with buckle or waist accessory"], commonConfusions: ["accessories.general", "bags.handbags"] },
+  "bags.handbags": { id: "bags.handbags", displayName: "Handbag", parent: "bags", aliases: ["bag", "handbag", "purse", "shoulder bag", "tote", "包"], expectedAttributes: ["material", "color", "dimensions"], likelyVariantGroups: ["Color", "Style"], marketplaceMappingHooks: ["bags"], relatedCategories: ["accessories.general"], disambiguationSignals: ["bag body with handle or strap"], commonConfusions: ["accessories.general"] },
+  "accessories.general": { id: "accessories.general", displayName: "Accessories", parent: "accessories", aliases: ["accessory", "accessories", "hair accessory", "配件"], expectedAttributes: ["material", "color"], likelyVariantGroups: ["Color", "Style"], marketplaceMappingHooks: ["accessories"], relatedCategories: ["accessories.belts", "jewelry.general", "bags.handbags"], disambiguationSignals: ["non-apparel wearable item with unclear subtype"], commonConfusions: ["jewelry.general", "bags.handbags", "accessories.belts"] },
+  "collectibles.general": { id: "collectibles.general", displayName: "Collectible", parent: "collectibles", aliases: ["collectible", "toy", "figure"], expectedAttributes: ["condition"], likelyVariantGroups: ["Style"], marketplaceMappingHooks: ["collectibles"], relatedCategories: ["accessories.general"], disambiguationSignals: ["collectible object not worn as apparel"], commonConfusions: ["accessories.general"] },
 };
 
 export function inferUniversalCategoryId(label?: string | null): UniversalCategoryId | null {
   const value = (label || "").toLowerCase();
-  if (value.includes("hoodie")) return "apparel.tops.hoodies";
+  const aliasMatch = Object.values(universalCategoryProfiles).find((profile) => profile.aliases.some((alias) => value.includes(alias.toLowerCase())));
+  if (aliasMatch) return aliasMatch.id;
   if (value.includes("streetwear")) return "apparel.tops.tshirts";
-  if (value.includes("shirt") || value.includes("tee") || value.includes("t-shirt") || value.includes("top")) return "apparel.tops.tshirts";
-  if (value.includes("jean") || value.includes("pants")) return "apparel.bottoms.jeans";
+  if (value.includes("pants")) return "apparel.bottoms.jeans";
   if (value.includes("shoe") || value.includes("sneaker")) return "apparel.shoes.sneakers";
-  if (value.includes("necklace") || value.includes("chain")) return "jewelry.necklaces";
-  if (value.includes("bracelet")) return "jewelry.bracelets";
-  if (value.includes("bag") || value.includes("purse")) return "bags.handbags";
   if (value.includes("collect")) return "collectibles.general";
   return null;
 }

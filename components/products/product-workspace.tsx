@@ -4,7 +4,7 @@ import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, Atom, CheckCircle2, CircleAlert, Edit3, GitBranch, Save, Sparkles, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Atom, CheckCircle2, CircleAlert, Edit3, Eye, GitBranch, Save, Sparkles, X } from "lucide-react";
 import { toast } from "sonner";
 import { ActivityTimeline, MarketplaceBadge, PrimaryButton, StatusBadge } from "@/components/faust/design-system";
 import { ProductImage } from "@/components/products/product-image";
@@ -108,6 +108,7 @@ export function ProductWorkspace({ item }: { item: ProductExperience }) {
       </Panel>
 
       <ProductKnowledgePanel item={item} />
+      <VisualIntelligencePanel item={item} />
 
       <section className="grid items-start gap-6 xl:grid-cols-[1.05fr_0.95fr]">
         <div className="space-y-6">
@@ -197,6 +198,89 @@ export function ProductWorkspace({ item }: { item: ProductExperience }) {
       </Panel>
       {editing ? <ProductEditDrawer item={item} onClose={() => setEditing(false)} /> : null}
     </div>
+  );
+}
+
+function VisualIntelligencePanel({ item }: { item: ProductExperience }) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const visual = item.visualIntelligence;
+  const recommendedImage = visual.recommendation ? (item.product.images || []).find((_, index) => index === 0 && visual.recommendation?.recommendedImageId === item.coverImage?.id) || item.image : item.image;
+  const choose = (payload: Record<string, unknown>) => {
+    startTransition(async () => {
+      const response = await fetch("/api/products/actions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "review-image-intelligence", productId: item.product.id, ...payload }) });
+      const result = await response.json();
+      if (!response.ok || !result.ok) {
+        toast.error(result.message || "Could not save visual review.");
+        return;
+      }
+      toast.success("Visual intelligence review saved.");
+      router.refresh();
+    });
+  };
+  return (
+    <Panel title="Visual Intelligence">
+      <div className="grid gap-4 lg:grid-cols-[0.85fr_1.15fr]">
+        <div className="rounded-3xl border border-slate-700/35 bg-black/35 p-4">
+          <div className="flex items-center gap-2 text-sm font-semibold text-[#edf3ff]"><Eye size={16} />Image-backed Product evidence</div>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            Faust uses images as supporting evidence only. Image guesses can corroborate, lower confidence, or request review, but they never replace user decisions or reliable supplier facts.
+          </p>
+          {recommendedImage ? <ProductImage src={recommendedImage} alt="Recommended cover preview" className="mt-4 aspect-[4/3] w-full rounded-3xl border border-slate-700/35 object-cover" fallbackClassName="mt-4 aspect-[4/3] w-full rounded-3xl border border-slate-700/35" /> : null}
+          {visual.recommendation ? (
+            <div className="mt-4 rounded-2xl border border-slate-700/35 bg-slate-950/45 p-3">
+              <p className="text-sm font-semibold text-[#f6f8ff]">Recommended cover · {Math.round(visual.recommendation.confidence * 100)}%</p>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">{visual.recommendation.explanation}</p>
+              <button type="button" disabled={isPending || visual.recommendation.status === "approved"} onClick={() => choose({ imageAction: "approve_cover" })} className="mt-3 rounded-full border border-slate-600/60 bg-[#66708d] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#77829f] disabled:opacity-50">Approve cover</button>
+            </div>
+          ) : <p className="mt-4 rounded-2xl border border-slate-700/35 bg-slate-950/45 p-3 text-sm text-muted-foreground">Add Product images to get cover recommendations.</p>}
+        </div>
+        <div className="grid gap-3">
+          {visual.conflict ? (
+            <div className="rounded-3xl border border-amber-400/25 bg-amber-500/10 p-4">
+              <p className="text-sm font-semibold text-amber-100">Review required</p>
+              <p className="mt-2 text-sm leading-6 text-amber-50/80">{visual.conflict.message}</p>
+            </div>
+          ) : null}
+          <div className="rounded-3xl border border-slate-700/35 bg-black/35 p-4">
+            <p className="text-sm font-semibold text-[#edf3ff]">Category candidates</p>
+            <div className="mt-3 grid gap-2">
+              {visual.categoryCandidates.slice(0, 3).map((candidate) => (
+                <article key={candidate.id} aria-label={`Category candidate ${candidate.label}`} className="rounded-2xl border border-slate-700/35 bg-slate-950/45 p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-sm font-semibold">{candidate.label}</p>
+                    <span className="text-xs text-muted-foreground">{candidate.confidence}%</span>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">{candidate.supportingEvidence[0]}</p>
+                  {candidate.conflictingEvidence.length ? <p className="mt-1 text-xs text-amber-100">{candidate.conflictingEvidence[0]}</p> : null}
+                  <button type="button" disabled={isPending} onClick={() => choose({ imageAction: "approve_category_candidate", fieldKey: "universal_category", value: candidate.label })} className="mt-2 rounded-full border border-slate-700/60 bg-zinc-950/60 px-3 py-1.5 text-xs font-semibold text-[#edf3ff] transition hover:border-slate-400/60 disabled:opacity-50">Approve category</button>
+                </article>
+              ))}
+              {!visual.categoryCandidates.length ? <p className="text-sm text-muted-foreground">No image-supported category candidate is strong enough yet.</p> : null}
+            </div>
+          </div>
+          <div className="rounded-3xl border border-slate-700/35 bg-black/35 p-4">
+            <p className="text-sm font-semibold text-[#edf3ff]">Image review</p>
+            <div className="mt-3 grid gap-2">
+              {visual.qualities.slice(0, 5).map((quality, index) => (
+                <article key={quality.id} aria-label={`Image review ${index + 1} ${quality.role.replaceAll("_", " ")}`} className="rounded-2xl border border-slate-700/35 bg-slate-950/45 p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-sm font-medium">Image {index + 1} · {quality.role.replaceAll("_", " ")}</p>
+                    <span className="text-xs text-muted-foreground">{quality.marketplaceSuitability}% suitable</span>
+                  </div>
+                  <p className="mt-1 text-xs leading-5 text-muted-foreground">{quality.explanation}</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <button type="button" disabled={isPending} onClick={() => choose({ imageAction: "mark_size_chart", imageId: quality.imageId })} className="rounded-full border border-slate-700/60 px-3 py-1 text-xs">Size chart</button>
+                    <button type="button" disabled={isPending} onClick={() => choose({ imageAction: "mark_detail_only", imageId: quality.imageId })} className="rounded-full border border-slate-700/60 px-3 py-1 text-xs">Detail only</button>
+                    <button type="button" disabled={isPending} onClick={() => choose({ imageAction: "exclude_from_publishing", imageId: quality.imageId })} className="rounded-full border border-slate-700/60 px-3 py-1 text-xs">Exclude</button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </Panel>
   );
 }
 

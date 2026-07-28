@@ -33,6 +33,23 @@ function experience(overrides: Partial<ProductExperience> = {}): ProductExperien
       overview: { understoodPercent: 0, evidenceCount: 0, mustReview: 0, missing: 0, conflicts: 0, confirmedEvidence: 0, recommendedPrimaryAction: "Complete product details" },
       observability: { evidenceRecordsCreated: 0, decisionsMade: 0, generatedFields: 0, confirmedFields: 0, correctedFields: 0, rejectedFields: 0, conflicts: 0, memoryApplications: 0, memoryOverrides: 0, suspendedMemories: 0, averageCompleteness: 0, averageReviewCount: 0, averageTimeToReadyMinutes: 0 },
     },
+    visualIntelligence: {
+      observations: [],
+      qualities: [],
+      recommendation: undefined,
+      categoryCandidates: [],
+      coverImageId: undefined,
+      conflict: undefined,
+      observability: {
+        imageObservationsCreated: 0,
+        categoryConflictsDetected: 0,
+        coverRecommendationsAccepted: 0,
+        coverRecommendationsOverridden: 0,
+        imageDerivedFieldsApproved: 0,
+        imageDerivedFieldsCorrected: 0,
+        falsePositiveImageSuggestions: 0,
+      },
+    },
     timeline: [],
   } satisfies ProductExperience;
   return { ...base, ...overrides } as ProductExperience;

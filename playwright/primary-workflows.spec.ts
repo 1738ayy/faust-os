@@ -131,7 +131,7 @@ test("AI Center answers with evidence, generates briefs, scenarios, approvals, a
 
 test("browser extension API scans, analyzes, imports, confirms, syncs, and reports failures", async ({ request, page }) => {
   await resetDemo(request);
-  const product = { source: "1688", importedAt: new Date().toISOString(), title: "Playwright 1688 Hoodie", superbuyUrl: "https://detail.1688.com/offer/999.html", supplier: "PW Factory", storeName: "PW Factory Store", category: "Item", rawAttributes: { "Product Category": "Hoodie", "Main Fabric Composition": "Cotton fleece" }, images: ["https://img.example.test/pw.jpg"], variants: [{ id: "pw-l", name: "Black / L", options: ["Black", "L"], price: 118 }], variantOptions: { colors: ["Black"], sizes: ["L"] }, price: 118, domesticShipping: 12, minimumOrderQuantity: 3, weight: "650g", sellerRating: 4.7, salesCount: 1200, pageTimestamp: new Date().toISOString() };
+  const product = { source: "1688", importedAt: new Date().toISOString(), title: "Playwright 1688 T-shirt", superbuyUrl: "https://detail.1688.com/offer/999.html", supplier: "PW Factory", storeName: "PW Factory Store", category: "Blouse", rawAttributes: { "Product Category": "Blouse", "Main Fabric Composition": "Cotton fleece" }, images: ["https://img.example.test/playwright-black-tshirt-front-clean.jpg", "https://img.example.test/playwright-black-tshirt-size-chart.jpg", "https://img.example.test/playwright-black-tshirt-detail-label.jpg"], variants: [{ id: "pw-l", name: "Black / L", options: ["Black", "L"], price: 118 }], variantOptions: { colors: ["Black"], sizes: ["L"] }, price: 118, domesticShipping: 12, minimumOrderQuantity: 3, weight: "650g", sellerRating: 4.7, salesCount: 1200, pageTimestamp: new Date().toISOString() };
   const registration = await request.post("/api/extension/register", { data: { deviceName: "Playwright extension", browser: "Chromium", environment: "local", version: "1.1.0-phase2", permissions: ["storage", "tabs"], idempotencyKey: crypto.randomUUID() } });
   expect(registration.ok(), await registration.text()).toBeTruthy();
   const registered = await registration.json();
@@ -154,7 +154,7 @@ test("browser extension API scans, analyzes, imports, confirms, syncs, and repor
   state = await imported.json();
   const draft = state.data.channelListingDrafts.find((entry: { marketplace: string; title: string }) => entry.marketplace === "Depop" && entry.title.includes("Playwright"));
   expect(draft).toBeTruthy();
-  const importedProduct = state.data.products.find((entry: { title: string }) => entry.title === "Playwright 1688 Hoodie");
+  const importedProduct = state.data.products.find((entry: { title: string }) => entry.title === "Playwright 1688 T-shirt");
   const importedVariant = state.data.variants.find((entry: { productId: string }) => entry.productId === importedProduct.id);
   expect(state.data.productKnowledgeFields.some((entry: { productId: string; fieldKey: string; value: string }) => entry.productId === importedProduct.id && entry.fieldKey === "material" && entry.value === "Cotton fleece")).toBeTruthy();
   expect(state.data.productKnowledgeEvidence.some((entry: { productId: string; sourceLabel: string }) => entry.productId === importedProduct.id && entry.sourceLabel === "Main Fabric Composition")).toBeTruthy();
@@ -167,6 +167,35 @@ test("browser extension API scans, analyzes, imports, confirms, syncs, and repor
   await expect(materialCard.getByText("Cotton fleece", { exact: true })).toBeVisible();
   await materialCard.getByRole("button", { name: "Approve", exact: true }).click();
   await expect(page.getByText(/Product Knowledge saved/i)).toBeVisible();
+  const visualPanel = productMain.locator("section").filter({ has: page.getByRole("heading", { name: "Visual Intelligence", exact: true }) });
+  await expect(visualPanel).toBeVisible();
+  await expect(visualPanel.getByText(/Faust uses images as supporting evidence only/i)).toBeVisible();
+  await expect(visualPanel.getByText(/Recommended cover/i)).toBeVisible();
+  const hasVisualDecision = async (action: string) => {
+    const response = await request.get("/api/operating-system");
+    expect(response.ok(), await response.text()).toBeTruthy();
+    const body = await response.json();
+    return body.data.productImageReviewDecisions.some((entry: { productId: string; action: string }) => entry.productId === importedProduct.id && entry.action === action);
+  };
+  await visualPanel.getByRole("button", { name: "Approve cover", exact: true }).click();
+  await expect.poll(() => hasVisualDecision("approve_cover")).toBeTruthy();
+  const tshirtCandidate = visualPanel.getByRole("article", { name: "Category candidate T-shirt", exact: true });
+  await expect(tshirtCandidate).toBeVisible();
+  await tshirtCandidate.getByRole("button", { name: "Approve category", exact: true }).click();
+  await expect.poll(() => hasVisualDecision("approve_category_candidate")).toBeTruthy();
+  const sizeChartRow = visualPanel.getByRole("article", { name: /Image review .* size chart/i });
+  await expect(sizeChartRow).toBeVisible();
+  await sizeChartRow.getByRole("button", { name: "Exclude", exact: true }).click();
+  await expect.poll(() => hasVisualDecision("exclude_from_publishing")).toBeTruthy();
+  const reviewed = await request.get("/api/operating-system");
+  expect(reviewed.ok(), await reviewed.text()).toBeTruthy();
+  state = await reviewed.json();
+  expect(state.data.productImageReviewDecisions.some((entry: { productId: string; action: string }) => entry.productId === importedProduct.id && entry.action === "approve_cover")).toBeTruthy();
+  expect(state.data.productImageReviewDecisions.some((entry: { productId: string; action: string }) => entry.productId === importedProduct.id && entry.action === "approve_category_candidate")).toBeTruthy();
+  expect(state.data.productImageReviewDecisions.some((entry: { productId: string; action: string }) => entry.productId === importedProduct.id && entry.action === "exclude_from_publishing")).toBeTruthy();
+  expect(state.data.productKnowledgeFields.some((entry: { productId: string; fieldKey: string; value: string; source: string }) => entry.productId === importedProduct.id && entry.fieldKey === "universal_category" && entry.value === "T-shirt" && entry.source === "user_decision")).toBeTruthy();
+  await page.reload();
+  await expect(visualPanel.getByText(/Recommended cover/i)).toBeVisible();
   const second = await request.post("/api/extension/import", { headers: authHeaders(), data: { product, assumptions: { rmbUsdRate: 0.14, targetSalePriceUsd: 65, quantity: 3 }, approved: true, idempotencyKey: crypto.randomUUID() } });
   expect(second.ok(), await second.text()).toBeTruthy();
   state = await second.json();

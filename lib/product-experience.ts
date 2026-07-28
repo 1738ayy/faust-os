@@ -4,6 +4,7 @@ import { buildProductIntelligence, type ProductIntelligence } from "@/lib/produc
 import { productCoverImage, productCoverRecord, productImageRevision } from "@/lib/product-images";
 import { getProductReadiness } from "@/lib/product-readiness";
 import { productKnowledgeSummary } from "@/lib/product-knowledge";
+import { visualIntelligenceSummary } from "@/lib/product-visual-intelligence";
 import { activeVariants, isActiveProduct, isActiveVariant } from "./product-state";
 
 export type MarketplacePresence = {
@@ -69,6 +70,7 @@ export type ProductExperience = {
   };
   intelligence: ProductIntelligence;
   productKnowledge: ReturnType<typeof productKnowledgeSummary>;
+  visualIntelligence: ReturnType<typeof visualIntelligenceSummary>;
   timeline: { id: string; title: string; detail: string; at: string }[];
 };
 
@@ -102,6 +104,7 @@ export function buildProductExperience(data: OperatingData, product: Product, va
   const lots = data.inventoryLots?.filter((lot) => lot.variantId === variant.id) || [];
   const orderItems = data.orders.flatMap((order) => order.items.filter((item) => item.variantId === variant.id).map((item) => ({ order, item })));
   const movements = data.stockMovements.filter((movement) => movement.variantId === variant.id);
+  const visualIntelligence = visualIntelligenceSummary(data, product.id);
   const readiness = getProductReadiness(data, variant, product);
   const inventory = {
     onHand: balances.reduce((sum, balance) => sum + balance.onHand, 0),
@@ -190,6 +193,7 @@ export function buildProductExperience(data: OperatingData, product: Product, va
     },
     intelligence,
     productKnowledge,
+    visualIntelligence,
     timeline,
   };
 }

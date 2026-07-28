@@ -26,7 +26,7 @@ const categoryExpectations: Record<string, { sourceLabel: string; expectedCatego
   Necklaces: { sourceLabel: "Necklace", expectedCategory: "Necklace", titleNoun: "chain necklace" },
   Bracelets: { sourceLabel: "Bracelet", expectedCategory: "Bracelet", titleNoun: "charm bracelet" },
   Belts: { sourceLabel: "Belt", expectedCategory: "Belt", titleNoun: "studded belt" },
-  Handbags: { sourceLabel: "Bags > Shoulder Bags", expectedCategory: "Bags", titleNoun: "crescent handbag" },
+  Handbags: { sourceLabel: "Bags > Shoulder Bags", expectedCategory: "Handbag", titleNoun: "crescent handbag" },
   Accessories: { sourceLabel: "Fashion accessories", expectedCategory: "Accessories", titleNoun: "hair accessory" },
 };
 
