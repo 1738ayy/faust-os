@@ -1,9 +1,11 @@
-import type { ChannelListingDraft, CrossListingJob, DurableJob, Listing, ListingReviewItem, ListingSyncJob, ListingTemplate, Marketplace, MarketplaceAccountDefault, MarketplacePublishTask, OperatingData, PhysicalSkuMapping, ProductMarketplaceOverride, ProductMarketplaceStatus, TransactionalOutboxEvent } from "@/domain/business";
+import type { ChannelListingDraft, CrossListingJob, DurableJob, Listing, ListingReviewItem, ListingSyncJob, ListingTemplate, Marketplace, MarketplaceAccountDefault, MarketplaceListingDraftField, MarketplacePublishTask, OperatingData, PhysicalSkuMapping, ProductMarketplaceOverride, ProductMarketplaceStatus, TransactionalOutboxEvent } from "@/domain/business";
 import { availableUnits } from "./business-calculations";
 import { isActiveVariant } from "./product-state";
 import { getMarketplaceAdapter } from "../services/adapters/marketplace";
 import { MarketplaceEngine, getMarketplaceProfile } from "./marketplace-intelligence";
 import type { ManagedMarketplace, MarketplaceDraftInspector } from "./marketplace-intelligence";
+import { materializeDraftFields, resetListingDraftField, saveListingDraftField, type ListingDraftEditableValue } from "./listings/draft-fields";
+import { imageUrlsForMarketplace, saveMarketplaceImageOrder } from "./listings/image-order";
 
 const now = () => new Date().toISOString();
 const id = () => crypto.randomUUID();
@@ -15,6 +17,8 @@ export type ListingActionInput = { draftId: string; idempotencyKey?: string; ext
 export type MarketplaceDefaultInput = { marketplaceAccountId: string; fieldKey: string; value: MarketplaceAccountDefault["value"]; universalCategoryId?: string | null; enabled?: boolean; actor?: string };
 export type ProductOverrideInput = { productId: string; marketplace: ManagedMarketplace; fieldKey: string; value: ProductMarketplaceOverride["value"]; marketplaceAccountId?: string; variantId?: string; actor?: string };
 export type CrossListingPublishInput = { productId: string; marketplaces?: ManagedMarketplace[]; initiatedBy?: string; inventoryStrategy?: CrossListingJob["inventoryStrategy"]; idempotencyKey?: string };
+export type DraftFieldInput = { draftId: string; fieldKey: string; currentValue: ListingDraftEditableValue; actor?: string };
+export type DraftFieldResetInput = { draftId: string; fieldKey: string; actor?: string };
 
 export function ensureListingsCollections(data: OperatingData) {
   data.marketplaceAccounts ||= [];
@@ -30,6 +34,8 @@ export function ensureListingsCollections(data: OperatingData) {
   data.marketplaceAccountDefaults ||= [];
   data.productMarketplaceOverrides ||= [];
   data.marketplaceImageOrders ||= [];
+  data.marketplaceListingDraftFields ||= [];
+  data.marketplaceListingDraftRevisions ||= [];
   data.crossListingJobs ||= [];
   data.marketplacePublishTasks ||= [];
   data.productListingSyncReviews ||= [];
@@ -197,7 +203,7 @@ export function inspectProductMarketplaceDraft(data: OperatingData, input: { var
     physicalSku: variant.sku,
     quantity: balance ? availableUnits(balance) : 0,
     productImages: productImagesFor(data, product.id),
-    imageUrls: productImageUrls(data, product.id),
+    imageUrls: imageUrlsForMarketplace(data, product.id, input.marketplace).length ? imageUrlsForMarketplace(data, product.id, input.marketplace) : productImageUrls(data, product.id),
     overrides: coerceOverrideMap(defaults, overrides),
   }, input.marketplace);
   const enrichedFields = draft.mappingSources.map((field) => {
@@ -326,6 +332,7 @@ export function createFiveChannelDrafts(data: OperatingData, input: CreateCrossL
         data.listingReviewItems!.filter((entry) => entry.channelDraftId === existingDraft.id && entry.reason === "validation_error" && entry.status === "open").forEach((entry) => { entry.status = "resolved"; entry.resolvedAt = now(); });
       }
       existingDraft.updatedAt = now();
+      materializeDraftFields(data, existingDraft, inspectProductMarketplaceDraft(data, { variantId: variant.id, marketplace }));
       continue;
     }
     const price = draftPlan.price;
@@ -337,6 +344,7 @@ export function createFiveChannelDrafts(data: OperatingData, input: CreateCrossL
     data.listings.push(listing);
     data.physicalSkuMappings!.push(mapping);
     data.channelListingDrafts!.push(draft);
+    materializeDraftFields(data, draft, inspectProductMarketplaceDraft(data, { variantId: variant.id, marketplace }));
     addOutboxJob(data, "listing.publish_requested", draft, "publish", { draftId: draft.id, marketplace, physicalSku }, input.idempotencyKey);
     if (draft.publishMode !== "adapter") review(data, { channelDraftId: draft.id, marketplace, severity: "info", reason: "manual_publish_required", detail: `${marketplace} uses ${draft.publishMode === "extension" ? "extension-assisted" : "manual"} publishing until live credentials are connected.`, actionLabel: "Open manual workflow" });
     if (draft.validationErrors.length) review(data, { channelDraftId: draft.id, marketplace, severity: "warning", reason: "validation_error", detail: draft.validationErrors.join(" ") });
@@ -344,6 +352,33 @@ export function createFiveChannelDrafts(data: OperatingData, input: CreateCrossL
   }
   activity(data, "Five channel drafts created", "variant", variant.id, `${physicalSku} generated drafts for Depop, eBay, Etsy, Mercari, and Poshmark.`);
   return data;
+}
+
+export function saveMarketplaceDraftField(data: OperatingData, input: DraftFieldInput): MarketplaceListingDraftField {
+  ensureListingsCollections(data);
+  const field = saveListingDraftField(data, input);
+  activity(data, "Marketplace draft field edited", "channel_listing_draft", input.draftId, `${input.fieldKey} saved for marketplace draft.`);
+  return field;
+}
+
+export function resetMarketplaceDraftField(data: OperatingData, input: DraftFieldResetInput): MarketplaceListingDraftField {
+  ensureListingsCollections(data);
+  const field = resetListingDraftField(data, input);
+  activity(data, "Marketplace draft field reset", "channel_listing_draft", input.draftId, `${input.fieldKey} reset to generated value.`);
+  return field;
+}
+
+export function saveDraftImageOrder(data: OperatingData, input: { productId: string; marketplace: ManagedMarketplace; imageIds: string[]; excludedImageIds?: string[]; coverImageId?: string; variantId?: string }) {
+  ensureListingsCollections(data);
+  const order = saveMarketplaceImageOrder(data, input);
+  const variant = data.variants.find((entry) => entry.productId === input.productId && (!input.variantId || entry.id === input.variantId));
+  const draft = variant ? data.channelListingDrafts!.find((entry) => entry.variantId === variant.id && entry.marketplace === input.marketplace) : undefined;
+  if (draft) {
+    draft.imageUrls = imageUrlsForMarketplace(data, input.productId, input.marketplace);
+    draft.updatedAt = now();
+  }
+  activity(data, "Marketplace image order saved", "product", input.productId, `${input.marketplace} image order saved.`);
+  return order;
 }
 
 function applyInspectorValuesToDraft(draft: ChannelListingDraft, inspector: MarketplaceDraftInspector) {

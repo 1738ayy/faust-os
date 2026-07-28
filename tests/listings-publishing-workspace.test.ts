@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { OperatingData } from "../domain/business";
-import { buildListingsPublishingWorkspace, createCrossListingPublishJob, createProductListingSyncReview, inspectProductMarketplaceDraft, retryMarketplacePublishTask, seedMarketplaceAccountsAndTemplates, upsertMarketplaceAccountDefault, upsertProductMarketplaceOverride } from "../lib/listings-core";
+import { buildListingsPublishingWorkspace, createCrossListingPublishJob, createFiveChannelDrafts, createProductListingSyncReview, inspectProductMarketplaceDraft, resetMarketplaceDraftField, retryMarketplacePublishTask, saveDraftImageOrder, saveMarketplaceDraftField, seedMarketplaceAccountsAndTemplates, upsertMarketplaceAccountDefault, upsertProductMarketplaceOverride } from "../lib/listings-core";
+import { buildCrossListingComposerModel } from "../lib/listings/composer";
 
 const fixture = (): OperatingData => {
   const time = new Date().toISOString();
@@ -99,4 +100,69 @@ test("Listings 2.0 creates controlled sync reviews instead of overwriting publis
   assert.equal(data.productListingSyncReviews?.length, 2);
   assert.deepEqual(data.productListingSyncReviews?.map((entry) => entry.status), ["open", "open"]);
   assert.ok(data.activity.some((entry) => entry.action === "Listing sync review created"));
+});
+
+test("Listings 2.0 persists editable draft fields with provenance and reset-to-generated behavior", () => {
+  const data = fixture();
+  seedMarketplaceAccountsAndTemplates(data);
+  createFiveChannelDrafts(data, { variantId: data.variants[0].id, imageUrls: data.products[0].images });
+  const draft = data.channelListingDrafts!.find((entry) => entry.marketplace === "Depop")!;
+  const titleField = data.marketplaceListingDraftFields!.find((entry) => entry.draftId === draft.id && entry.fieldKey === "title")!;
+  assert.equal(titleField.source, "mapping");
+  assert.ok(titleField.sourcePath?.includes("title"));
+  assert.equal(titleField.isOverridden, false);
+
+  saveMarketplaceDraftField(data, { draftId: draft.id, fieldKey: "title", currentValue: "Vintage wash hoodie - Depop exclusive", actor: "tester" });
+  assert.equal(draft.title, "Vintage wash hoodie - Depop exclusive");
+  assert.equal(data.marketplaceListingDraftFields!.find((entry) => entry.id === titleField.id)?.source, "user_edit");
+  assert.equal(data.marketplaceListingDraftRevisions?.at(-1)?.reason, "user_edit");
+
+  resetMarketplaceDraftField(data, { draftId: draft.id, fieldKey: "title", actor: "tester" });
+  assert.equal(draft.title, titleField.generatedValue);
+  assert.equal(data.marketplaceListingDraftFields!.find((entry) => entry.id === titleField.id)?.isOverridden, false);
+});
+
+test("Listings 2.0 persists marketplace image order without duplicating assets", () => {
+  const data = fixture();
+  seedMarketplaceAccountsAndTemplates(data);
+  createFiveChannelDrafts(data, { variantId: data.variants[0].id, imageUrls: data.products[0].images });
+  const images = data.productImages!;
+  saveDraftImageOrder(data, { productId: data.products[0].id, marketplace: "Mercari", imageIds: [images[1].id, images[0].id], coverImageId: images[1].id });
+  const order = data.marketplaceImageOrders![0];
+  assert.deepEqual(order.imageIds, [images[1].id, images[0].id]);
+  assert.equal(data.productImages!.length, 2);
+  const draft = data.channelListingDrafts!.find((entry) => entry.marketplace === "Mercari")!;
+  assert.deepEqual(draft.imageUrls, [images[1].url, images[0].url]);
+});
+
+test("Listings 2.0 composer restores persisted fields after repository reload and excludes archived products", () => {
+  const data = fixture();
+  seedMarketplaceAccountsAndTemplates(data);
+  createCrossListingPublishJob(data, { productId: data.products[0].id, marketplaces: ["Depop"], idempotencyKey: crypto.randomUUID() });
+  const draft = data.channelListingDrafts!.find((entry) => entry.marketplace === "Depop")!;
+  saveMarketplaceDraftField(data, { draftId: draft.id, fieldKey: "description", currentValue: "Saved marketplace-specific description." });
+  const reloaded = JSON.parse(JSON.stringify(data)) as OperatingData;
+  const composer = buildCrossListingComposerModel(reloaded, { variantId: reloaded.variants[0].id, marketplace: "Depop" });
+  assert.equal(composer.fields.find((entry) => entry.fieldKey === "description")?.currentValue, "Saved marketplace-specific description.");
+
+  reloaded.products[0].status = "paused";
+  const workspace = buildListingsPublishingWorkspace(reloaded);
+  assert.equal(workspace.products.length, 0);
+});
+
+test("Listings 2.0 durable publish tasks survive restart and retry only the failed marketplace", () => {
+  const data = fixture();
+  seedMarketplaceAccountsAndTemplates(data);
+  createCrossListingPublishJob(data, { productId: data.products[0].id, marketplaces: ["Depop", "Mercari"], idempotencyKey: crypto.randomUUID() });
+  const reloaded = JSON.parse(JSON.stringify(data)) as OperatingData;
+  const publishedBefore = reloaded.marketplacePublishTasks!.filter((entry) => entry.status === "published").length;
+  const failed = reloaded.marketplacePublishTasks!.find((entry) => entry.status === "queued")!;
+  failed.status = "failed";
+  failed.failureCode = "network_timeout";
+  failed.failureMessage = "Temporary timeout.";
+  failed.retryable = true;
+  retryMarketplacePublishTask(reloaded, { taskId: failed.id });
+  assert.equal(reloaded.marketplacePublishTasks!.filter((entry) => entry.status === "published").length, publishedBefore);
+  assert.equal(failed.status, "queued");
+  assert.equal(failed.attemptCount, 2);
 });

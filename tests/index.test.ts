@@ -15,6 +15,7 @@ import "./wholesale-core.test";
 import "./marketplace-intelligence.test";
 import "./listings-core.test";
 import "./listings-publishing-workspace.test";
+import "./listings-production-parity.test";
 import "./purchasing-core.test";
 import "./analytics.test";
 import "./automations.test";
