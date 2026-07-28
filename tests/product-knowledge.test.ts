@@ -3,7 +3,8 @@ import { test } from "node:test";
 import type { OperatingData } from "../domain/business";
 import type { SuperbuyProduct } from "../types/superbuy-product";
 import { importExtensionProduct } from "../lib/browser-extension";
-import { applyProductKnowledgeDecision, buildProductKnowledgeFromSuperbuy, productKnowledgeSummary, productKnowledgeValue } from "../lib/product-knowledge";
+import { productKnowledgeBenchmarkFixtures, evaluateProductKnowledgeBenchmark } from "../lib/product-knowledge-benchmark";
+import { applyProductKnowledgeDecision, approveHighConfidenceProductKnowledgeFacts, buildProductKnowledgeFromSuperbuy, estimateProductKnowledgeTimeToReady, productKnowledgeCorrectionImpactPreview, productKnowledgeFieldHistory, productKnowledgeObservability, productKnowledgeSummary, productKnowledgeValue } from "../lib/product-knowledge";
 import { createFiveChannelDrafts, inspectProductMarketplaceDraft } from "../lib/listings-core";
 
 const time = "2026-07-27T00:00:00.000Z";
@@ -214,4 +215,120 @@ test("Marketplace drafts consume corrected Product Knowledge and preserve proven
   const titleField = inspector.mappingSources.find((field) => field.fieldKey === "title");
   assert.equal(titleField?.source, "product");
   assert.equal(titleField?.sourcePath, "productKnowledge.suggested_title");
+});
+
+test("Product Knowledge benchmark dataset covers representative supplier product shapes", () => {
+  assert.equal(productKnowledgeBenchmarkFixtures.length, 30);
+  const categories = new Set(productKnowledgeBenchmarkFixtures.map((entry) => entry.category));
+  for (const category of ["T-shirts", "Tops", "Jeans", "Shorts", "Jewelry", "Necklaces", "Bracelets", "Belts", "Handbags", "Accessories"]) {
+    assert.ok(categories.has(category), `${category} benchmark fixture exists`);
+  }
+  assert.ok(productKnowledgeBenchmarkFixtures.some((entry) => entry.notes.includes("mixed Chinese labels")));
+  assert.ok(productKnowledgeBenchmarkFixtures.some((entry) => entry.notes.includes("conflicting material signals")));
+  assert.ok(productKnowledgeBenchmarkFixtures.some((entry) => entry.notes.includes("tiered RMB prices")));
+  assert.ok(productKnowledgeBenchmarkFixtures.some((entry) => entry.notes.includes("incomplete metadata")));
+});
+
+test("Product Knowledge benchmark measures extraction quality and unknown-value restraint", () => {
+  const result = evaluateProductKnowledgeBenchmark();
+
+  assert.equal(result.fixtureCount, 30);
+  assert.ok(result.fieldResultCount >= 300);
+  assert.ok(result.exactOrAcceptableAccuracy >= 78, `accuracy ${result.exactOrAcceptableAccuracy}`);
+  assert.ok(result.missingFieldPrecision >= 60, `unknown precision ${result.missingFieldPrecision}`);
+  assert.ok(result.falsePositiveRate <= 40, `false positive rate ${result.falsePositiveRate}`);
+  assert.ok(result.variantPreservationAccuracy >= 90, `variant preservation ${result.variantPreservationAccuracy}`);
+  assert.ok(result.supplierCleanupAccuracy >= 80, `supplier cleanup ${result.supplierCleanupAccuracy}`);
+  assert.ok(result.priceExtractionAccuracy >= 95, `price extraction ${result.priceExtractionAccuracy}`);
+  assert.ok(result.stockAccuracy >= 90, `stock extraction ${result.stockAccuracy}`);
+});
+
+test("Product Knowledge confidence calibration is directionally sane", () => {
+  const result = evaluateProductKnowledgeBenchmark();
+  const high = result.confidenceBuckets.find((bucket) => bucket.label === "90-100%");
+  const mid = result.confidenceBuckets.find((bucket) => bucket.label === "75-89%");
+  const low = result.confidenceBuckets.find((bucket) => bucket.label === "50-74%");
+
+  assert.ok(high?.count);
+  assert.ok(mid?.count);
+  assert.ok(low?.count);
+  assert.ok(high.correctness >= mid.correctness, `high ${high.correctness} mid ${mid.correctness}`);
+  if (low.count >= 10) assert.ok(mid.correctness >= low.correctness, `mid ${mid.correctness} low ${low.correctness}`);
+  else assert.ok(low.correctness >= 90, `small low-confidence sample remains measured separately: ${low.correctness}`);
+});
+
+test("Product Knowledge summary prioritizes meaningful review and safe bulk approval", () => {
+  const data = fixture();
+  const productId = "abababab-abab-4bab-8bab-abababababab";
+  data.products.push({ id: productId, title: "Review tee", category: "Imported", tags: [], status: "draft", createdAt: time, updatedAt: time });
+  buildProductKnowledgeFromSuperbuy(data, productId, {
+    ...sourceProduct,
+    rawAttributes: {
+      "Product Category": "T-shirt",
+      "Material": "Leather",
+      "Main Fabric Composition": "Cotton",
+    },
+  });
+
+  const summary = productKnowledgeSummary(data, productId);
+  assert.ok(summary.overview.understoodPercent > 50);
+  assert.ok(summary.reviewPlan.mustReview.some((field) => field.fieldKey === "material"));
+  assert.ok(summary.reviewPlan.safeBulkApproval.every((field) => field.confidence >= 0.82 && !field.reviewRequired));
+
+  const approval = approveHighConfidenceProductKnowledgeFacts(data, productId);
+  assert.ok(approval.approvedCount > 0);
+  assert.ok(!approval.approvedFieldKeys.includes("material"));
+  assert.ok(data.productKnowledgeDecisions?.some((decision) => decision.reason === "Bulk approved high-confidence supplier evidence."));
+});
+
+test("Product Knowledge exposes decision history, impact preview, observability, and time-to-ready metrics", () => {
+  const data = fixture();
+  const productId = "cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd";
+  data.products.push({ id: productId, title: sourceProduct.title, category: "Imported", tags: [], status: "draft", createdAt: time, updatedAt: time });
+  buildProductKnowledgeFromSuperbuy(data, productId, sourceProduct);
+  applyProductKnowledgeDecision(data, { productId, fieldKey: "universal_category", decision: "corrected", value: "Tops > T-Shirts", reason: "Supplier category was too broad.", actor: "test" });
+
+  const history = productKnowledgeFieldHistory(data, productId, "universal_category");
+  assert.ok(history.some((entry) => entry.type === "Imported"));
+  assert.ok(history.some((entry) => entry.type === "Corrected"));
+
+  const impact = productKnowledgeCorrectionImpactPreview(data, productId, "universal_category", "Apparel > Tops > T-Shirts");
+  assert.ok(impact.updates.includes("marketplace draft categories"));
+  assert.ok(impact.protectedItems.includes("manually edited marketplace fields"));
+  assert.ok(impact.estimatedMarketplaceReadinessLift > 0);
+
+  const observability = productKnowledgeObservability(data, productId);
+  assert.ok(observability.evidenceRecordsCreated > 0);
+  assert.ok(observability.correctedFields >= 1);
+  assert.ok(observability.averageCompleteness > 0);
+
+  const effort = estimateProductKnowledgeTimeToReady(productKnowledgeSummary(data, productId).fields);
+  assert.ok(effort.manualMinutes > effort.estimatedPkeMinutes);
+  assert.ok(effort.effortSavedPercent > 0);
+});
+
+test("Product Knowledge memory improves related products without leaking across scope", () => {
+  const data = fixture();
+  const firstProductId = "efefefef-efef-4fef-8fef-efefefefefef";
+  data.products.push({ id: firstProductId, title: sourceProduct.title, category: "Imported", tags: [], status: "draft", createdAt: time, updatedAt: time });
+  buildProductKnowledgeFromSuperbuy(data, firstProductId, sourceProduct, "supplier-a");
+  applyProductKnowledgeDecision(data, { productId: firstProductId, fieldKey: "universal_category", decision: "corrected", value: "Premium tees", actor: "test" });
+  const memory = data.productKnowledgeMemory?.find((entry) => entry.memoryType === "category_mapping");
+  assert.ok(memory);
+  memory.scope = "supplier";
+  memory.supplierId = "supplier-a";
+
+  const relatedProductId = "fafafafa-fafa-4afa-8afa-fafafafafafa";
+  data.products.push({ id: relatedProductId, title: "Related tee", category: "Imported", tags: [], status: "draft", createdAt: time, updatedAt: time });
+  buildProductKnowledgeFromSuperbuy(data, relatedProductId, { ...sourceProduct, title: "Related tee", superbuyUrl: "https://detail.1688.com/offer/related.html" }, "supplier-a");
+  const related = productKnowledgeSummary(data, relatedProductId).fields.find((entry) => entry.fieldKey === "universal_category");
+  assert.equal(related?.value, "Premium tees");
+  assert.equal(related?.source, "memory");
+  assert.match(related?.explanation || "", /Confidence increased/);
+
+  const unrelatedProductId = "12121212-1212-4212-8212-121212121212";
+  data.products.push({ id: unrelatedProductId, title: "Unrelated tee", category: "Imported", tags: [], status: "draft", createdAt: time, updatedAt: time });
+  buildProductKnowledgeFromSuperbuy(data, unrelatedProductId, { ...sourceProduct, title: "Unrelated tee", superbuyUrl: "https://detail.1688.com/offer/unrelated.html" }, "supplier-b");
+  const unrelated = productKnowledgeSummary(data, unrelatedProductId).fields.find((entry) => entry.fieldKey === "universal_category");
+  assert.notEqual(unrelated?.value, "Premium tees");
 });

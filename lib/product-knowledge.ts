@@ -47,6 +47,8 @@ const fieldLabels: Record<ProductKnowledgeFieldKey, string> = {
   suggested_hashtags: "Suggested hashtags",
 };
 
+export const productKnowledgeFieldLabels = fieldLabels;
+
 const sourceLabelMappings: Record<string, ProductKnowledgeFieldKey> = {
   "main fabric composition": "fabric_composition",
   "main material": "material",
@@ -167,11 +169,11 @@ function categoryFact(data: OperatingData, productId: string, product: SuperbuyP
 
 function memoryScore(memory: ProductKnowledgeMemory, scope?: Partial<ProductKnowledgeMemory>) {
   if (memory.status === "suspended") return -1;
-  if (memory.supplierId && scope?.supplierId === memory.supplierId) return 50;
-  if (memory.sourcePlatform && scope?.sourcePlatform === memory.sourcePlatform) return 30;
-  if (memory.universalCategory && scope?.universalCategory === memory.universalCategory) return 20;
+  if (memory.scope === "supplier") return memory.supplierId && scope?.supplierId === memory.supplierId ? 50 : -1;
+  if (memory.scope === "source_platform") return memory.sourcePlatform && scope?.sourcePlatform === memory.sourcePlatform ? 30 : -1;
+  if (memory.scope === "universal_category") return memory.universalCategory && scope?.universalCategory === memory.universalCategory ? 20 : -1;
   if (memory.scope === "business") return 10;
-  return 1;
+  return memory.scope === "global" ? 1 : -1;
 }
 
 function memoryFor(data: OperatingData, type: ProductKnowledgeMemory["memoryType"], pattern: string, scope?: Partial<ProductKnowledgeMemory>) {
@@ -188,7 +190,7 @@ function applyMemory(data: OperatingData, type: ProductKnowledgeMemory["memoryTy
   memory.usageCount += 1;
   memory.lastUsedAt = now();
   memory.updatedAt = now();
-  return { value: memory.output, confidenceBoost: Math.min(0.16, memory.confidenceAdjustment), memoryId: memory.id };
+  return { value: memory.output, confidenceBoost: Math.min(0.16, memory.confidenceAdjustment), memoryId: memory.id, memory };
 }
 
 function valuesConflict(values: string[]) {
@@ -273,12 +275,12 @@ export function buildProductKnowledgeFromSuperbuy(data: OperatingData, productId
 
   upsertField(data, productId, "suggested_title", source.title, { confidence: 0.92, source: "evidence", explanation: "Supplier title captured from the product page.", evidenceIds: titleEvidence ? [titleEvidence.id] : [], sourceRecordId: source.superbuyUrl });
   upsertField(data, productId, "product_type", category.rawCategory || category.label, { confidence: category.fact ? 0.86 : 0.52, source: category.fact ? "evidence" : "system_inference", explanation: category.fact ? "Explicit supplier product category captured from source attributes." : "Product type inferred from title because no explicit supplier category was found.", evidenceIds: category.fact?.evidence ? [category.fact.evidence.id] : titleEvidence ? [titleEvidence.id] : [], alternatives: category.alternatives, sourceRecordId: source.superbuyUrl });
-  upsertField(data, productId, "universal_category", categoryMemory?.value || category.label, { confidence: Math.min(1, (category.fact ? 0.86 : 0.55) + (categoryMemory?.confidenceBoost || 0)), source: categoryMemory?.memoryId ? "memory" : category.fact ? "evidence" : "system_inference", explanation: category.fact ? `Explicit supplier category '${category.rawCategory}' mapped to a Faust universal category.` : "Category inferred from the product title because no explicit category was found.", evidenceIds: category.fact?.evidence ? [category.fact.evidence.id] : titleEvidence ? [titleEvidence.id] : [], alternatives: category.alternatives, reviewRequired: !category.fact || !category.label, sourceRecordId: source.superbuyUrl });
+  upsertField(data, productId, "universal_category", categoryMemory?.value || category.label, { confidence: Math.min(1, (category.fact ? 0.86 : 0.55) + (categoryMemory?.confidenceBoost || 0)), source: categoryMemory?.memoryId ? "memory" : category.fact ? "evidence" : "system_inference", explanation: categoryMemory?.memory ? `Confidence increased because this ${categoryMemory.memory.scope} category mapping was learned from prior corrections. Explicit supplier category '${category.rawCategory}' remains preserved as evidence.` : category.fact ? `Explicit supplier category '${category.rawCategory}' mapped to a Faust universal category.` : "Category inferred from the product title because no explicit category was found.", evidenceIds: category.fact?.evidence ? [category.fact.evidence.id] : titleEvidence ? [titleEvidence.id] : [], alternatives: category.alternatives, reviewRequired: !category.fact || !category.label, sourceRecordId: source.superbuyUrl });
   upsertField(data, productId, "marketplace_category_candidates", category.alternatives, { confidence: category.alternatives.length ? 0.66 : 0, source: "system_inference", explanation: "Candidate categories are derived from supplier category, mapped universal category, and source page category hints.", evidenceIds: category.fact?.evidence ? [category.fact.evidence.id] : [], sourceRecordId: source.superbuyUrl });
-  upsertField(data, productId, "material", selectedMaterial, { confidence: Math.min(1, (primaryMaterial?.evidence ? 0.83 : 0) + (materialMemory?.confidenceBoost || 0)), source: materialMemory?.memoryId ? "memory" : primaryMaterial?.evidence ? "evidence" : "missing", explanation: primaryMaterial?.evidence ? `Selected from supplier attribute '${primaryMaterial.label}'.${materialConflictIds.length ? " Conflicting material evidence requires review." : ""}` : "No reliable material evidence was found.", evidenceIds: primaryMaterial?.evidence ? [primaryMaterial.evidence.id] : [], conflictingEvidenceIds: materialConflictIds.filter((entry) => entry !== primaryMaterial?.evidence?.id), alternatives: materialFacts.map((fact) => fact.value), sourceRecordId: source.superbuyUrl });
+  upsertField(data, productId, "material", selectedMaterial, { confidence: Math.min(1, (primaryMaterial?.evidence ? 0.83 : 0) + (materialMemory?.confidenceBoost || 0)), source: materialMemory?.memoryId ? "memory" : primaryMaterial?.evidence ? "evidence" : "missing", explanation: materialMemory?.memory ? `Confidence increased because this ${materialMemory.memory.scope} material mapping was confirmed previously. Source evidence '${primaryMaterial?.label}' remains inspectable.` : primaryMaterial?.evidence ? `Selected from supplier attribute '${primaryMaterial.label}'.${materialConflictIds.length ? " Conflicting material evidence requires review." : ""}` : "No reliable material evidence was found.", evidenceIds: primaryMaterial?.evidence ? [primaryMaterial.evidence.id] : [], conflictingEvidenceIds: materialConflictIds.filter((entry) => entry !== primaryMaterial?.evidence?.id), alternatives: materialFacts.map((fact) => fact.value), sourceRecordId: source.superbuyUrl });
   upsertField(data, productId, "fabric_composition", fabricComposition?.value || selectedMaterial, { confidence: fabricComposition?.evidence ? 0.88 : primaryMaterial?.evidence ? 0.72 : 0, source: fabricComposition?.evidence || primaryMaterial?.evidence ? "evidence" : "missing", explanation: fabricComposition?.evidence ? `Fabric composition captured from '${fabricComposition.label}'.` : "Fabric composition falls back to the best available material evidence.", evidenceIds: [fabricComposition?.evidence?.id || primaryMaterial?.evidence?.id].filter((entry): entry is string => Boolean(entry)), sourceRecordId: source.superbuyUrl });
   upsertField(data, productId, "supplier", cleanSupplierName(supplierEvidence?.rawValue), { confidence: supplierEvidence ? 0.76 : 0, source: supplierEvidence ? "evidence" : "missing", explanation: "Supplier display name is cleaned separately from immutable raw supplier evidence.", evidenceIds: supplierEvidence ? [supplierEvidence.id] : [], sourceRecordId: source.superbuyUrl });
-  upsertField(data, productId, "supplier_shop", supplierMemory?.value || cleanSupplierName(supplierEvidence?.rawValue), { confidence: Math.min(1, 0.76 + (supplierMemory?.confidenceBoost || 0)), source: supplierMemory?.memoryId ? "memory" : supplierEvidence ? "evidence" : "missing", explanation: "Supplier shop name captured from the source page and cleaned before display; raw source text remains preserved as evidence.", evidenceIds: supplierEvidence ? [supplierEvidence.id] : [], sourceRecordId: source.superbuyUrl });
+  upsertField(data, productId, "supplier_shop", supplierMemory?.value || cleanSupplierName(supplierEvidence?.rawValue), { confidence: Math.min(1, 0.76 + (supplierMemory?.confidenceBoost || 0)), source: supplierMemory?.memoryId ? "memory" : supplierEvidence ? "evidence" : "missing", explanation: supplierMemory?.memory ? "Supplier shop cleanup used a previously reviewed memory rule; raw source text remains preserved as evidence." : "Supplier shop name captured from the source page and cleaned before display; raw source text remains preserved as evidence.", evidenceIds: supplierEvidence ? [supplierEvidence.id] : [], sourceRecordId: source.superbuyUrl });
   upsertField(data, productId, "supplier_platform", "1688", { confidence: source.original1688Url || source.source === "1688" ? 1 : 0.7, source: "evidence", explanation: "The supplier marketplace is separated from the Superbuy sourcing-agent page.", evidenceIds: [], sourceRecordId: source.original1688Url || source.superbuyUrl });
   upsertField(data, productId, "supplier_url", source.original1688Url || source.supplierStoreUrl || null, { confidence: source.original1688Url ? 1 : source.supplierStoreUrl ? 0.7 : 0, source: source.original1688Url || source.supplierStoreUrl ? "evidence" : "missing", explanation: "Supplier URL points to the original marketplace or store page when exposed.", evidenceIds: [], sourceRecordId: source.superbuyUrl });
   upsertField(data, productId, "source_platform", source.source === "superbuy" ? "Superbuy" : "1688", { confidence: 1, source: "evidence", explanation: "Captured from the browser extension source adapter.", evidenceIds: [], sourceRecordId: source.superbuyUrl });
@@ -319,6 +321,43 @@ export function applyProductKnowledgeDecision(data: OperatingData, input: { prod
   maybeCreateMemory(data, field, input);
   data.productKnowledgeConfidenceHistory!.push({ id: id(), productId: input.productId, fieldKey: input.fieldKey, previousConfidence: previousValue === nextValue ? field.confidence : 0, nextConfidence: field.confidence, reason: field.explanation, evidenceIds: field.supportingEvidenceIds, createdAt: decidedAt });
   return field;
+}
+
+const riskyBulkApprovalFields: ProductKnowledgeFieldKey[] = [
+  "brand",
+  "condition",
+  "marketplace_category_candidates",
+  "suggested_description",
+  "suggested_keywords",
+  "suggested_hashtags",
+];
+
+export function canBulkApproveProductKnowledgeField(field: ProductKnowledgeField) {
+  return field.status === "generated"
+    && field.source === "evidence"
+    && field.confidence >= 0.82
+    && !field.reviewRequired
+    && !field.conflictingEvidenceIds?.length
+    && !riskyBulkApprovalFields.includes(field.fieldKey);
+}
+
+export function approveHighConfidenceProductKnowledgeFacts(data: OperatingData, productId: string, input: { fieldKeys?: ProductKnowledgeFieldKey[]; actor?: string; reason?: string } = {}) {
+  ensureProductKnowledgeCollections(data);
+  const candidates = data.productKnowledgeFields!
+    .filter((field) => field.productId === productId)
+    .filter((field) => !input.fieldKeys || input.fieldKeys.includes(field.fieldKey))
+    .filter(canBulkApproveProductKnowledgeField);
+  for (const field of candidates) {
+    applyProductKnowledgeDecision(data, {
+      productId,
+      fieldKey: field.fieldKey,
+      decision: "confirmed",
+      value: field.value,
+      actor: input.actor || "local-user",
+      reason: input.reason || "Bulk approved high-confidence supplier evidence.",
+    });
+  }
+  return { approvedCount: candidates.length, approvedFieldKeys: candidates.map((field) => field.fieldKey) };
 }
 
 function strengthenOrWeakenMemory(data: OperatingData, field: ProductKnowledgeField, input: { decision: "confirmed" | "corrected" | "rejected" | "overridden" }) {
@@ -368,7 +407,138 @@ export function productKnowledgeSummary(data: OperatingData, productId: string) 
   const fields = data.productKnowledgeFields!.filter((entry) => entry.productId === productId);
   const evidence = data.productKnowledgeEvidence!.filter((entry) => entry.productId === productId);
   const decisions = data.productKnowledgeDecisions!.filter((entry) => entry.productId === productId);
-  return { fields, evidence, decisions, completeness: productKnowledgeCompleteness(fields) };
+  const completeness = productKnowledgeCompleteness(fields);
+  return {
+    fields,
+    evidence,
+    decisions,
+    completeness,
+    reviewPlan: productKnowledgeReviewPlan(fields),
+    overview: productKnowledgeOverview(fields, evidence),
+    observability: productKnowledgeObservability(data, productId),
+  };
+}
+
+export function productKnowledgeOverview(fields: ProductKnowledgeField[], evidence: ProductKnowledgeEvidence[]) {
+  const usable = fields.filter((field) => field.status !== "missing" && field.status !== "rejected");
+  const understoodPercent = fields.length ? Math.round(usable.reduce((sum, field) => sum + (field.status === "confirmed" || field.status === "corrected" ? 1 : field.reviewRequired ? Math.min(field.confidence, 0.6) : field.confidence), 0) / fields.length * 100) : 0;
+  const conflicts = fields.filter((field) => field.conflictingEvidenceIds?.length).length;
+  const missing = fields.filter((field) => field.status === "missing" || field.status === "rejected").length;
+  const mustReview = fields.filter((field) => field.reviewRequired || field.conflictingEvidenceIds?.length || field.status === "rejected").length;
+  const confirmedEvidence = fields.filter((field) => field.status === "confirmed" && field.source !== "system_inference").length;
+  return {
+    understoodPercent,
+    evidenceCount: evidence.length,
+    mustReview,
+    missing,
+    conflicts,
+    confirmedEvidence,
+    recommendedPrimaryAction: mustReview ? `Review ${mustReview} uncertain field${mustReview === 1 ? "" : "s"}` : missing ? `Complete ${missing} missing field${missing === 1 ? "" : "s"}` : "Approve marketplace drafts",
+  };
+}
+
+export function productKnowledgeReviewPlan(fields: ProductKnowledgeField[]) {
+  const blockingKeys: ProductKnowledgeFieldKey[] = ["universal_category", "product_type", "price", "variant_options", "image_set"];
+  const mustReview = fields.filter((field) => field.conflictingEvidenceIds?.length || field.status === "rejected" || (field.reviewRequired && (blockingKeys.includes(field.fieldKey) || field.confidence < 0.6)));
+  const recommendedReview = fields.filter((field) => !mustReview.includes(field) && (field.reviewRequired || (field.status === "generated" && field.confidence < 0.82)));
+  const alreadyUnderstood = fields.filter((field) => !mustReview.includes(field) && !recommendedReview.includes(field) && field.status !== "missing");
+  const safeBulkApproval = fields.filter(canBulkApproveProductKnowledgeField);
+  return { mustReview, recommendedReview, alreadyUnderstood, safeBulkApproval };
+}
+
+export function productKnowledgeFieldHistory(data: OperatingData, productId: string, fieldKey: ProductKnowledgeFieldKey) {
+  ensureProductKnowledgeCollections(data);
+  const field = data.productKnowledgeFields!.find((entry) => entry.productId === productId && entry.fieldKey === fieldKey);
+  const evidence = data.productKnowledgeEvidence!.filter((entry) => entry.productId === productId && (entry.normalizedFieldKey === fieldKey || field?.supportingEvidenceIds.includes(entry.id) || field?.conflictingEvidenceIds?.includes(entry.id)));
+  const decisions = data.productKnowledgeDecisions!.filter((entry) => entry.productId === productId && entry.fieldKey === fieldKey);
+  const confidence = data.productKnowledgeConfidenceHistory!.filter((entry) => entry.productId === productId && entry.fieldKey === fieldKey);
+  return [
+    ...evidence.map((entry) => ({ type: "Imported" as const, value: entry.rawValue, actor: entry.sourceType, at: entry.capturedAt, reason: `Captured from ${entry.sourceLabel}.`, memoryAction: "No memory action." })),
+    ...(field ? [{ type: "Generated" as const, value: field.value, actor: field.source, at: field.updatedAt, reason: field.explanation, memoryAction: field.source === "memory" ? "Memory influenced this suggestion." : "No memory action." }] : []),
+    ...decisions.map((entry) => ({ type: entry.decision === "confirmed" ? "Confirmed" as const : entry.decision === "corrected" || entry.decision === "overridden" ? "Corrected" as const : "Rejected" as const, previousValue: entry.previousValue, value: entry.value, actor: entry.decidedBy || "local-user", at: entry.decidedAt, reason: entry.reason || "User reviewed this field.", memoryAction: entry.decision === "confirmed" ? "Strengthens matching memory when one exists." : entry.decision === "rejected" ? "Weakens matching memory and may suspend it." : "Creates or updates safe reusable memory when pattern-safe." })),
+    ...confidence.map((entry) => ({ type: "Regenerated" as const, value: entry.nextConfidence, actor: "confidence-model", at: entry.createdAt, reason: entry.reason, memoryAction: "Confidence history recorded." })),
+  ].sort((a, b) => a.at.localeCompare(b.at));
+}
+
+export function productKnowledgeCorrectionImpactPreview(data: OperatingData, productId: string, fieldKey: ProductKnowledgeFieldKey, nextValue: KnowledgeValue) {
+  ensureProductKnowledgeCollections(data);
+  const field = data.productKnowledgeFields!.find((entry) => entry.productId === productId && entry.fieldKey === fieldKey);
+  const previousValue = field?.value ?? null;
+  const updates = new Set<string>();
+  const protectedItems = new Set<string>();
+  if (fieldKey === "universal_category" || fieldKey === "product_type") {
+    updates.add("marketplace draft categories");
+    updates.add("required product detail groups");
+    updates.add("Product completeness");
+    updates.add("marketplace readiness");
+  }
+  if (fieldKey === "material" || fieldKey === "fabric_composition") {
+    updates.add("marketplace attributes");
+    updates.add("search keywords");
+    updates.add("Product completeness");
+  }
+  if (fieldKey === "price" || fieldKey === "domestic_shipping") {
+    updates.add("pricing review");
+    updates.add("margin estimates");
+  }
+  if (fieldKey === "variant_options" || fieldKey === "variant_groups") {
+    updates.add("variant draft mapping");
+    updates.add("inventory setup requirements");
+  }
+  protectedItems.add("manually edited marketplace fields");
+  protectedItems.add("user-approved Product photos");
+  protectedItems.add("existing live listings");
+  return {
+    fieldKey,
+    previousValue,
+    nextValue,
+    updates: [...updates],
+    protectedItems: [...protectedItems],
+    estimatedCompletenessLift: field?.status === "missing" || field?.status === "rejected" ? 9 : field?.reviewRequired ? 6 : 2,
+    estimatedMarketplaceReadinessLift: fieldKey === "universal_category" || fieldKey === "variant_options" || fieldKey === "image_set" ? 12 : 4,
+  };
+}
+
+export function productKnowledgeObservability(data: OperatingData, productId?: string) {
+  ensureProductKnowledgeCollections(data);
+  const fields = productId ? data.productKnowledgeFields!.filter((field) => field.productId === productId) : data.productKnowledgeFields!;
+  const evidence = productId ? data.productKnowledgeEvidence!.filter((entry) => entry.productId === productId) : data.productKnowledgeEvidence!;
+  const decisions = productId ? data.productKnowledgeDecisions!.filter((entry) => entry.productId === productId) : data.productKnowledgeDecisions!;
+  const productIds = [...new Set(fields.map((field) => field.productId))];
+  const completenessValues = productIds.map((id) => productKnowledgeOverview(data.productKnowledgeFields!.filter((field) => field.productId === id), data.productKnowledgeEvidence!.filter((entry) => entry.productId === id)).understoodPercent);
+  return {
+    evidenceRecordsCreated: evidence.length,
+    decisionsMade: decisions.length,
+    generatedFields: fields.filter((field) => field.status === "generated").length,
+    confirmedFields: fields.filter((field) => field.status === "confirmed").length,
+    correctedFields: fields.filter((field) => field.status === "corrected").length,
+    rejectedFields: fields.filter((field) => field.status === "rejected").length,
+    conflicts: fields.filter((field) => field.conflictingEvidenceIds?.length).length,
+    memoryApplications: fields.filter((field) => field.source === "memory").length,
+    memoryOverrides: data.productKnowledgeMemory!.reduce((sum, memory) => sum + (memory.overriddenApplications || 0), 0),
+    suspendedMemories: data.productKnowledgeMemory!.filter((memory) => memory.status === "suspended").length,
+    averageCompleteness: completenessValues.length ? Math.round(completenessValues.reduce((sum, value) => sum + value, 0) / completenessValues.length) : 0,
+    averageReviewCount: productIds.length ? Math.round(fields.filter((field) => field.reviewRequired || field.conflictingEvidenceIds?.length).length / productIds.length * 10) / 10 : 0,
+    averageTimeToReadyMinutes: estimateProductKnowledgeTimeToReady(fields).estimatedPkeMinutes,
+  };
+}
+
+export function estimateProductKnowledgeTimeToReady(fields: ProductKnowledgeField[]) {
+  const mustReview = fields.filter((field) => field.reviewRequired || field.conflictingEvidenceIds?.length || field.status === "rejected").length;
+  const missing = fields.filter((field) => field.status === "missing").length;
+  const corrections = fields.filter((field) => field.status === "corrected").length;
+  const approvals = fields.filter(canBulkApproveProductKnowledgeField).length;
+  const manualMinutes = Math.max(4, fields.length * 0.8 + missing * 1.2);
+  const estimatedPkeMinutes = Math.max(1, mustReview * 0.7 + missing * 0.8 + corrections * 0.4 + approvals * 0.08);
+  return {
+    manualMinutes: Math.round(manualMinutes * 10) / 10,
+    estimatedPkeMinutes: Math.round(estimatedPkeMinutes * 10) / 10,
+    fieldsTyped: missing + corrections,
+    fieldsApproved: approvals,
+    corrections,
+    unresolvedFields: mustReview + missing,
+    effortSavedPercent: Math.max(0, Math.round((1 - estimatedPkeMinutes / manualMinutes) * 100)),
+  };
 }
 
 function productKnowledgeCompleteness(fields: ProductKnowledgeField[]): CompletenessCategory[] {

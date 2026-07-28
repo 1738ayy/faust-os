@@ -24,7 +24,15 @@ function experience(overrides: Partial<ProductExperience> = {}): ProductExperien
     ],
     ai: { recommendation: "", confidence: 0, evidence: "", nextAction: "Complete product details" },
     intelligence: { faustScore: { score: 0, label: "New", explanation: "", components: [] }, health: [], dna: [], relationships: [], recommendation: { situation: "", reasoning: "", expectedOutcome: "", confidence: 0, confidenceBasis: [] } },
-    productKnowledge: { fields: [], evidence: [], decisions: [], completeness: [] },
+    productKnowledge: {
+      fields: [],
+      evidence: [],
+      decisions: [],
+      completeness: [],
+      reviewPlan: { mustReview: [], recommendedReview: [], alreadyUnderstood: [], safeBulkApproval: [] },
+      overview: { understoodPercent: 0, evidenceCount: 0, mustReview: 0, missing: 0, conflicts: 0, confirmedEvidence: 0, recommendedPrimaryAction: "Complete product details" },
+      observability: { evidenceRecordsCreated: 0, decisionsMade: 0, generatedFields: 0, confirmedFields: 0, correctedFields: 0, rejectedFields: 0, conflicts: 0, memoryApplications: 0, memoryOverrides: 0, suspendedMemories: 0, averageCompleteness: 0, averageReviewCount: 0, averageTimeToReadyMinutes: 0 },
+    },
     timeline: [],
   } satisfies ProductExperience;
   return { ...base, ...overrides } as ProductExperience;

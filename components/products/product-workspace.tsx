@@ -211,6 +211,7 @@ function ProductKnowledgePanel({ item }: { item: ProductExperience }) {
       return (aIndex === -1 ? 999 : aIndex) - (bIndex === -1 ? 999 : bIndex);
     })
     .slice(0, 8);
+  const { overview, reviewPlan } = item.productKnowledge;
 
   const decide = (field: ProductKnowledgeField, decision: "confirmed" | "corrected" | "rejected", value?: ProductKnowledgeField["value"]) => {
     startTransition(async () => {
@@ -229,12 +230,41 @@ function ProductKnowledgePanel({ item }: { item: ProductExperience }) {
     });
   };
 
+  const approveSafeFacts = () => {
+    startTransition(async () => {
+      const safeKeys = reviewPlan.safeBulkApproval.map((field) => field.fieldKey);
+      const response = await fetch("/api/products/actions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "approve-knowledge-facts", productId: item.product.id, fieldKeys: safeKeys }),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.ok) {
+        toast.error(result.message || "Could not approve Product Knowledge.");
+        return;
+      }
+      toast.success(`${safeKeys.length} high-confidence fact${safeKeys.length === 1 ? "" : "s"} approved.`);
+      router.refresh();
+    });
+  };
+
   return (
     <Panel title="Product Knowledge">
       <div className="grid gap-4 lg:grid-cols-[0.72fr_1.28fr]">
         <div className="rounded-3xl border border-slate-700/35 bg-black/35 p-4">
-          <p className="text-sm font-semibold text-[#edf3ff]">Faust has {item.productKnowledge.evidence.length} source record(s) for this product.</p>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">Review the evidence once, and Faust remembers your corrections for future imports, marketplace drafts, and recommendations.</p>
+          <p className="text-sm font-semibold text-[#edf3ff]">Faust understands {overview.understoodPercent}% of this Product.</p>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            {overview.mustReview} field(s) need review. {overview.missing} field(s) are missing. {overview.conflicts} conflict(s) were detected. {overview.confirmedEvidence} field(s) were confirmed from supplier evidence.
+          </p>
+          <div className="mt-4 rounded-2xl border border-slate-700/35 bg-slate-950/45 p-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#c8d2e6]">Recommended primary action</p>
+            <p className="mt-1 text-sm font-semibold text-[#f6f8ff]">{overview.recommendedPrimaryAction}</p>
+          </div>
+          {reviewPlan.safeBulkApproval.length ? (
+            <button type="button" disabled={isPending} onClick={approveSafeFacts} className="mt-3 w-full rounded-full border border-slate-600/60 bg-[#66708d] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#77829f] disabled:opacity-50">
+              Approve {reviewPlan.safeBulkApproval.length} safe supplier fact{reviewPlan.safeBulkApproval.length === 1 ? "" : "s"}
+            </button>
+          ) : null}
           <div className="mt-4 grid gap-2">
             {item.productKnowledge.completeness.map((category) => (
               <div key={category.label} className="rounded-2xl border border-slate-700/35 bg-slate-950/45 p-3">
@@ -246,6 +276,15 @@ function ProductKnowledgePanel({ item }: { item: ProductExperience }) {
               </div>
             ))}
           </div>
+          <details className="mt-4 rounded-2xl border border-slate-700/35 bg-black/25 p-3">
+            <summary className="cursor-pointer text-sm font-semibold text-[#edf3ff]">Review groups</summary>
+            <div className="mt-3 grid gap-2 text-xs text-muted-foreground">
+              <p>Must review: {reviewPlan.mustReview.length}</p>
+              <p>Recommended review: {reviewPlan.recommendedReview.length}</p>
+              <p>Already understood: {reviewPlan.alreadyUnderstood.length}</p>
+              <p>High-confidence safe approvals: {reviewPlan.safeBulkApproval.length}</p>
+            </div>
+          </details>
         </div>
         <div className="grid gap-3">
           {fields.length ? fields.map((field) => <KnowledgeFieldRow key={field.id} field={field} disabled={isPending} onDecide={decide} />) : <p className="rounded-2xl border border-slate-700/35 bg-black/35 p-4 text-sm text-muted-foreground">No Product Knowledge has been captured yet. Import from the Faust extension to create evidence-backed suggestions.</p>}
@@ -272,6 +311,14 @@ function KnowledgeFieldRow({ field, disabled, onDecide }: { field: ProductKnowle
       <p className="mt-1 text-xs text-muted-foreground">Evidence: {field.supportingEvidenceIds.length || 0} source record(s){field.conflictingEvidenceIds?.length ? ` · ${field.conflictingEvidenceIds.length} conflict(s)` : ""}</p>
       {field.reviewRequired ? <p className="mt-2 rounded-2xl border border-amber-400/25 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">Review recommended before this value is used broadly.</p> : null}
       {field.alternatives?.length ? <p className="mt-2 text-xs text-muted-foreground">Alternatives: {field.alternatives.map(valueLabel).filter(Boolean).join(" · ")}</p> : null}
+      <details className="mt-3 rounded-2xl border border-slate-700/35 bg-slate-950/35 p-3">
+        <summary className="cursor-pointer text-xs font-semibold text-[#edf3ff]">Evidence, history, and impact</summary>
+        <div className="mt-3 space-y-2 text-xs leading-5 text-muted-foreground">
+          <p>Source record: {field.sourceRecordId ? "Captured from supplier page" : "Not linked"}</p>
+          <p>Decision history: current revision {field.revision}{field.reviewedAt ? ` · reviewed ${new Date(field.reviewedAt).toLocaleDateString()}` : ""}</p>
+          <p>Correction impact: changes to {field.fieldKey.replaceAll("_", " ")} can update marketplace draft readiness, Product completeness, and generated recommendations while preserving manually edited listing fields.</p>
+        </div>
+      </details>
       {editing ? (
         <div className="mt-3 flex flex-col gap-2 sm:flex-row">
           <input value={value} onChange={(event) => setValue(event.target.value)} className="min-h-10 flex-1 rounded-full border border-slate-700/60 bg-zinc-950/70 px-4 text-sm text-[#f6f8ff] outline-none transition focus:border-[#66708d]" aria-label={`Correct ${field.fieldKey.replaceAll("_", " ")}`} />

@@ -24,7 +24,7 @@ import { applyExtensionAction, type ExtensionAction } from "@/lib/browser-extens
 import { canonicalListingIdentity, markImportQueueItemCompleted, removeImportQueueItems as removeImportQueueItemsFromData } from "@/lib/import-queue";
 import { ensureProductImageOwnership, normalizeProductImageUrls, productCoverRecord as canonicalProductCoverRecord, productGallery, productImageRevision, setProductImages } from "@/lib/product-images";
 import { archiveProductGraph, hardDeleteProductGraph, productDeleteDependencySummary } from "@/lib/product-deletion";
-import { applyProductKnowledgeDecision, ensureProductKnowledgeCollections } from "@/lib/product-knowledge";
+import { applyProductKnowledgeDecision, approveHighConfidenceProductKnowledgeFacts, ensureProductKnowledgeCollections } from "@/lib/product-knowledge";
 
 const file = path.join(process.cwd(), ".faust", "operating-system.json");
 const now = () => new Date().toISOString();
@@ -178,6 +178,13 @@ export async function saveProductKnowledgeDecision(input: { productId: string; f
  const field = applyProductKnowledgeDecision(data, input);
  const product = data.products.find((entry) => entry.id === input.productId);
  if (product) activity(data, "Product knowledge reviewed", "product", product.id, `${input.fieldKey.replaceAll("_", " ")} ${field.status}.`);
+ return write(data);
+}
+export async function approveProductKnowledgeFacts(input: { productId: string; fieldKeys?: ProductKnowledgeFieldKey[]; actor?: string }) {
+ const data = await read();
+ const result = approveHighConfidenceProductKnowledgeFacts(data, input.productId, { fieldKeys: input.fieldKeys, actor: input.actor, reason: "Approved high-confidence supplier facts from the Product Knowledge review." });
+ const product = data.products.find((entry) => entry.id === input.productId);
+ if (product) activity(data, "Product knowledge approved", "product", product.id, `${result.approvedCount} high-confidence field(s) approved.`);
  return write(data);
 }
 export async function manageProductKnowledgeMemory(input: { memoryId: string; action: "suspend" | "restore" | "delete" | "narrow-scope"; scope?: "business" | "supplier" | "source_platform" | "universal_category" }) {
