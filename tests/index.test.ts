@@ -9,6 +9,7 @@ import "./product-images.test";
 import "./product-dna.test";
 import "./product-knowledge.test";
 import "./product-visual-intelligence.test";
+import "./product-pipeline.test";
 import "./product-deletion.test";
 import "./orders-deepening.test";
 import "./fulfillment-workflows.test";

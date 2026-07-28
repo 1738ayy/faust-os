@@ -18,6 +18,8 @@ test("primary operations pages render their operational page titles", async ({ r
   await resetDemo(request);
   const routes = [
     ["/", "Know what needs action next."],
+    ["/catalog", "Products"],
+    ["/action-center", "Action Center"],
     ["/inventory", "Inventory"],
     ["/orders", "Orders"],
     ["/purchasing", "Purchasing & inbound"],
@@ -30,7 +32,7 @@ test("primary operations pages render their operational page titles", async ({ r
   ] as const;
   for (const [route, title] of routes) {
     const appMain = page.getByTestId("app-main");
-    await page.goto(route); await expect(appMain).toBeVisible(); await expect(appMain.getByRole("heading", { name: title, exact: true })).toBeVisible();
+    await page.goto(route); await expect(appMain).toBeVisible(); await expect(appMain.getByRole("heading", { name: title, level: 1, exact: true })).toBeVisible();
   }
 });
 
@@ -214,6 +216,35 @@ test("browser extension API scans, analyzes, imports, confirms, syncs, and repor
   expect(state.data.listingReviewItems.some((entry: { detail: string }) => entry.detail === "Selector changed in controlled test")).toBeTruthy();
   expect(state.data.extensionArtifacts.length).toBeGreaterThanOrEqual(2);
   expect(state.data.extensionActionAudits.some((entry: { action: string }) => entry.action === "report-error")).toBeTruthy();
+});
+
+test("Action Center prioritizes product pipeline work and runs a review session", async ({ request, page }) => {
+  await resetDemo(request);
+  const product = { source: "1688", importedAt: new Date().toISOString(), title: "Action Center Pipeline Tee", superbuyUrl: "https://detail.1688.com/offer/action-center.html", supplier: "Action Center Factory", storeName: "Action Center Factory", category: "T-shirt", rawAttributes: { "Product Category": "T-shirt", "Main Fabric Composition": "Cotton blend" }, images: ["https://img.example.test/action-center-tshirt-front-clean.jpg", "https://img.example.test/action-center-tshirt-size-chart.jpg"], variants: [{ id: "action-l", name: "Black / L", options: ["Black", "L"], price: 88 }], variantOptions: { colors: ["Black"], sizes: ["L"] }, price: 88, domesticShipping: 8, minimumOrderQuantity: 2, weight: "420g", sellerRating: 4.7, salesCount: 200, pageTimestamp: new Date().toISOString() };
+  const registration = await request.post("/api/extension/register", { data: { deviceName: "Action Center extension", browser: "Chromium", environment: "local", version: "1.1.0-phase2", permissions: ["storage", "tabs"], idempotencyKey: crypto.randomUUID() } });
+  expect(registration.ok(), await registration.text()).toBeTruthy();
+  const registered = await registration.json();
+  const imported = await request.post("/api/extension/import", { headers: { "X-Faust-Device-Id": registered.actionResult.deviceId, "X-Faust-Extension-Token": registered.actionResult.token, "X-Faust-Nonce": crypto.randomUUID() }, data: { product, assumptions: { rmbUsdRate: 0.14, targetSalePriceUsd: 54, quantity: 2 }, approved: true, idempotencyKey: crypto.randomUUID() } });
+  expect(imported.ok(), await imported.text()).toBeTruthy();
+  const importedState = await imported.json();
+  const importedProduct = importedState.data.products.find((entry: { title: string }) => entry.title === product.title);
+  expect(importedProduct).toBeTruthy();
+
+  await page.goto("/action-center");
+  const actionMain = page.getByTestId("app-main");
+  await expect(actionMain.getByRole("heading", { name: "Action Center", level: 1, exact: true })).toBeVisible();
+  await expect(actionMain.getByRole("heading", { name: "Pipeline", exact: true })).toBeVisible();
+  await expect(actionMain.getByRole("heading", { name: "Review Session", exact: true })).toBeVisible();
+  await expect(actionMain.getByRole("heading", { name: "Product Queue", exact: true })).toBeVisible();
+  await expect(actionMain.getByText("Action Center Pipeline Tee", { exact: true })).toBeVisible();
+  await actionMain.getByRole("button", { name: /Start session/i }).click();
+  await expect(actionMain.getByRole("button", { name: /Exit session/i })).toBeVisible();
+  await actionMain.getByRole("button", { name: /Approve safe Product Knowledge/i }).click();
+  await expect.poll(async () => {
+    const state = await request.get("/api/operating-system");
+    const json = await state.json();
+    return json.data.productKnowledgeDecisions.filter((entry: { productId: string }) => entry.productId === importedProduct.id).length;
+  }).toBeGreaterThan(0);
 });
 
 test("import queue manages multiple scans, removal, and catalog completion", async ({ request }) => {

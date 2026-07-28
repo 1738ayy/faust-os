@@ -8,6 +8,7 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 const titles: Record<string, string> = {
   "/": "Mission Control",
   "/catalog": "Products",
+  "/action-center": "Action Center",
   "/inventory": "Inventory",
   "/orders": "Orders",
   "/listings": "Listings",

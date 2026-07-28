@@ -1,6 +1,6 @@
 import {
   LayoutDashboard,
-  Search, Package, DollarSign, BrainCircuit, Truck, Settings, Store, ShoppingBag, Tags, Factory, BarChart3, Bot, Workflow, ClipboardList, Boxes,
+  Search, Package, DollarSign, BrainCircuit, Truck, Settings, Store, ShoppingBag, Tags, Factory, BarChart3, Bot, Workflow, ClipboardList, Boxes, ClipboardCheck,
 } from "lucide-react";
 
 export const primaryNavigation = [
@@ -13,6 +13,11 @@ export const primaryNavigation = [
     title: "Products",
     href: "/catalog",
     icon: Boxes,
+  },
+  {
+    title: "Action Center",
+    href: "/action-center",
+    icon: ClipboardCheck,
   },
   {
     title: "Opportunities",

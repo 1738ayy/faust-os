@@ -3,6 +3,7 @@ import { AppLayout } from "@/components/navigation/app-layout";
 import { EmptyState, PageHeader, PrimaryButton, SecondaryButton } from "@/components/faust/design-system";
 import { CatalogWorkspace } from "@/components/products/catalog-workspace";
 import { buildProductExperiences } from "@/lib/product-experience";
+import { buildProductPipeline, productPipelineStageLabel, productPipelineStages } from "@/lib/product-pipeline";
 import { money } from "@/lib/business-calculations";
 import { getOperatingData } from "@/services/operating-system/repository";
 
@@ -11,6 +12,7 @@ export const dynamic = "force-dynamic";
 export default async function CatalogPage() {
   const data = await getOperatingData();
   const products = buildProductExperiences(data);
+  const pipeline = buildProductPipeline(data, products);
   const ready = products.filter((item) => item.readiness.score >= 85).length;
   const live = products.filter((item) => item.marketplaces.some((marketplace) => marketplace.status === "live")).length;
   const inventoryValue = products.reduce((sum, item) => sum + item.inventory.value, 0);
@@ -66,9 +68,28 @@ export default async function CatalogPage() {
             </section>
 
             <section className="flex flex-wrap items-center gap-3">
+              <SecondaryButton href="/action-center">Open Action Center</SecondaryButton>
               <SecondaryButton href="/opportunity-analyzer">Analyze opportunity</SecondaryButton>
               <SecondaryButton href="/listings">Generate drafts</SecondaryButton>
               <SecondaryButton href="/purchasing">Plan reorder</SecondaryButton>
+            </section>
+
+            <section className="rounded-[2rem] border border-slate-700/45 bg-zinc-950/60 p-5 shadow-2xl shadow-black/25 backdrop-blur">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-xl font-semibold">Product pipeline</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">The catalog now flows from import to publish to monitoring.</p>
+                </div>
+                <PrimaryButton href="/action-center">Work the queue<ArrowRight size={15} /></PrimaryButton>
+              </div>
+              <div className="mt-5 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+                {productPipelineStages.filter((stage) => pipeline.summary.stageCounts[stage] > 0).map((stage) => (
+                  <article key={stage} className="rounded-3xl border border-slate-700/35 bg-black/25 p-4">
+                    <p className="text-xs text-muted-foreground">{productPipelineStageLabel(stage)}</p>
+                    <p className="mt-2 text-2xl font-semibold tabular-nums">{pipeline.summary.stageCounts[stage]}</p>
+                  </article>
+                ))}
+              </div>
             </section>
 
             <CatalogWorkspace products={products} mode={data.mode} />
