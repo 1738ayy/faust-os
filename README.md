@@ -2,6 +2,8 @@
 
 Faust OS is a dark-first operating system for a resale business. It connects sourcing, products, stock, purchasing, inbound parcels, listings, orders, fulfillment, finance, tasks, and evidence-backed operating insights.
 
+The long-term product doctrine is captured in [FAUST Vision Lock](docs/faust-vision-lock.md): Faust should move sellers from manually creating and maintaining listings toward approving intelligent, evidence-backed commerce operations.
+
 ## Run locally
 
 ```bash
