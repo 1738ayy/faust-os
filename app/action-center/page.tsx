@@ -3,7 +3,7 @@ import { PageHeader } from "@/components/faust/design-system";
 import { ActionCenterWorkspace } from "@/components/products/action-center-workspace";
 import { buildProductExperiences } from "@/lib/product-experience";
 import { buildProductPipeline } from "@/lib/product-pipeline";
-import { getOperatingData } from "@/services/operating-system/repository";
+import { getOperatingData, persistProductPipelineSnapshot } from "@/services/operating-system/repository";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +11,7 @@ export default async function ActionCenterPage() {
   const data = await getOperatingData();
   const products = buildProductExperiences(data);
   const pipeline = buildProductPipeline(data, products);
+  await persistProductPipelineSnapshot(pipeline);
 
   return (
     <AppLayout>

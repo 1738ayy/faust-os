@@ -239,16 +239,39 @@ test("Action Center prioritizes product pipeline work and runs a review session"
   await expect(actionMain.getByText("Action Center Pipeline Tee", { exact: true })).toBeVisible();
   await actionMain.getByRole("button", { name: /Start session/i }).click();
   await expect(actionMain.getByRole("button", { name: /Exit session/i })).toBeVisible();
+  await expect.poll(async () => {
+    const state = await request.get("/api/operating-system");
+    const json = await state.json();
+    return json.data.productPipelineReviewSessions.filter((entry: { status: string; productIds: string[] }) => entry.status === "active" && entry.productIds.includes(importedProduct.id)).length;
+  }).toBeGreaterThan(0);
+  await expect.poll(async () => {
+    const state = await request.get("/api/operating-system");
+    const json = await state.json();
+    return json.data.productPipelineQueueItems.filter((entry: { productId: string; status: string }) => entry.productId === importedProduct.id && entry.status === "open").length;
+  }).toBeGreaterThan(0);
   await actionMain.getByRole("button", { name: /Approve safe Product Knowledge/i }).click();
   await expect.poll(async () => {
     const state = await request.get("/api/operating-system");
     const json = await state.json();
     return json.data.productKnowledgeDecisions.filter((entry: { productId: string }) => entry.productId === importedProduct.id).length;
   }).toBeGreaterThan(0);
+  await expect.poll(async () => {
+    const state = await request.get("/api/operating-system");
+    const json = await state.json();
+    return json.data.productPipelineBulkOperations.filter((entry: { productIds: string[]; status: string }) => entry.status === "completed" && entry.productIds.includes(importedProduct.id)).length;
+  }).toBeGreaterThan(0);
 });
 
 test("import queue manages multiple scans, removal, and catalog completion", async ({ request }) => {
   await resetDemo(request);
+  const registration = await request.post("/api/extension/register", { data: { deviceName: "Import Queue extension", browser: "Chromium", environment: "local", version: "2.0.1-runtime", permissions: ["storage", "tabs"], idempotencyKey: crypto.randomUUID() } });
+  expect(registration.ok(), await registration.text()).toBeTruthy();
+  const registered = await registration.json();
+  const extensionHeaders = () => ({
+    "X-Faust-Device-Id": registered.actionResult.deviceId,
+    "X-Faust-Extension-Token": registered.actionResult.token,
+    "X-Faust-Nonce": crypto.randomUUID(),
+  });
   const products = [1, 2, 3].map((index) => ({
     source: "1688",
     importedAt: new Date(Date.now() + index * 1000).toISOString(),
@@ -265,7 +288,7 @@ test("import queue manages multiple scans, removal, and catalog completion", asy
     pageTimestamp: new Date().toISOString(),
   }));
   for (const product of products) {
-    const scan = await request.post("/api/extension/scan", { data: { payload: product } });
+    const scan = await request.post("/api/extension/scan", { headers: extensionHeaders(), data: { payload: product } });
     expect(scan.ok(), await scan.text()).toBeTruthy();
   }
   let queueResponse = await request.get("/api/import-queue");

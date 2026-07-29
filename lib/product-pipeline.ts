@@ -1,5 +1,6 @@
-import type { OperatingData } from "../domain/business";
+import type { OperatingData, ProductPipelineBulkOperation, ProductPipelineQueueHistory, ProductPipelineQueueItem, ProductPipelineReviewSession, ProductPipelineStageSnapshot } from "../domain/business";
 import type { ProductExperience } from "./product-experience";
+import { deterministicUuid } from "./finance";
 
 export const productPipelineStages = [
   "imported",
@@ -146,6 +147,18 @@ function deriveStage(data: OperatingData, item: ProductExperience): ProductPipel
   return "imported";
 }
 
+function transitionSafeStage(data: OperatingData, item: ProductExperience, derived: ProductPipelineStage): ProductPipelineStage {
+  const prior = (data.productPipelineStages || []).find((entry) => entry.productId === item.product.id && entry.variantId === item.variant.id)?.stage as ProductPipelineStage | undefined;
+  if (!prior || prior === derived) return derived;
+  if (derived === "archived" || derived === "sold") return derived;
+  const priorIndex = productPipelineStages.indexOf(prior);
+  const derivedIndex = productPipelineStages.indexOf(derived);
+  const lateStage = prior === "published" || prior === "monitoring" || prior === "sold";
+  if (lateStage && derivedIndex < productPipelineStages.indexOf("published")) return prior;
+  if (priorIndex > derivedIndex && derivedIndex <= productPipelineStages.indexOf("imported")) return prior;
+  return derived;
+}
+
 function baseWork(item: ProductExperience, stage: ProductPipelineStage, kind: WorkItemKind, title: string, detail: string, severity: WorkSeverity, impact: number, action: ProductWorkItem["action"], options: Partial<ProductWorkItem> = {}): ProductWorkItem {
   return {
     id: workId(item, kind, title.toLowerCase().replace(/[^a-z0-9]+/g, "-")),
@@ -243,7 +256,7 @@ function priorityFor(item: ProductExperience, stage: ProductPipelineStage, workI
 export function buildProductPipeline(data: OperatingData, products: ProductExperience[], now = new Date()): ProductPipeline {
   const prefix = todayPrefix(now);
   const pipelineProducts = products.map((item) => {
-    const stage = deriveStage(data, item);
+    const stage = transitionSafeStage(data, item, deriveStage(data, item));
     const workItems = workItemsForProduct(data, item, stage);
     const revenuePotential = Math.max(0, item.finance.projectedRevenue || item.finance.revenue || item.variant.defaultSalePrice * Math.max(1, item.inventory.available));
     return {
@@ -300,4 +313,104 @@ export function buildProductPipeline(data: OperatingData, products: ProductExper
 
 export function productPipelineStageLabel(stage: ProductPipelineStage) {
   return stageLabel(stage).replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+export function ensureProductPipelineCollections(data: OperatingData) {
+  data.productPipelineStages ||= [];
+  data.productPipelineQueueItems ||= [];
+  data.productPipelineQueueHistory ||= [];
+  data.productPipelineStageHistory ||= [];
+  data.productPipelineReviewSessions ||= [];
+  data.productPipelineBulkOperations ||= [];
+  data.productPipelineTaskResolutions ||= [];
+}
+
+export function productPipelineQueueItemId(workId: string) {
+  return deterministicUuid(`pipeline-queue:${workId}`);
+}
+
+function revisionForProduct(item: ProductPipelineItem) {
+  return `${item.productId}:${item.variantId}:${item.stage}:${item.readinessScore}:${item.priorityScore}:${item.workItems.map((work) => work.id).join("|")}`;
+}
+
+function history(data: OperatingData, entry: Omit<ProductPipelineQueueHistory, "id" | "createdAt">, at: string) {
+  data.productPipelineQueueHistory!.push({ id: deterministicUuid(`pipeline-history:${entry.queueItemId}:${entry.action}:${at}`), ...entry, createdAt: at });
+}
+
+export function syncProductPipelineState(data: OperatingData, pipeline: ProductPipeline, at = new Date().toISOString()) {
+  ensureProductPipelineCollections(data);
+  const activeKeys = new Set(pipeline.workItems.map((work) => work.id));
+  const productStages = new Map(pipeline.products.map((item) => [`${item.productId}:${item.variantId}`, item]));
+
+  for (const product of pipeline.products) {
+    const key = `${product.productId}:${product.variantId}`;
+    const sourceRevision = revisionForProduct(product);
+    const existing = data.productPipelineStages!.find((entry) => entry.productId === product.productId && entry.variantId === product.variantId);
+    if (!existing) {
+      const snapshot: ProductPipelineStageSnapshot = { id: deterministicUuid(`pipeline-stage:${key}`), productId: product.productId, variantId: product.variantId, stage: product.stage, priority: product.priorityScore, readinessScore: product.readinessScore, sourceRevision, observedAt: at, updatedAt: at };
+      data.productPipelineStages!.push(snapshot);
+      data.productPipelineStageHistory!.push({ id: deterministicUuid(`pipeline-stage-history:${key}:start:${at}`), productId: product.productId, variantId: product.variantId, toStage: product.stage, reason: "Initial derived pipeline stage observed.", sourceRevision, createdAt: at });
+    } else {
+      if (existing.stage !== product.stage) {
+        data.productPipelineStageHistory!.push({ id: deterministicUuid(`pipeline-stage-history:${key}:${existing.stage}:${product.stage}:${at}`), productId: product.productId, variantId: product.variantId, fromStage: existing.stage, toStage: product.stage, reason: "Canonical Product state changed the derived pipeline stage.", sourceRevision, createdAt: at });
+      }
+      existing.stage = product.stage;
+      existing.priority = product.priorityScore;
+      existing.readinessScore = product.readinessScore;
+      existing.sourceRevision = sourceRevision;
+      existing.updatedAt = at;
+    }
+  }
+
+  for (const work of pipeline.workItems) {
+    const existing = data.productPipelineQueueItems!.find((entry) => entry.deterministicKey === work.id && entry.status === "open");
+    if (existing) {
+      existing.priority = priorityForQueue(work);
+      existing.severity = work.severity;
+      existing.estimatedTime = work.estimatedEffortSeconds;
+      existing.expectedBenefit = work.expectedBenefit;
+      existing.blocking = work.blocksDownstream;
+      existing.recommendedAction = work.suggestedAction;
+      existing.title = work.title;
+      existing.detail = work.detail;
+      existing.href = work.href;
+      existing.stage = work.stage;
+      existing.updatedAt = at;
+    } else {
+      const item: ProductPipelineQueueItem = { id: productPipelineQueueItemId(work.id), deterministicKey: work.id, type: work.kind, severity: work.severity, priority: priorityForQueue(work), estimatedTime: work.estimatedEffortSeconds, expectedBenefit: work.expectedBenefit, blocking: work.blocksDownstream, recommendedAction: work.suggestedAction, productId: work.productId, variantId: work.variantId, sku: work.sku, title: work.title, detail: work.detail, href: work.href, stage: work.stage, status: "open", generatedFrom: "product_pipeline", createdAt: at, updatedAt: at };
+      data.productPipelineQueueItems!.push(item);
+      history(data, { queueItemId: item.id, productId: item.productId, variantId: item.variantId, action: "generated", detail: item.title }, at);
+    }
+  }
+
+  for (const item of data.productPipelineQueueItems!.filter((entry) => entry.status === "open" && !activeKeys.has(entry.deterministicKey))) {
+    const currentProduct = productStages.get(`${item.productId}:${item.variantId}`);
+    item.status = "resolved";
+    item.resolvedAt = at;
+    item.updatedAt = at;
+    data.productPipelineTaskResolutions!.push({ id: deterministicUuid(`pipeline-resolution:${item.id}:${at}`), queueItemId: item.id, productId: item.productId, variantId: item.variantId, resolution: "resolved", beforeStage: item.stage, afterStage: currentProduct?.stage || item.stage, action: item.recommendedAction, detail: "Deterministic completion condition is no longer present.", createdAt: at });
+    history(data, { queueItemId: item.id, productId: item.productId, variantId: item.variantId, action: "resolved", detail: "Completion condition cleared." }, at);
+  }
+
+  return data;
+}
+
+function priorityForQueue(work: ProductWorkItem) {
+  return severityWeight(work.severity) + work.readinessImpact + (work.blocksDownstream ? 25 : 0);
+}
+
+export function createProductReviewSession(data: OperatingData, pipeline: ProductPipeline, at = new Date().toISOString()) {
+  ensureProductPipelineCollections(data);
+  syncProductPipelineState(data, pipeline, at);
+  const queueIds = pipeline.summary.session.items.map((work) => productPipelineQueueItemId(work.id));
+  const session: ProductPipelineReviewSession = { id: deterministicUuid(`pipeline-session:${at}:${queueIds.join("|")}`), status: "active", productIds: [...new Set(pipeline.summary.session.items.map((item) => item.productId))], queueItemIds: queueIds, estimatedMinutes: pipeline.summary.session.estimatedMinutes, goal: pipeline.summary.session.goal, startedAt: at, createdAt: at, updatedAt: at };
+  data.productPipelineReviewSessions!.unshift(session);
+  return session;
+}
+
+export function recordProductPipelineBulkOperation(data: OperatingData, input: { operationType: ProductPipelineBulkOperation["operationType"]; queueItemIds: string[]; productIds: string[]; skippedQueueItemIds?: string[]; resultSummary?: string }, at = new Date().toISOString()) {
+  ensureProductPipelineCollections(data);
+  const operation: ProductPipelineBulkOperation = { id: deterministicUuid(`pipeline-bulk:${input.operationType}:${at}:${input.queueItemIds.join("|")}`), operationType: input.operationType, status: "completed", queueItemIds: input.queueItemIds, productIds: input.productIds, skippedQueueItemIds: input.skippedQueueItemIds || [], resultSummary: input.resultSummary || `${input.queueItemIds.length} pipeline task(s) processed.`, createdAt: at, completedAt: at };
+  data.productPipelineBulkOperations!.unshift(operation);
+  return operation;
 }

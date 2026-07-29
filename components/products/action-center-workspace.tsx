@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { MetricCard, PrimaryButton, SecondaryButton, StatusBadge } from "@/components/faust/design-system";
 import type { ProductPipeline, ProductWorkItem, WorkSeverity } from "@/lib/product-pipeline";
-import { productPipelineStageLabel, productPipelineStages } from "@/lib/product-pipeline";
+import { productPipelineQueueItemId, productPipelineStageLabel, productPipelineStages } from "@/lib/product-pipeline";
 import { money } from "@/lib/business-calculations";
 
 function severityTone(severity: WorkSeverity): "danger" | "warning" | "info" | "neutral" {
@@ -48,6 +48,19 @@ async function runWorkItem(item: ProductWorkItem) {
   }
 }
 
+async function recordPipelineAction(payload: Record<string, unknown>) {
+  const response = await fetch("/api/product-pipeline/actions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+  const body = await response.json();
+  if (!response.ok || body.ok === false) throw new Error(body.message || "Could not record pipeline action.");
+  return body;
+}
+
+function bulkOperationType(label: string) {
+  if (/draft/i.test(label)) return "generate_drafts";
+  if (/publish/i.test(label)) return "publish_ready_products";
+  return "approve_supplier_facts";
+}
+
 export function ActionCenterWorkspace({ pipeline }: { pipeline: ProductPipeline }) {
   const router = useRouter();
   const [activeKind, setActiveKind] = useState<string>("all");
@@ -67,10 +80,24 @@ export function ActionCenterWorkspace({ pipeline }: { pipeline: ProductPipeline 
     startTransition(async () => {
       try {
         for (const item of items) await runWorkItem(item);
+        await recordPipelineAction({ action: "record-bulk-operation", operationType: bulkOperationType(label), queueItemIds: items.map((item) => productPipelineQueueItemId(item.id)), productIds: [...new Set(items.map((item) => item.productId))], resultSummary: label });
         toast.success(label);
         router.refresh();
       } catch (error) {
         toast.error("Action Center stopped", { description: error instanceof Error ? error.message : "Review the item and retry." });
+      }
+    });
+  };
+
+  const startSession = () => {
+    startTransition(async () => {
+      try {
+        await recordPipelineAction({ action: "start-review-session" });
+        setSessionMode(true);
+        toast.success("Review session started");
+        router.refresh();
+      } catch (error) {
+        toast.error("Could not start Review Session", { description: error instanceof Error ? error.message : "Try again from Action Center." });
       }
     });
   };
@@ -88,7 +115,7 @@ export function ActionCenterWorkspace({ pipeline }: { pipeline: ProductPipeline 
           </div>
           <div className="flex flex-wrap gap-3 xl:justify-end">
             {pipeline.recommended?.action.type === "open" ? <PrimaryButton href={pipeline.recommended.href}>{pipeline.recommended.suggestedAction}<ArrowRight size={15} /></PrimaryButton> : pipeline.recommended ? <button disabled={busy} onClick={() => run(pipeline.recommended!.suggestedAction, [pipeline.recommended!])} className="faust-action px-4 py-2 text-sm disabled:opacity-50">{pipeline.recommended.suggestedAction}<ArrowRight size={15} /></button> : <PrimaryButton href="/sourcing">Import product</PrimaryButton>}
-            <button type="button" onClick={() => setSessionMode((current) => !current)} className="faust-secondary-action px-4 py-2 text-sm"><Play size={15} />{sessionMode ? "Exit session" : "Start session"}</button>
+            <button type="button" onClick={() => sessionMode ? setSessionMode(false) : startSession()} className="faust-secondary-action px-4 py-2 text-sm"><Play size={15} />{sessionMode ? "Exit session" : "Start session"}</button>
           </div>
         </div>
       </section>

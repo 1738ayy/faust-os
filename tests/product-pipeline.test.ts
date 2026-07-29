@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { OperatingData } from "../domain/business";
-import { buildProductPipeline } from "../lib/product-pipeline";
+import { buildProductPipeline, createProductReviewSession, productPipelineQueueItemId, recordProductPipelineBulkOperation, syncProductPipelineState } from "../lib/product-pipeline";
 import type { ProductExperience } from "../lib/product-experience";
 
 const time = "2026-07-28T00:00:00.000Z";
@@ -112,4 +112,74 @@ test("product pipeline reports session scope, effort, and operational progress",
   assert.equal(pipeline.summary.today.sold, 1);
   assert.ok(pipeline.summary.session.productCount >= 1);
   assert.ok(pipeline.summary.session.estimatedMinutes >= 1);
+});
+
+test("product pipeline persists generated stage, queue, and history snapshots", () => {
+  const operating = data();
+  const pipeline = buildProductPipeline(operating, [experience()]);
+
+  syncProductPipelineState(operating, pipeline, time);
+
+  assert.equal(operating.productPipelineStages?.length, 1);
+  assert.equal(operating.productPipelineStages?.[0].stage, "ready");
+  assert.equal(operating.productPipelineQueueItems?.length, 1);
+  assert.equal(operating.productPipelineQueueItems?.[0].id, productPipelineQueueItemId(pipeline.workItems[0].id));
+  assert.equal(operating.productPipelineQueueItems?.[0].status, "open");
+  assert.equal(operating.productPipelineQueueHistory?.[0].action, "generated");
+  assert.equal(operating.productPipelineStageHistory?.[0].toStage, "ready");
+});
+
+test("product pipeline resolves queue tasks when deterministic completion conditions clear", () => {
+  const operating = data();
+  const product = experience();
+  const first = buildProductPipeline(operating, [product]);
+  syncProductPipelineState(operating, first, time);
+
+  const afterDrafts = buildProductPipeline({
+    ...operating,
+    channelListingDrafts: ["Depop", "eBay", "Etsy", "Mercari", "Poshmark"].map((marketplace, index) => ({ id: `55555555-5555-4555-8555-55555555555${index}`, listingId: `66666666-6666-4666-8666-66666666666${index}`, variantId: product.variant.id, physicalSku: product.variant.sku, marketplace: marketplace as "Depop", title: `${marketplace} Pipeline Tee`, price: 50, quantity: 2, status: "validated" as const, syncState: "clean" as const, publishMode: "adapter" as const, imageUrls: ["/tee.jpg"], description: "A complete marketplace-ready product description for pipeline testing.", category: "T-shirt", attributes: {}, validationErrors: [], createdAt: time, updatedAt: time })),
+  }, [product]);
+  syncProductPipelineState(operating, afterDrafts, "2026-07-28T00:05:00.000Z");
+
+  assert.ok(operating.productPipelineQueueItems?.some((item) => item.status === "resolved" && item.type === "generate_drafts"));
+  assert.ok(operating.productPipelineTaskResolutions?.some((item) => item.resolution === "resolved"));
+  assert.ok(operating.productPipelineQueueHistory?.some((item) => item.action === "resolved"));
+});
+
+test("product pipeline prevents impossible backward transitions from published to imported", () => {
+  const operating = data();
+  const product = experience();
+  operating.productPipelineStages = [{ id: "77777777-7777-4777-8777-777777777777", productId: product.product.id, variantId: product.variant.id, stage: "published", priority: 90, readinessScore: 100, sourceRevision: "prior", observedAt: time, updatedAt: time }];
+
+  const pipeline = buildProductPipeline(operating, [product]);
+
+  assert.equal(pipeline.products[0].stage, "published");
+});
+
+test("product pipeline persists focused review sessions and safe bulk operations", () => {
+  const operating = data();
+  const item = experience({
+    readiness: { status: "incomplete", score: 68, missing: ["material"], nextAction: "Review material", dimensions: [] },
+    productKnowledge: {
+      ...experience().productKnowledge,
+      reviewPlan: { mustReview: [], recommendedReview: [], alreadyUnderstood: [], safeBulkApproval: [{ id: "field-3", productId: "11111111-1111-4111-8111-111111111111", fieldKey: "material", value: "Cotton", confidence: 0.94, status: "generated", source: "evidence", explanation: "Supplier confirmed.", supportingEvidenceIds: [], revision: 1, updatedAt: time }] },
+    },
+  });
+  const pipeline = buildProductPipeline(operating, [item]);
+  syncProductPipelineState(operating, pipeline, time);
+
+  const session = createProductReviewSession(operating, pipeline, time);
+  const operation = recordProductPipelineBulkOperation(operating, {
+    operationType: "approve_materials",
+    queueItemIds: pipeline.summary.session.items.map((work) => productPipelineQueueItemId(work.id)),
+    productIds: [item.product.id],
+    resultSummary: "Approve high-confidence materials",
+  }, time);
+
+  assert.equal(session.status, "active");
+  assert.ok(session.queueItemIds.every((id) => /^[0-9a-f-]{36}$/.test(id)));
+  assert.equal(operation.operationType, "approve_materials");
+  assert.equal(operation.status, "completed");
+  assert.ok(operating.productPipelineReviewSessions?.some((entry) => entry.id === session.id));
+  assert.ok(operating.productPipelineBulkOperations?.some((entry) => entry.id === operation.id));
 });
