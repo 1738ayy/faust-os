@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { OperatingData } from "../domain/business";
-import { approveAutomation, archiveAutomationRule, createAutomationRule, defaultAutomationTemplates, dueScheduledRules, duplicateAutomationRule, ensureAutomationCollections, expireApprovals, ingestAutomationEvent, nextBackoff, processAutomationWorkerTick, recoverStaleRuns, replayDeadLetter, retryAutomation, runAutomationRule, setAutomationEnabled, setSchedulePaused, testAutomationRule } from "../lib/automations";
+import { approveAutomation, archiveAutomationRule, automationEngineMetrics, classifyAutomationAction, createAutomationRule, defaultAutomationTemplates, dueScheduledRules, duplicateAutomationRule, ensureAutomationCollections, expireApprovals, ingestAutomationEvent, nextBackoff, previewAutomationEvent, processAutomationWorkerTick, recoverStaleRuns, replayDeadLetter, retryAutomation, runAutomationRule, setAutomationEnabled, setAutomationProfile, setSchedulePaused, testAutomationRule, workflowAutomationPolicy } from "../lib/automations";
 import { createAnalyticsReport } from "../lib/analytics";
 import { createFiveChannelDrafts } from "../lib/listings-core";
 
@@ -179,4 +179,57 @@ test("automation action failure rolls back partial module writes and creates a d
   assert.equal(data.stockMovements.length, beforeMovements);
   assert.equal(data.automationDeadLetters?.[0].status, "open");
   assert.ok(data.notices.some((notice) => notice.title === "Automation failed"));
+});
+
+test("workflow automation profile gates safe, approval, and blocked actions deterministically", () => {
+  const data = fixture();
+  ensureAutomationCollections(data);
+  assert.equal(workflowAutomationPolicy(data).profile, "assisted");
+  const rule = createAutomationRule(data, { enabled: true, dryRun: false, triggerType: "inventory.below_reorder_point" });
+  const blockedAction = { id: crypto.randomUUID(), type: "call_webhook_boundary" as const, config: { url: "https://example.test/webhook" } };
+  rule.actions = [
+    { id: crypto.randomUUID(), type: "create_notification", config: {} },
+    { id: crypto.randomUUID(), type: "draft_purchase_order", config: {} },
+  ];
+  assert.equal(classifyAutomationAction(rule.actions[0], rule).safetyLevel, "safe");
+  assert.equal(classifyAutomationAction(rule.actions[1], rule).safetyLevel, "requires_approval");
+  assert.equal(classifyAutomationAction(blockedAction, rule).safetyLevel, "blocked");
+  const assisted = runAutomationRule(data, rule.id, { available: 1, sku: "AUTO-HOOD" }, "profile-assisted");
+  assert.equal(assisted.status, "waiting_approval");
+  assert.equal(data.notices.length, 1);
+  assert.equal(data.purchaseOrders.length, 0);
+  setAutomationProfile(data, "manual");
+  const manualRule = createAutomationRule(data, { enabled: true, dryRun: false, triggerType: "analytics.kpi_threshold_crossed" });
+  manualRule.actions = [{ id: crypto.randomUUID(), type: "create_notification", config: { title: "Manual review" } }];
+  const manual = runAutomationRule(data, manualRule.id, { id: "manual-event" }, "profile-manual");
+  assert.equal(manual.status, "waiting_approval");
+  assert.ok(data.automationApprovals?.some((approval) => approval.proposedAction === "create_notification"));
+  setAutomationProfile(data, "automatic");
+  const blockedRule = createAutomationRule(data, { enabled: true, dryRun: false, triggerType: "analytics.channel_margin_dropped" });
+  blockedRule.actions = [{ id: crypto.randomUUID(), type: "call_webhook_boundary", config: { url: "https://example.test/webhook" } }];
+  const blocked = runAutomationRule(data, blockedRule.id, { marginDelta: -20 }, "blocked-boundary");
+  assert.equal(blocked.status, "dead_lettered");
+  assert.ok(data.automationDeadLetters?.some((deadLetter) => deadLetter.reason.includes("blocked")));
+});
+
+test("workflow automation dry-run previews, priority ordering, metrics, and marketplace adapter queue handoff", () => {
+  const data = fixture();
+  ensureAutomationCollections(data);
+  createFiveChannelDrafts(data, { variantId: data.variants[0].id, physicalSku: "AUTO-HOOD" });
+  const syncJobsBeforePreview = data.listingSyncJobs?.length || 0;
+  const slow = createAutomationRule(data, { name: "B later sync rule", templateId: "auto-template-listing-sync", enabled: true, dryRun: false, priority: 20 });
+  const fast = createAutomationRule(data, { name: "A first sync rule", templateId: "auto-template-listing-sync", enabled: true, dryRun: false, priority: 5 });
+  const preview = previewAutomationEvent(data, "listing.quantity_sync_failed", { status: "failed", draftId: data.channelListingDrafts![0].id });
+  assert.equal(preview.changesApplied, false);
+  assert.equal(preview.wouldRunCount, 2);
+  assert.equal(preview.safeActionCount, 6);
+  assert.equal(data.listingSyncJobs?.length || 0, syncJobsBeforePreview);
+  const receipt = ingestAutomationEvent(data, "listing.quantity_sync_failed", { id: "evt-sync", aggregateId: data.channelListingDrafts![0].id, status: "failed", draftId: data.channelListingDrafts![0].id }, "sync-event-once");
+  assert.deepEqual(receipt.runIds.map((runId) => data.automationRuns!.find((run) => run.id === runId)?.ruleId), [fast.id, slow.id]);
+  assert.ok(data.listingSyncJobs?.some((job) => job.action === "sync_quantity"));
+  const duplicate = ingestAutomationEvent(data, "listing.quantity_sync_failed", { id: "evt-sync", status: "failed" }, "sync-event-once");
+  assert.equal(duplicate.id, receipt.id);
+  const metrics = automationEngineMetrics(data);
+  assert.ok(metrics.totalRuns >= 2);
+  assert.ok(metrics.manualInterventionsAvoided >= 2);
 });

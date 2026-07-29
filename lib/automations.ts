@@ -1,4 +1,4 @@
-import type { AutomationAction, AutomationCondition, AutomationDeadLetter, AutomationEventReceipt, AutomationIdempotencyReceipt, AutomationRule, AutomationRun, AutomationStep, AutomationTemplate, AutomationTriggerType, AutomationWorkerHeartbeat, OperatingData } from "@/domain/business";
+import type { AutomationAction, AutomationActionSafetyPolicy, AutomationCondition, AutomationDeadLetter, AutomationDryRunSummary, AutomationEventReceipt, AutomationIdempotencyReceipt, AutomationMetricSnapshot, AutomationProfile, AutomationRule, AutomationRun, AutomationStep, AutomationTemplate, AutomationTriggerType, AutomationWorkerHeartbeat, OperatingData, WorkflowAutomationPolicy } from "@/domain/business";
 import { availableUnits } from "./business-calculations";
 import { activeVariants } from "./product-state";
 import { advanceOrder } from "./operational-workflows";
@@ -9,7 +9,7 @@ import { create1688PurchaseOrder, generateReorderRecommendations, refreshSupplie
 const now = () => new Date().toISOString();
 const id = () => crypto.randomUUID();
 
-export type AutomationMutationInput = { ruleId?: string; runId?: string; stepId?: string; deadLetterId?: string; templateId?: string; idempotencyKey?: string; name?: string; triggerType?: AutomationTriggerType; dryRun?: boolean; enabled?: boolean; paused?: boolean; threshold?: number; priority?: number; conditionMode?: "AND" | "OR"; samplePayload?: Record<string, unknown>; workerId?: string; concurrency?: number; leaseTimeoutMs?: number; pollingIntervalMs?: number };
+export type AutomationMutationInput = { ruleId?: string; runId?: string; stepId?: string; deadLetterId?: string; templateId?: string; idempotencyKey?: string; name?: string; triggerType?: AutomationTriggerType; dryRun?: boolean; enabled?: boolean; paused?: boolean; threshold?: number; priority?: number; conditionMode?: "AND" | "OR"; samplePayload?: Record<string, unknown>; workerId?: string; concurrency?: number; leaseTimeoutMs?: number; pollingIntervalMs?: number; profile?: AutomationProfile; cooldownMinutes?: number };
 export type WorkerRuntimeOptions = { workerId?: string; concurrency?: number; pollingIntervalMs?: number; leaseTimeoutMs?: number; now?: string };
 
 const condition = (field: string, operator: AutomationCondition["operator"], value?: AutomationCondition["value"]): AutomationCondition => ({ id: id(), field, operator, value });
@@ -46,8 +46,40 @@ function template(idValue: string, name: string, triggerType: AutomationTriggerT
 
 export function ensureAutomationCollections(data: OperatingData) {
   data.automationRules ||= []; data.automationRuns ||= []; data.automationSteps ||= []; data.automationApprovals ||= []; data.automationRetries ||= []; data.automationDeadLetters ||= []; data.automationIdempotencyReceipts ||= [];
-  data.automationEventReceipts ||= []; data.automationWorkerLeases ||= []; data.automationWorkerHeartbeats ||= []; data.automationExecutionTraces ||= [];
+  data.automationEventReceipts ||= []; data.automationWorkerLeases ||= []; data.automationWorkerHeartbeats ||= []; data.automationExecutionTraces ||= []; data.automationPolicies ||= []; data.automationDryRunSummaries ||= []; data.automationMetricSnapshots ||= [];
+  if (!data.automationPolicies.length) data.automationPolicies.unshift(defaultAutomationPolicy());
   if (!data.automationTemplates?.length || data.automationTemplates.some((entry) => !entry.version)) data.automationTemplates = defaultAutomationTemplates();
+}
+
+function defaultAutomationPolicy(createdAt = now()): WorkflowAutomationPolicy {
+  return { id: id(), profile: "assisted", enabled: true, safeActionsAutonomous: true, approvalRequiredActions: true, blockedActionsPrevented: true, cooldownMinutes: 5, createdAt, updatedAt: createdAt };
+}
+
+export function workflowAutomationPolicy(data: OperatingData): WorkflowAutomationPolicy {
+  ensureAutomationCollections(data);
+  return data.automationPolicies![0];
+}
+
+export function setAutomationProfile(data: OperatingData, profile: AutomationProfile, input: AutomationMutationInput = {}) {
+  const policy = workflowAutomationPolicy(data);
+  policy.profile = profile;
+  if (input.cooldownMinutes !== undefined) policy.cooldownMinutes = Math.max(0, input.cooldownMinutes);
+  policy.safeActionsAutonomous = profile === "assisted" || profile === "automatic";
+  policy.approvalRequiredActions = profile !== "automatic";
+  policy.blockedActionsPrevented = true;
+  policy.updatedAt = now();
+  audit(data, "Automation profile updated", "automation_policy", policy.id, `Workflow automation profile set to ${profile}.`);
+  return policy;
+}
+
+const approvalActionTypes = new Set<AutomationAction["type"]>(["draft_purchase_order", "request_approval", "move_tax_reserve", "create_expense", "create_inventory_adjustment", "pause_listing", "place_order_on_hold", "place_shipment_hold", "request_po_approval"]);
+const blockedActionTypes = new Set<AutomationAction["type"]>(["call_webhook_boundary"]);
+
+export function classifyAutomationAction(automationAction: AutomationAction, rule?: AutomationRule): AutomationActionSafetyPolicy {
+  const actionType = automationAction.type;
+  if (automationAction.destructive || blockedActionTypes.has(actionType)) return { actionType, safetyLevel: "blocked", reason: "This action can mutate external systems or perform destructive work and is blocked until a reviewed connector policy exists.", reversible: false, requiresApproval: true };
+  if (automationAction.approvalRequired || rule?.approvalRequired || automationAction.financial || approvalActionTypes.has(actionType)) return { actionType, safetyLevel: "requires_approval", reason: "This action changes money, holds, purchasing, inventory adjustments, or listing availability.", reversible: actionType !== "draft_purchase_order", requiresApproval: true };
+  return { actionType, safetyLevel: "safe", reason: "This action creates review work, queues deterministic jobs, or updates recoverable internal state.", reversible: true, requiresApproval: false };
 }
 
 export function createAutomationRule(data: OperatingData, input: AutomationMutationInput = {}) {
@@ -90,7 +122,7 @@ export function ingestAutomationEvent(data: OperatingData, eventType: Automation
   if (existing) return existing;
   const receipt: AutomationEventReceipt = { id: id(), eventId: String(payload.id || id()), eventType, aggregateType: String(payload.aggregateType || eventType.split(".")[0]), aggregateId: String(payload.aggregateId || payload.id || "unknown"), payload, status: "pending", runIds: [], idempotencyKey, receivedAt: now() };
   data.automationEventReceipts!.unshift(receipt);
-  const matches = data.automationRules!.filter((entry) => entry.enabled && !entry.archivedAt && entry.trigger.type === eventType);
+  const matches = data.automationRules!.filter((entry) => entry.enabled && !entry.archivedAt && entry.trigger.type === eventType).sort(automationPrioritySort);
   receipt.status = matches.length ? "matched" : "ignored";
   for (const entry of matches) {
     const run = runAutomationRule(data, entry.id, payload, `${idempotencyKey}:${entry.id}`);
@@ -104,6 +136,7 @@ export function ingestAutomationEvent(data: OperatingData, eventType: Automation
 export function runAutomationRule(data: OperatingData, ruleId: string, payload?: Record<string, unknown>, idempotencyKey = `${ruleId}:${JSON.stringify(payload || {})}`, workerId = "inline-worker") {
   ensureAutomationCollections(data);
   const entry = rule(data, ruleId);
+  const policy = workflowAutomationPolicy(data);
   if (!entry.enabled && !entry.dryRun) throw new Error("Automation rule is disabled.");
   const existing = data.automationIdempotencyReceipts!.find((receipt) => receipt.key === idempotencyKey);
   if (existing) return data.automationRuns!.find((run) => run.id === existing.runId)!;
@@ -113,9 +146,17 @@ export function runAutomationRule(data: OperatingData, ruleId: string, payload?:
   data.automationRuns!.unshift(run); receipt(data, idempotencyKey, entry.id, run.id); trace(data, run, "info", "Automation run started", { ruleId: entry.id });
   if (!passes) { const step = stepFor(run.id, "Conditions did not match", "skipped"); data.automationSteps!.unshift(step); run.stepIds.push(step.id); finishRun(data, entry, run, entry.dryRun ? "dry_run" : "succeeded", started); return run; }
   for (const automationAction of entry.actions) {
-    const requiresApproval = !entry.dryRun && approvalRequiredFor(automationAction, entry);
+    const safety = classifyAutomationAction(automationAction, entry);
+    if (safety.safetyLevel === "blocked" && !entry.dryRun) {
+      const step = stepFor(run.id, automationAction.type.replaceAll("_", " "), "failed", automationAction.id);
+      step.error = safety.reason; step.finishedAt = now(); step.logs.push(`Blocked by automation safety policy: ${safety.reason}`);
+      data.automationSteps!.unshift(step); run.stepIds.push(step.id); run.status = "failed"; run.error = safety.reason; deadLetter(data, run, entry, safety.reason); incident(data, run, step); break;
+    }
+    const requiresApproval = !entry.dryRun && approvalRequiredFor(automationAction, entry, policy.profile);
     const step = stepFor(run.id, automationAction.type.replaceAll("_", " "), requiresApproval ? "waiting_approval" : "running", automationAction.id);
     data.automationSteps!.unshift(step); run.stepIds.push(step.id);
+    step.logs.push(`Safety: ${safety.safetyLevel}. ${safety.reason}`);
+    if (entry.dryRun) { step.status = "skipped"; step.finishedAt = now(); step.logs.push("Dry run: no changes were applied."); continue; }
     if (step.status === "waiting_approval") { approval(data, entry, run, automationAction); run.status = "waiting_approval"; continue; }
     executeAction(data, entry, run, step, automationAction);
     if (run.status === "failed" || run.status === "dead_lettered") break;
@@ -124,8 +165,11 @@ export function runAutomationRule(data: OperatingData, ruleId: string, payload?:
   return run;
 }
 
-function approvalRequiredFor(automationAction: AutomationAction, rule: AutomationRule) {
-  return automationAction.approvalRequired || rule.approvalRequired || ["draft_purchase_order", "move_tax_reserve", "create_expense", "create_inventory_adjustment", "pause_listing", "place_order_on_hold", "place_shipment_hold"].includes(automationAction.type);
+function approvalRequiredFor(automationAction: AutomationAction, rule: AutomationRule, profile: AutomationProfile) {
+  const safety = classifyAutomationAction(automationAction, rule);
+  if (profile === "manual" || profile === "suggested") return true;
+  if (safety.safetyLevel === "requires_approval" || safety.safetyLevel === "blocked") return true;
+  return false;
 }
 
 export function approveAutomation(data: OperatingData, approvalId: string, approved: boolean, editedPayload?: Record<string, unknown>) {
@@ -167,6 +211,59 @@ export function replayDeadLetter(data: OperatingData, deadLetterId: string) {
 
 export function cancelAutomationRun(data: OperatingData, runId: string) { const run = data.automationRuns?.find((entry) => entry.id === runId); if (!run) throw new Error("Automation run not found."); run.status = "cancelled"; run.finishedAt = now(); return run; }
 export function testAutomationRule(data: OperatingData, ruleId: string) { const entry = rule(data, ruleId); const originalDryRun = entry.dryRun; entry.dryRun = true; const run = runAutomationRule(data, ruleId, entry.trigger.samplePayload, `${ruleId}:test:${Date.now()}`, "test-worker"); entry.dryRun = originalDryRun; return run; }
+
+export function previewAutomationEvent(data: OperatingData, eventType: AutomationTriggerType, payload: Record<string, unknown> = {}): AutomationDryRunSummary {
+  ensureAutomationCollections(data);
+  const profile = workflowAutomationPolicy(data).profile;
+  const matches = data.automationRules!.filter((entry) => entry.enabled && !entry.archivedAt && entry.trigger.type === eventType).sort(automationPrioritySort);
+  const actionBreakdown: Record<string, number> = {};
+  let wouldRunCount = 0, wouldSkipCount = 0, safeActionCount = 0, approvalActionCount = 0, blockedActionCount = 0;
+  for (const entry of matches) {
+    const eventPayload = { ...entry.trigger.samplePayload, ...payload };
+    const conditionResults = evaluateConditions(entry.conditions, eventPayload, data);
+    const passes = entry.conditionMode === "AND" ? conditionResults.every((item) => item.result) : conditionResults.some((item) => item.result);
+    if (!passes) { wouldSkipCount += 1; continue; }
+    wouldRunCount += 1;
+    for (const automationAction of entry.actions) {
+      actionBreakdown[automationAction.type] = (actionBreakdown[automationAction.type] || 0) + 1;
+      const safety = classifyAutomationAction(automationAction, entry);
+      if (safety.safetyLevel === "safe") safeActionCount += 1;
+      else if (safety.safetyLevel === "requires_approval") approvalActionCount += 1;
+      else blockedActionCount += 1;
+    }
+  }
+  const summary: AutomationDryRunSummary = { id: id(), eventType, profile, wouldRunCount, wouldSkipCount, safeActionCount, approvalActionCount, blockedActionCount, estimatedTimeSavedMinutes: Math.round((safeActionCount * 2 + approvalActionCount) * 10) / 10, changesApplied: false, actionBreakdown, createdAt: now() };
+  data.automationDryRunSummaries!.unshift(summary);
+  audit(data, "Automation dry run previewed", "automation_preview", summary.id, `${eventType}: ${wouldRunCount} rule${wouldRunCount === 1 ? "" : "s"} would run.`);
+  return summary;
+}
+
+export function automationEngineMetrics(data: OperatingData): AutomationMetricSnapshot {
+  ensureAutomationCollections(data);
+  const runs = data.automationRuns || [];
+  const completed = runs.filter((entry) => ["succeeded", "failed", "dead_lettered", "dry_run", "cancelled"].includes(entry.status));
+  const successes = runs.filter((entry) => entry.status === "succeeded").length;
+  const failures = runs.filter((entry) => entry.status === "failed" || entry.status === "dead_lettered").length;
+  const dryRuns = runs.filter((entry) => entry.status === "dry_run").length;
+  const approvalCount = (data.automationApprovals || []).filter((entry) => entry.status === "pending").length;
+  const durations = completed.map((entry) => entry.durationMs || 0).filter((duration) => duration > 0);
+  const safeSucceededSteps = (data.automationSteps || []).filter((step) => step.status === "succeeded" && step.logs.some((log) => log.includes("Safety: safe"))).length;
+  const snapshot: AutomationMetricSnapshot = {
+    id: id(),
+    totalRuns: runs.length,
+    successRate: runs.length ? Math.round((successes / runs.length) * 1000) / 10 : 0,
+    failureRate: runs.length ? Math.round((failures / runs.length) * 1000) / 10 : 0,
+    dryRunCount: dryRuns,
+    approvalCount,
+    timeSavedMinutes: Math.round(safeSucceededSteps * 2 * 10) / 10,
+    manualInterventionsAvoided: safeSucceededSteps,
+    disabledRules: (data.automationRules || []).filter((entry) => !entry.enabled && !entry.archivedAt).length,
+    averageDurationMs: durations.length ? Math.round(durations.reduce((sum, duration) => sum + duration, 0) / durations.length) : 0,
+    createdAt: now(),
+  };
+  data.automationMetricSnapshots!.unshift(snapshot);
+  return snapshot;
+}
 
 export function processAutomationWorkerTick(data: OperatingData, options: WorkerRuntimeOptions = {}) {
   ensureAutomationCollections(data); const workerId = options.workerId || "automation-worker-local"; const heartbeat = beat(data, workerId, options); const due = dueScheduledRules(data, options.now || now()).slice(0, options.concurrency || 4);
@@ -308,3 +405,4 @@ function beat(data: OperatingData, workerId: string, options: WorkerRuntimeOptio
 function lease(data: OperatingData, workerId: string, resourceType: "outbox" | "schedule" | "retry" | "dead_letter" | "stale_run", resourceId: string, leaseTimeoutMs: number) { data.automationWorkerLeases!.unshift({ id: id(), workerId, resourceType, resourceId, status: "active", acquiredAt: now(), expiresAt: new Date(Date.now() + leaseTimeoutMs).toISOString() }); }
 function rule(data: OperatingData, ruleId: string) { ensureAutomationCollections(data); const entry = data.automationRules!.find((item) => item.id === ruleId); if (!entry) throw new Error("Automation rule not found."); return entry; }
 function nextCopyName(data: OperatingData, sourceName: string) { const names = new Set((data.automationRules || []).map((entry) => entry.name)); const base = `${sourceName} copy`; if (!names.has(base)) return base; for (let index = 2; ; index += 1) { const candidate = `${base} ${index}`; if (!names.has(candidate)) return candidate; } }
+function automationPrioritySort(left: AutomationRule, right: AutomationRule) { return left.priority - right.priority || left.name.localeCompare(right.name) || left.id.localeCompare(right.id); }

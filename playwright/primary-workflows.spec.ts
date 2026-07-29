@@ -62,6 +62,18 @@ test("automations create, test, enable, run, approve, retry, duplicate, archive,
   expect(event.ok(), await event.text()).toBeTruthy();
   state = (await event.json()).data;
   expect(state.automationEventReceipts.some((entry: { status: string }) => entry.status === "processed")).toBeTruthy();
+  const profile = await request.post("/api/automations/actions", { data: { action: "set-profile", profile: "assisted", cooldownMinutes: 5 } });
+  expect(profile.ok(), await profile.text()).toBeTruthy();
+  state = (await profile.json()).data;
+  expect(state.automationPolicies.some((entry: { profile: string; safeActionsAutonomous: boolean }) => entry.profile === "assisted" && entry.safeActionsAutonomous)).toBeTruthy();
+  const preview = await request.post("/api/automations/actions", { data: { action: "dry-run-event", triggerType: "inventory.below_reorder_point", samplePayload: { available: 1, reorderPoint: 2, sku: "FST-HOOD-001" } } });
+  expect(preview.ok(), await preview.text()).toBeTruthy();
+  state = (await preview.json()).data;
+  expect(state.automationDryRunSummaries.some((entry: { changesApplied: boolean; wouldRunCount: number }) => !entry.changesApplied && entry.wouldRunCount >= 1)).toBeTruthy();
+  const metrics = await request.post("/api/automations/actions", { data: { action: "metrics" } });
+  expect(metrics.ok(), await metrics.text()).toBeTruthy();
+  state = (await metrics.json()).data;
+  expect(state.automationMetricSnapshots.some((entry: { totalRuns: number }) => entry.totalRuns >= 1)).toBeTruthy();
   const worker = await request.post("/api/automations/actions", { data: { action: "worker-tick", workerId: "playwright-worker", concurrency: 2 } });
   expect(worker.ok(), await worker.text()).toBeTruthy();
   state = (await worker.json()).data;
