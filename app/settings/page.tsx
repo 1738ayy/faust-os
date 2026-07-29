@@ -21,6 +21,7 @@ export default async function SettingsPage() {
         <SecondaryButton href="/settings">Connections</SecondaryButton>
         <SecondaryButton href="/settings/marketplaces">Marketplace Registry</SecondaryButton>
         <SecondaryButton href="/settings/product-knowledge">Product Knowledge Memory</SecondaryButton>
+        <SecondaryButton href="/settings/intelligence">Intelligence Studio</SecondaryButton>
         <SecondaryButton href="/settings">Developer Tools</SecondaryButton>
       </div>
       <ExtensionConnections data={data} />

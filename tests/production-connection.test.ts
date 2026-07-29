@@ -58,7 +58,7 @@ test("storage descriptors cover every required production artifact boundary", ()
 test("migration inventory is ordered and includes the production connection prerequisites", () => {
   const inventory = migrationInventory();
   assert.equal(inventory.ready, true);
-  assert.equal(inventory.latest, "034_workflow_automation_engine.sql");
+  assert.equal(inventory.latest, "035_intelligence_observability_studio.sql");
   assert.ok(inventory.files.includes("001_core_auth_and_tenancy.sql"));
   assert.ok(inventory.files.includes("022_browser_extension_phase2.sql"));
   assert.ok(inventory.files.includes("023_product_image_ownership.sql"));
@@ -73,6 +73,7 @@ test("migration inventory is ordered and includes the production connection prer
   assert.ok(inventory.files.includes("032_product_pipeline_workflow_engine.sql"));
   assert.ok(inventory.files.includes("033_depop_production_connector.sql"));
   assert.ok(inventory.files.includes("034_workflow_automation_engine.sql"));
+  assert.ok(inventory.files.includes("035_intelligence_observability_studio.sql"));
   const guard = readFileSync("supabase/migrations/027_product_cover_dna_schema_guard.sql", "utf8");
   assert.match(guard, /add column if not exists cover_image_id uuid/);
   assert.match(guard, /create table if not exists public\.product_digital_twin_assets/);
@@ -103,6 +104,13 @@ test("migration inventory is ordered and includes the production connection prer
   assert.match(automationEngine, /automation_dry_run_summaries/);
   assert.match(automationEngine, /automation_metric_snapshots/);
   assert.match(automationEngine, /enable row level security/i);
+  const intelligence = readFileSync("supabase/migrations/035_intelligence_observability_studio.sql", "utf8");
+  assert.match(intelligence, /intelligence_decision_timeline/);
+  assert.match(intelligence, /intelligence_benchmark_runs/);
+  assert.match(intelligence, /intelligence_replay_runs/);
+  assert.match(intelligence, /intelligence_repository_parity_checks/);
+  assert.match(intelligence, /intelligence_diagnostics_bundles/);
+  assert.match(intelligence, /enable row level security/i);
 });
 
 test("production health reports database, worker, storage, migrations, extension, and provider status", () => {

@@ -171,6 +171,13 @@ export const aiCenterActionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("feedback"), messageId: z.string().uuid().optional(), recommendationId: z.string().uuid().optional(), rating: z.enum(["useful", "not_useful", "unsafe", "wrong"]), comment: z.string().trim().max(1000).optional() }),
 ]);
 
+export const intelligenceActionSchema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("run-benchmark"), suite: z.enum(["product_knowledge", "visual_category", "marketplace_adapter", "automation_rules"]).optional(), versionLabel: z.string().trim().min(1).max(80).optional(), idempotencyKey: z.string().uuid().optional() }),
+  z.object({ action: z.literal("replay-product"), productId: z.string().uuid().optional(), versionLabel: z.string().trim().min(1).max(80).optional(), idempotencyKey: z.string().uuid().optional() }),
+  z.object({ action: z.literal("repository-parity"), idempotencyKey: z.string().uuid().optional() }),
+  z.object({ action: z.literal("export-diagnostics"), productId: z.string().uuid().optional(), idempotencyKey: z.string().uuid().optional() }),
+]);
+
 const extensionAssumptionsSchema = z.object({
   rmbUsdRate: z.coerce.number().positive().optional(),
   internationalFreightPerKgUsd: z.coerce.number().nonnegative().optional(),

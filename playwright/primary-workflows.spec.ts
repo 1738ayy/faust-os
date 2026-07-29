@@ -104,6 +104,38 @@ test("automations create, test, enable, run, approve, retry, duplicate, archive,
   await expect(automationMain.getByText("Queue depth", { exact: true })).toBeVisible();
 });
 
+test("intelligence studio traces, replays, benchmarks, checks parity, and exports diagnostics", async ({ request, page }) => {
+  await resetDemo(request);
+  const benchmark = await request.post("/api/intelligence/actions", { data: { action: "run-benchmark", suite: "product_knowledge", versionLabel: "browser-regression", idempotencyKey: crypto.randomUUID() } });
+  expect(benchmark.ok(), await benchmark.text()).toBeTruthy();
+  let state = await benchmark.json();
+  expect(state.data.intelligenceBenchmarkRuns.length).toBeGreaterThan(0);
+  const productId = state.data.products[0].id;
+  const replay = await request.post("/api/intelligence/actions", { data: { action: "replay-product", productId, versionLabel: "browser-regression", idempotencyKey: crypto.randomUUID() } });
+  expect(replay.ok(), await replay.text()).toBeTruthy();
+  state = await replay.json();
+  expect(state.data.intelligenceReplayRuns.some((entry: { productId: string }) => entry.productId === productId)).toBeTruthy();
+  const parity = await request.post("/api/intelligence/actions", { data: { action: "repository-parity", idempotencyKey: crypto.randomUUID() } });
+  expect(parity.ok(), await parity.text()).toBeTruthy();
+  state = await parity.json();
+  expect(state.data.intelligenceRepositoryParityChecks[0].ready).toBeTruthy();
+  const diagnostics = await request.post("/api/intelligence/actions", { data: { action: "export-diagnostics", productId, idempotencyKey: crypto.randomUUID() } });
+  expect(diagnostics.ok(), await diagnostics.text()).toBeTruthy();
+  state = await diagnostics.json();
+  expect(state.data.intelligenceDiagnosticsBundles[0].sections.length).toBeGreaterThan(0);
+
+  await page.goto("/settings/intelligence");
+  const appMain = page.getByTestId("app-main");
+  await expect(appMain.getByRole("heading", { name: "Intelligence Observability & Learning Studio", exact: true })).toBeVisible();
+  const controls = appMain.getByRole("region", { name: "Intelligence Studio actions" });
+  await expect(controls).toBeVisible();
+  await controls.getByRole("button", { name: "Run benchmark", exact: true }).click();
+  await expect(controls.getByRole("status")).toContainText(/Benchmark saved/i);
+  for (const section of ["Decision Timeline", "Evidence Explorer", "Learning Explorer", "Benchmark Studio", "Confidence Calibration", "Replay Mode", "Rule Effectiveness", "Adapter Health Dashboard", "Diagnostics Bundles"]) {
+    await expect(appMain.getByRole("heading", { name: section, exact: true })).toBeVisible();
+  }
+});
+
 test("AI Center answers with evidence, generates briefs, scenarios, approvals, and history", async ({ request, page }) => {
   await resetDemo(request);
   const ask = await request.post("/api/ai-center/actions", { data: { action: "ask-question", question: "Is Vintage wash heavyweight hoodie active?", saveQuestion: true, provider: "deterministic" } });
