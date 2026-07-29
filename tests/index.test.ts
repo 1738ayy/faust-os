@@ -16,6 +16,7 @@ import "./fulfillment-workflows.test";
 import "./finance.test";
 import "./wholesale-core.test";
 import "./marketplace-intelligence.test";
+import "./depop-connector.test";
 import "./listings-core.test";
 import "./listings-publishing-workspace.test";
 import "./listings-production-parity.test";

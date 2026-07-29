@@ -58,7 +58,7 @@ test("storage descriptors cover every required production artifact boundary", ()
 test("migration inventory is ordered and includes the production connection prerequisites", () => {
   const inventory = migrationInventory();
   assert.equal(inventory.ready, true);
-  assert.equal(inventory.latest, "032_product_pipeline_workflow_engine.sql");
+  assert.equal(inventory.latest, "033_depop_production_connector.sql");
   assert.ok(inventory.files.includes("001_core_auth_and_tenancy.sql"));
   assert.ok(inventory.files.includes("022_browser_extension_phase2.sql"));
   assert.ok(inventory.files.includes("023_product_image_ownership.sql"));
@@ -71,6 +71,7 @@ test("migration inventory is ordered and includes the production connection prer
   assert.ok(inventory.files.includes("030_product_knowledge_learning_hardening.sql"));
   assert.ok(inventory.files.includes("031_product_visual_intelligence.sql"));
   assert.ok(inventory.files.includes("032_product_pipeline_workflow_engine.sql"));
+  assert.ok(inventory.files.includes("033_depop_production_connector.sql"));
   const guard = readFileSync("supabase/migrations/027_product_cover_dna_schema_guard.sql", "utf8");
   assert.match(guard, /add column if not exists cover_image_id uuid/);
   assert.match(guard, /create table if not exists public\.product_digital_twin_assets/);
@@ -91,6 +92,11 @@ test("migration inventory is ordered and includes the production connection prer
   assert.match(pipeline, /product_pipeline_queue_items/);
   assert.match(pipeline, /product_pipeline_review_sessions/);
   assert.match(pipeline, /enable row level security/i);
+  const depop = readFileSync("supabase/migrations/033_depop_production_connector.sql", "utf8");
+  assert.match(depop, /marketplace_connector_credentials/);
+  assert.match(depop, /marketplace_connector_diagnostics/);
+  assert.match(depop, /marketplace_listing_snapshots/);
+  assert.match(depop, /enable row level security/i);
 });
 
 test("production health reports database, worker, storage, migrations, extension, and provider status", () => {

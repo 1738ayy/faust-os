@@ -7,6 +7,7 @@ import type { ManagedMarketplace, MarketplaceDraftInspector } from "./marketplac
 import { materializeDraftFields, resetListingDraftField, saveListingDraftField, type ListingDraftEditableValue } from "./listings/draft-fields";
 import { imageUrlsForMarketplace, saveMarketplaceImageOrder } from "./listings/image-order";
 import { productWithKnowledge, variantWithKnowledge } from "./product-knowledge";
+import { DEPOP_CONNECTOR_VERSION, DepopConnectorError, depopConnectorConfig, endDepopDraftViaConnector, ensureDepopConnectorCollections, publishDepopDraftViaConnector, recordDepopDiagnostic, recordDepopSnapshot, syncDepopInventoryViaConnector } from "./depop-connector";
 
 const now = () => new Date().toISOString();
 const id = () => crypto.randomUUID();
@@ -40,6 +41,7 @@ export function ensureListingsCollections(data: OperatingData) {
   data.crossListingJobs ||= [];
   data.marketplacePublishTasks ||= [];
   data.productListingSyncReviews ||= [];
+  ensureDepopConnectorCollections(data);
 }
 
 export function seedMarketplaceAccountsAndTemplates(data: OperatingData) {
@@ -87,6 +89,56 @@ function review(data: OperatingData, input: Omit<ListingReviewItem, "id" | "crea
   data.listingReviewItems!.unshift(item);
   data.notices.unshift({ id: id(), severity: input.severity, title: `Listing ${input.reason.replaceAll("_", " ")}`, detail: input.detail, actionLabel: item.actionLabel, href: "/listings", createdAt: now(), category: "system", entityType: "listing_review_item", entityId: item.id, read: false });
   return item;
+}
+
+function connectorAccountId(data: OperatingData, draft: ChannelListingDraft) {
+  return draft.accountId || data.marketplaceAccounts!.find((entry) => entry.marketplace === draft.marketplace)?.id;
+}
+
+function failPublishTaskFromConnector(data: OperatingData, draft: ChannelListingDraft, task: MarketplacePublishTask | undefined, error: unknown, operation: "publish" | "update" | "end" | "sync_inventory" = "publish") {
+  const connectorError = error instanceof DepopConnectorError ? error : new DepopConnectorError(error instanceof Error ? error.message : "Marketplace connector failed.", "unknown_connector_response", true);
+  if (task) {
+    task.status = connectorError.retryable ? "retry_wait" : "failed";
+    task.failureCode = connectorError.code === "credentials_missing" || connectorError.code === "connector_not_configured" || connectorError.code === "scope_missing" || connectorError.code === "schema_mismatch" ? "authentication_expired" : connectorError.code;
+    task.failureMessage = connectorError.message;
+    task.retryable = connectorError.retryable;
+    task.completedAt = connectorError.retryable ? null : now();
+    task.updatedAt = now();
+  }
+  draft.status = "failed";
+  draft.syncState = "failed";
+  draft.updatedAt = now();
+  const accountId = connectorAccountId(data, draft);
+  recordDepopDiagnostic(data, { marketplace: "Depop", accountId, draftId: draft.id, taskId: task?.id, operation, status: connectorError.retryable ? "retry_wait" : "failed", httpStatus: connectorError.httpStatus, requestId: connectorError.requestId, retryable: connectorError.retryable, failureCode: connectorError.code, message: connectorError.message, suggestedResolution: connectorError.code === "credentials_missing" ? "Connect Depop partner API credentials before production publishing." : connectorError.retryable ? "Retry from the publishing queue after the backoff window." : "Review the Depop draft fields or reconnect the account.", metadata: connectorError.metadata });
+  review(data, { channelDraftId: draft.id, marketplace: "Depop", severity: connectorError.retryable ? "warning" : "critical", reason: connectorError.retryable ? "sync_failed" : "validation_error", detail: connectorError.message, actionLabel: connectorError.retryable ? "Retry publish" : "Review Depop connection" });
+}
+
+function applyPublishedDraft(data: OperatingData, draft: ChannelListingDraft, result: { externalId: string; externalUrl: string; requestId?: string; httpStatus?: number; metadata?: Record<string, string | number | boolean | null> }, task?: MarketplacePublishTask) {
+  draft.status = "published";
+  draft.syncState = "clean";
+  draft.externalListingId = result.externalId;
+  draft.externalUrl = result.externalUrl;
+  draft.lastSyncAt = now();
+  draft.updatedAt = now();
+  if (task) {
+    task.status = "published";
+    task.marketplaceListingId = result.externalId;
+    task.failureCode = null;
+    task.failureMessage = null;
+    task.retryable = false;
+    task.completedAt = now();
+    task.updatedAt = now();
+  }
+  const listing = data.listings.find((entry) => entry.id === draft.listingId);
+  if (listing) { listing.status = "active"; listing.syncState = "connected"; listing.marketplaceUrl = draft.externalUrl; }
+  const mapping = data.physicalSkuMappings!.find((entry) => entry.channelListingId === draft.listingId);
+  if (mapping) { mapping.externalListingId = result.externalId; mapping.updatedAt = now(); }
+  const variant = data.variants.find((entry) => entry.id === draft.variantId);
+  if (draft.marketplace === "Depop" && variant) {
+    recordDepopSnapshot(data, draft, variant.productId, { externalId: result.externalId, externalUrl: result.externalUrl, requestId: result.requestId || "", httpStatus: result.httpStatus || 201, metadata: result.metadata || {} });
+    recordDepopDiagnostic(data, { marketplace: "Depop", accountId: connectorAccountId(data, draft), draftId: draft.id, taskId: task?.id, operation: "publish", status: "succeeded", httpStatus: result.httpStatus || 201, requestId: result.requestId, retryable: false, message: "Depop listing published and external identity persisted.", suggestedResolution: "Monitor listing drift and inventory sync from Faust.", metadata: result.metadata || {} });
+  }
+  data.listingReviewItems!.filter((entry) => entry.channelDraftId === draft.id && entry.status === "open").forEach((entry) => { entry.status = "resolved"; entry.resolvedAt = now(); });
 }
 
 function addOutboxJob(data: OperatingData, topic: TransactionalOutboxEvent["topic"], draft: ChannelListingDraft, action: ListingSyncJob["action"], payload: Record<string, unknown>, idempotencyKey?: string) {
@@ -438,9 +490,15 @@ export function createCrossListingPublishJob(data: OperatingData, input: CrossLi
       task.status = "failed"; task.failureCode = "validation_rejected"; task.failureMessage = draft.validationErrors[0] || inspector.readinessResult.blockingIssues[0]?.message || "Marketplace readiness blocked publishing."; task.completedAt = time; draft.status = "failed"; draft.syncState = "failed"; job.failedCount += 1;
       review(data, { channelDraftId: draft.id, marketplace, severity: "warning", reason: "validation_error", detail: task.failureMessage });
     } else if (draft.publishMode === "adapter") {
-      task.status = "published"; task.marketplaceListingId = `${providerId(marketplace).toUpperCase()}-${draft.id.slice(0, 8)}`; task.completedAt = time; draft.status = "published"; draft.syncState = "clean"; draft.externalListingId = task.marketplaceListingId; draft.externalUrl = `https://example.test/${providerId(marketplace)}/${task.marketplaceListingId}`; draft.lastSyncAt = time; job.completedCount += 1;
-      const listing = data.listings.find((entry) => entry.id === draft.listingId);
-      if (listing) { listing.status = "active"; listing.syncState = "connected"; listing.marketplaceUrl = draft.externalUrl; }
+      if (marketplace === "Depop" && depopConnectorConfig().mode !== "fixture") {
+        task.status = "queued"; task.retryable = true; task.failureMessage = "Depop publish queued for the production connector worker.";
+        draft.status = "queued"; draft.syncState = "pending"; draft.updatedAt = time;
+        addOutboxJob(data, "listing.publish_requested", draft, "publish", { draftId: draft.id, marketplace: "Depop", taskId: task.id, connectorVersion: DEPOP_CONNECTOR_VERSION }, taskKey);
+      } else {
+        const externalId = marketplace === "Depop" ? `FAUST-${draft.physicalSku}-${draft.id.slice(0, 8)}`.replace(/[^A-Z0-9-]/gi, "-") : `${providerId(marketplace).toUpperCase()}-${draft.id.slice(0, 8)}`;
+        applyPublishedDraft(data, draft, { externalId, externalUrl: marketplace === "Depop" ? `https://www.depop.com/products/faust-${externalId.toLowerCase()}` : `https://example.test/${providerId(marketplace)}/${externalId}`, requestId: marketplace === "Depop" ? `local-${draft.id}` : undefined, httpStatus: 201, metadata: { mode: marketplace === "Depop" ? "fixture" : "local", connector: marketplace === "Depop" ? DEPOP_CONNECTOR_VERSION : "local-adapter" } }, task);
+        job.completedCount += 1;
+      }
     } else {
       task.status = "queued"; task.retryable = true; task.failureCode = null; task.failureMessage = `${marketplace} is ready for guided ${draft.publishMode === "extension" ? "extension" : "manual"} publishing.`; draft.status = "queued"; draft.syncState = "manual";
     }
@@ -484,6 +542,42 @@ export function retryMarketplacePublishTask(data: OperatingData, input: { taskId
   return data;
 }
 
+export function configureDepopConnector(data: OperatingData, input: { displayName?: string; tokenRef?: string; scopes?: string[]; mode?: "api_key" | "oauth_pkce"; validateOnly?: boolean }) {
+  ensureListingsCollections(data);
+  seedMarketplaceAccountsAndTemplates(data);
+  const account = data.marketplaceAccounts!.find((entry) => entry.marketplace === "Depop");
+  if (!account) throw new Error("Depop account record is missing.");
+  const time = now();
+  account.status = input.validateOnly ? account.status : "connected";
+  account.supportsApiPublish = true;
+  account.displayName = input.displayName || account.displayName;
+  account.lastSyncAt = time;
+  account.updatedAt = time;
+  const existing = data.marketplaceConnectorCredentials!.find((entry) => entry.marketplace === "Depop" && entry.accountId === account.id);
+  const credential = existing || { id: id(), marketplace: "Depop" as const, accountId: account.id, authMode: input.mode || "api_key" as const, status: "configured" as const, tokenRef: input.tokenRef || "env:DEPOP_API_KEY", scopes: input.scopes || ["products_read", "products_write", "orders_read", "shop_read"], createdAt: time };
+  credential.status = "validated";
+  credential.tokenRef = input.tokenRef || credential.tokenRef;
+  credential.scopes = input.scopes || credential.scopes;
+  credential.lastValidatedAt = time;
+  credential.updatedAt = time;
+  if (!existing) data.marketplaceConnectorCredentials!.unshift(credential);
+  recordDepopDiagnostic(data, { marketplace: "Depop", accountId: account.id, operation: "connect", status: "succeeded", retryable: false, message: "Depop connector credentials reference validated and stored without exposing secrets.", suggestedResolution: "Publish a Depop draft from the publishing queue.", metadata: { authMode: credential.authMode, scopeCount: credential.scopes.length } });
+  activity(data, "Depop connector configured", "marketplace_account", account.id, "Depop account can publish through the production connector boundary.");
+  return data;
+}
+
+export function disconnectDepopConnector(data: OperatingData) {
+  ensureListingsCollections(data);
+  const account = data.marketplaceAccounts!.find((entry) => entry.marketplace === "Depop");
+  if (account) { account.status = "credentials_required"; account.updatedAt = now(); }
+  for (const credential of data.marketplaceConnectorCredentials!.filter((entry) => entry.marketplace === "Depop")) {
+    credential.status = "revoked";
+    credential.updatedAt = now();
+  }
+  recordDepopDiagnostic(data, { marketplace: "Depop", accountId: account?.id, operation: "connect", status: "skipped", retryable: false, message: "Depop connector disconnected. Secrets remain outside the browser and were not exposed.", suggestedResolution: "Reconnect Depop before production publishing.", metadata: {} });
+  return data;
+}
+
 export function createProductListingSyncReview(data: OperatingData, input: { productId: string; fieldKey: string; previousValue: string; suggestedValue: string; marketplaces?: ManagedMarketplace[] }) {
   ensureListingsCollections(data);
   const product = data.products.find((entry) => entry.id === input.productId);
@@ -505,11 +599,20 @@ export async function publishChannelDraft(data: OperatingData, input: ListingAct
   draft.validationErrors = validateChannelDraft(draft);
   if (draft.validationErrors.length) { draft.status = "failed"; draft.syncState = "failed"; review(data, { channelDraftId: draft.id, marketplace: draft.marketplace, severity: "warning", reason: "validation_error", detail: draft.validationErrors.join(" ") }); return data; }
   if (draft.publishMode !== "adapter") { draft.status = "manual_required"; draft.syncState = "manual"; review(data, { channelDraftId: draft.id, marketplace: draft.marketplace, severity: "info", reason: "manual_publish_required", detail: "Use the extension-assisted workflow, then confirm external ID and URL." }); return data; }
+  if (draft.marketplace === "Depop") {
+    const task = data.marketplacePublishTasks!.find((entry) => entry.draftId === draft.id && !["published", "cancelled"].includes(entry.status));
+    try {
+      if (task) { task.status = "uploading_images"; task.startedAt ||= now(); task.updatedAt = now(); }
+      const result = await publishDepopDraftViaConnector(draft);
+      applyPublishedDraft(data, draft, result, task);
+      activity(data, "Depop listing published", "channel_listing_draft", draft.id, `${draft.title} published to Depop as ${result.externalId}.`);
+    } catch (error) {
+      failPublishTaskFromConnector(data, draft, task, error, "publish");
+    }
+    return data;
+  }
   const result = await getMarketplaceAdapter(providerId(draft.marketplace)).publish({ listingId: draft.id, title: draft.title, description: draft.description, price: draft.price, quantity: draft.quantity, imageUrls: draft.imageUrls, category: draft.category, condition: draft.attributes.condition });
-  draft.status = "published"; draft.syncState = "clean"; draft.externalListingId = result.externalId; draft.externalUrl = result.externalUrl; draft.lastSyncAt = now(); draft.updatedAt = now();
-  const listing = data.listings.find((entry) => entry.id === draft.listingId); if (listing) { listing.status = "active"; listing.syncState = "connected"; listing.marketplaceUrl = result.externalUrl; }
-  const mapping = data.physicalSkuMappings!.find((entry) => entry.channelListingId === draft.listingId); if (mapping) { mapping.externalListingId = result.externalId; mapping.updatedAt = now(); }
-  data.listingReviewItems!.filter((entry) => entry.channelDraftId === draft.id && entry.status === "open").forEach((entry) => { entry.status = "resolved"; entry.resolvedAt = now(); });
+  applyPublishedDraft(data, draft, { externalId: result.externalId, externalUrl: result.externalUrl, metadata: { connector: "local-adapter" } });
   activity(data, "Channel listing published", "channel_listing_draft", draft.id, `${draft.marketplace} published ${result.externalId}.`);
   return data;
 }
@@ -548,6 +651,24 @@ export function syncDraftQuantity(data: OperatingData, input: ListingActionInput
   return data;
 }
 
+export async function syncDepopDraftQuantity(data: OperatingData, input: ListingActionInput) {
+  syncDraftQuantity(data, input);
+  const draft = data.channelListingDrafts!.find((entry) => entry.id === input.draftId);
+  if (!draft || draft.marketplace !== "Depop" || draft.publishMode !== "adapter" || draft.syncState === "risk_locked") return data;
+  try {
+    const result = await syncDepopInventoryViaConnector(draft, draft.quantity);
+    draft.syncState = "clean";
+    draft.lastSyncAt = now();
+    draft.updatedAt = now();
+    const listing = data.listings.find((entry) => entry.id === draft.listingId);
+    if (listing) listing.syncState = "connected";
+    recordDepopDiagnostic(data, { marketplace: "Depop", accountId: connectorAccountId(data, draft), draftId: draft.id, operation: "sync_inventory", status: "succeeded", httpStatus: result.httpStatus, requestId: result.requestId, retryable: false, message: "Depop inventory quantity synchronized from Faust canonical stock.", suggestedResolution: "Continue monitoring for marketplace drift.", metadata: result.metadata });
+  } catch (error) {
+    failPublishTaskFromConnector(data, draft, undefined, error, "sync_inventory");
+  }
+  return data;
+}
+
 export function pauseOrDelistDraft(data: OperatingData, input: ListingActionInput & { mode: "pause" | "delist" }) {
   ensureListingsCollections(data);
   const draft = data.channelListingDrafts!.find((entry) => entry.id === input.draftId);
@@ -557,6 +678,24 @@ export function pauseOrDelistDraft(data: OperatingData, input: ListingActionInpu
   addOutboxJob(data, "listing.delist_requested", draft, input.mode === "pause" ? "pause" : "delist", { draftId: draft.id, mode: input.mode, reason: input.reason }, input.idempotencyKey);
   if (draft.publishMode !== "adapter") review(data, { channelDraftId: draft.id, marketplace: draft.marketplace, severity: "warning", reason: "manual_publish_required", detail: `Manually ${input.mode} this listing on ${draft.marketplace}, then confirm.` });
   activity(data, `Listing ${input.mode} requested`, "channel_listing_draft", draft.id, input.reason || input.mode);
+  return data;
+}
+
+export async function pauseOrDelistDepopDraft(data: OperatingData, input: ListingActionInput & { mode: "pause" | "delist" }) {
+  pauseOrDelistDraft(data, input);
+  const draft = data.channelListingDrafts!.find((entry) => entry.id === input.draftId);
+  if (!draft || draft.marketplace !== "Depop" || draft.publishMode !== "adapter") return data;
+  try {
+    const result = input.mode === "delist" ? await endDepopDraftViaConnector(draft) : await syncDepopInventoryViaConnector(draft, 0);
+    draft.syncState = "clean";
+    draft.lastSyncAt = now();
+    draft.updatedAt = now();
+    const listing = data.listings.find((entry) => entry.id === draft.listingId);
+    if (listing) listing.syncState = "connected";
+    recordDepopDiagnostic(data, { marketplace: "Depop", accountId: connectorAccountId(data, draft), draftId: draft.id, operation: input.mode === "delist" ? "end" : "sync_inventory", status: "succeeded", httpStatus: result.httpStatus, requestId: result.requestId, retryable: false, message: input.mode === "delist" ? "Depop listing ended from Faust without deleting Product Knowledge." : "Depop listing paused by synchronizing available quantity to zero.", suggestedResolution: "Use Faust to relist or restore availability when ready.", metadata: result.metadata });
+  } catch (error) {
+    failPublishTaskFromConnector(data, draft, undefined, error, input.mode === "delist" ? "end" : "sync_inventory");
+  }
   return data;
 }
 

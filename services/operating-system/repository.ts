@@ -15,7 +15,7 @@ import { getShippingProvider, type ShippingProviderKey } from "@/services/adapte
 import { deterministicUuid, financeAccountIds } from "@/lib/finance";
 import { activeBalances, activeInventoryValue, activeVariants, isActiveVariant } from "@/lib/product-state";
 import { allocateOrderItemFifo, processWholesaleOutbox, receiveWholesalePurchaseBatch, receiveWholesaleReturn, syncChannelInventoryRisk, wholesaleCoreSummary } from "@/lib/wholesale-core";
-import { confirmExternalListing, coordinateSoldItem, createCrossListingPublishJob, createFiveChannelDrafts, createProductListingSyncReview, listingsSummary, pauseOrDelistDraft, publishChannelDraft, resetMarketplaceDraftField, retryFailedListingSync, retryMarketplacePublishTask, saveDraftImageOrder, saveMarketplaceDraftField, seedMarketplaceAccountsAndTemplates, syncDraftQuantity, upsertMarketplaceAccountDefault, upsertProductMarketplaceOverride } from "@/lib/listings-core";
+import { configureDepopConnector, confirmExternalListing, coordinateSoldItem, createCrossListingPublishJob, createFiveChannelDrafts, createProductListingSyncReview, disconnectDepopConnector, listingsSummary, pauseOrDelistDepopDraft, pauseOrDelistDraft, publishChannelDraft, resetMarketplaceDraftField, retryFailedListingSync, retryMarketplacePublishTask, saveDraftImageOrder, saveMarketplaceDraftField, seedMarketplaceAccountsAndTemplates, syncDepopDraftQuantity, syncDraftQuantity, upsertMarketplaceAccountDefault, upsertProductMarketplaceOverride } from "@/lib/listings-core";
 import { approvePurchaseOrder, create1688PurchaseOrder, generateReorderRecommendations, purchasingSummary, receivePurchaseParcelToLots, recordPurchasePayment, seedSupplierOperations } from "@/lib/purchasing-core";
 import { createAnalyticsReport, duplicateAnalyticsReport, ensureAnalyticsCollections, recordAnalyticsReportRun, updateAnalyticsReport, type AnalyticsReportInput } from "@/lib/analytics";
 import { approveAutomation, archiveAutomationRule, cancelAutomationRun, createAutomationRule, duplicateAutomationRule, ensureAutomationCollections, expireApprovals, ingestAutomationEvent, installAutomationTemplate, processAutomationWorkerTick, replayDeadLetter, retryAutomation, runAutomationRule, setAutomationEnabled, setSchedulePaused, testAutomationRule, type AutomationMutationInput } from "@/lib/automations";
@@ -572,6 +572,15 @@ export async function mutateWholesaleCore(action: string, input: Record<string, 
 }
 export async function getWholesaleCoreSummary() { return wholesaleCoreSummary(await read()); }
 export async function mutateListings(action: string, input: Record<string, unknown>) {
+ if (isProductionAuthEnabled() && ["publish-draft", "connect-depop", "disconnect-depop", "sync-quantity", "pause-draft", "delist-draft"].includes(action)) {
+  const data = await readNormalizedOperatingData(); seedMarketplaceAccountsAndTemplates(data);
+  if (action === "publish-draft") await publishChannelDraft(data, { draftId: String(input.draftId), idempotencyKey: typeof input.idempotencyKey === "string" ? input.idempotencyKey : undefined });
+  else if (action === "connect-depop") configureDepopConnector(data, { displayName: typeof input.displayName === "string" ? input.displayName : undefined, tokenRef: typeof input.tokenRef === "string" ? input.tokenRef : undefined, scopes: Array.isArray(input.scopes) ? input.scopes as string[] : undefined, mode: input.mode === "oauth_pkce" ? "oauth_pkce" : "api_key" });
+  else if (action === "disconnect-depop") disconnectDepopConnector(data);
+  else if (action === "sync-quantity") await syncDepopDraftQuantity(data, { draftId: String(input.draftId), quantity: typeof input.quantity === "number" ? input.quantity : undefined, idempotencyKey: typeof input.idempotencyKey === "string" ? input.idempotencyKey : undefined });
+  else if (action === "pause-draft" || action === "delist-draft") await pauseOrDelistDepopDraft(data, { draftId: String(input.draftId), mode: action === "pause-draft" ? "pause" : "delist", reason: typeof input.reason === "string" ? input.reason : undefined, idempotencyKey: typeof input.idempotencyKey === "string" ? input.idempotencyKey : undefined });
+  return writeNormalizedOperatingData(data);
+ }
  if (isProductionAuthEnabled()) return applyListingsMutationRpc(action, input, typeof input.idempotencyKey === "string" ? input.idempotencyKey : undefined);
  const data = await read(); seedMarketplaceAccountsAndTemplates(data);
  if (action === "create-five-drafts") createFiveChannelDrafts(data, { variantId: String(input.variantId), physicalSku: typeof input.physicalSku === "string" ? input.physicalSku : undefined, basePrice: typeof input.basePrice === "number" ? input.basePrice : undefined, imageUrls: Array.isArray(input.imageUrls) ? input.imageUrls as string[] : undefined, idempotencyKey: typeof input.idempotencyKey === "string" ? input.idempotencyKey : undefined });
@@ -590,6 +599,8 @@ export async function mutateListings(action: string, input: Record<string, unkno
  else if (action === "reset-draft-field") resetMarketplaceDraftField(data, { draftId: String(input.draftId), fieldKey: String(input.fieldKey), actor: typeof input.actor === "string" ? input.actor : undefined });
  else if (action === "save-image-order") saveDraftImageOrder(data, { productId: String(input.productId), variantId: typeof input.variantId === "string" ? input.variantId : undefined, marketplace: input.marketplace as Parameters<typeof saveDraftImageOrder>[1]["marketplace"], imageIds: Array.isArray(input.imageIds) ? input.imageIds as string[] : [], excludedImageIds: Array.isArray(input.excludedImageIds) ? input.excludedImageIds as string[] : undefined, coverImageId: typeof input.coverImageId === "string" ? input.coverImageId : undefined });
  else if (action === "create-sync-review") createProductListingSyncReview(data, { productId: String(input.productId), fieldKey: String(input.fieldKey), previousValue: String(input.previousValue), suggestedValue: String(input.suggestedValue), marketplaces: Array.isArray(input.marketplaces) ? input.marketplaces as Parameters<typeof createProductListingSyncReview>[1]["marketplaces"] : undefined });
+ else if (action === "connect-depop") configureDepopConnector(data, { displayName: typeof input.displayName === "string" ? input.displayName : undefined, tokenRef: typeof input.tokenRef === "string" ? input.tokenRef : undefined, scopes: Array.isArray(input.scopes) ? input.scopes as string[] : undefined, mode: input.mode === "oauth_pkce" ? "oauth_pkce" : "api_key" });
+ else if (action === "disconnect-depop") disconnectDepopConnector(data);
  else throw new Error("Unsupported listings action.");
  return write(data);
 }

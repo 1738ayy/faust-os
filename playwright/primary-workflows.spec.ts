@@ -684,9 +684,17 @@ test("listings API creates five channel drafts and coordinates publish, sync, ma
   await expect(composer.getByRole("heading", { name: "Final review", exact: true })).toBeVisible();
   const depop = state.channelListingDrafts.find((entry: { marketplace: string }) => entry.marketplace === "Depop");
   const etsy = state.channelListingDrafts.find((entry: { marketplace: string }) => entry.marketplace === "Etsy");
+  const connected = await request.post("/api/listings/actions", { data: { action: "connect-depop", displayName: "Depop production", tokenRef: "env:DEPOP_API_KEY", idempotencyKey: crypto.randomUUID() } });
+  expect(connected.ok(), await connected.text()).toBeTruthy(); state = (await connected.json()).data;
+  expect(state.marketplaceConnectorCredentials.some((entry: { marketplace: string; tokenRef: string; status: string }) => entry.marketplace === "Depop" && entry.tokenRef === "env:DEPOP_API_KEY" && entry.status === "validated")).toBeTruthy();
+  expect(JSON.stringify(state.marketplaceConnectorCredentials)).not.toContain("pak_");
   const published = await request.post("/api/listings/actions", { data: { action: "publish-draft", draftId: depop.id, idempotencyKey: crypto.randomUUID() } });
   expect(published.ok(), await published.text()).toBeTruthy(); state = (await published.json()).data;
-  expect(state.channelListingDrafts.find((entry: { id: string }) => entry.id === depop.id).externalListingId).toBeTruthy();
+  const publishedDepop = state.channelListingDrafts.find((entry: { id: string }) => entry.id === depop.id);
+  expect(publishedDepop.externalListingId).toBeTruthy();
+  expect(publishedDepop.externalUrl).toContain("depop.com/products");
+  expect(state.marketplaceListingSnapshots.some((entry: { draftId: string; externalListingId: string; externalUrl: string }) => entry.draftId === depop.id && entry.externalListingId === publishedDepop.externalListingId && entry.externalUrl.includes("depop.com/products"))).toBeTruthy();
+  expect(state.marketplaceConnectorDiagnostics.some((entry: { marketplace: string; operation: string; status: string }) => entry.marketplace === "Depop" && entry.operation === "publish" && entry.status === "succeeded")).toBeTruthy();
   const manual = await request.post("/api/listings/actions", { data: { action: "publish-draft", draftId: etsy.id, idempotencyKey: crypto.randomUUID() } });
   expect(manual.ok(), await manual.text()).toBeTruthy(); state = (await manual.json()).data;
   expect(state.channelListingDrafts.find((entry: { id: string }) => entry.id === etsy.id).status).toBe("manual_required");
