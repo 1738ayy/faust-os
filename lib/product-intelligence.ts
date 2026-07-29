@@ -1,7 +1,8 @@
-import type { Marketplace, OperatingData, Product, Supplier, Variant } from "@/domain/business";
-import type { MarketplacePresence } from "@/lib/product-experience";
-import { activeVariants } from "./product-state";
-import type { ProductReadiness } from "@/lib/product-readiness";
+import type { Marketplace, OperatingData, Product, Supplier, Variant } from "../domain/business";
+import type { MarketplacePresence } from "./product-experience";
+import type { ProductReadiness } from "./product-readiness";
+
+const activeVariantCache = new WeakMap<OperatingData, { variants: Variant[]; productsById: Map<string, Product> }>();
 
 export type ProductDnaTag =
   | "Fast seller"
@@ -211,28 +212,38 @@ function buildRelationships(data: OperatingData, product: Product, variant: Vari
       variantIdsByMarketplace.set(listing.marketplace, set);
     }
   }
-  return activeVariants(data)
-    .filter((entry) => entry.id !== variant.id)
-    .map((entry) => {
-      const relatedProduct = data.products.find((candidate) => candidate.id === entry.productId);
-      if (!relatedProduct) return undefined;
-      if (relatedProduct.supplierId && relatedProduct.supplierId === product.supplierId) {
-        return { type: "shared_supplier" as const, label: `${relatedProduct.title} — ${entry.sku}`, href: `/catalog/${entry.id}`, detail: "Uses the same supplier." };
-      }
-      if (relatedProduct.category === product.category) {
-        return { type: "shared_category" as const, label: `${relatedProduct.title} — ${entry.sku}`, href: `/catalog/${entry.id}`, detail: `Also in ${product.category}.` };
-      }
-      if (Math.abs(entry.defaultSalePrice - variant.defaultSalePrice) <= 5) {
-        return { type: "similar_price" as const, label: `${relatedProduct.title} — ${entry.sku}`, href: `/catalog/${entry.id}`, detail: "Similar target selling price." };
-      }
+  const { variants, productsById } = activeVariantCandidates(data);
+  const relationships: ProductRelationship[] = [];
+  for (const entry of variants) {
+    if (entry.id === variant.id) continue;
+    const relatedProduct = productsById.get(entry.productId);
+    if (!relatedProduct) continue;
+    if (relatedProduct.supplierId && relatedProduct.supplierId === product.supplierId) {
+      relationships.push({ type: "shared_supplier", label: `${relatedProduct.title} — ${entry.sku}`, href: `/catalog/${entry.id}`, detail: "Uses the same supplier." });
+    } else if (relatedProduct.category === product.category) {
+      relationships.push({ type: "shared_category", label: `${relatedProduct.title} — ${entry.sku}`, href: `/catalog/${entry.id}`, detail: `Also in ${product.category}.` });
+    } else if (Math.abs(entry.defaultSalePrice - variant.defaultSalePrice) <= 5) {
+      relationships.push({ type: "similar_price", label: `${relatedProduct.title} — ${entry.sku}`, href: `/catalog/${entry.id}`, detail: "Similar target selling price." });
+    } else {
       const sharedMarketplace = marketplaces.find((marketplace) => variantIdsByMarketplace.get(marketplace.marketplace)?.has(entry.id));
-      if (sharedMarketplace) {
-        return { type: "same_marketplace" as const, label: `${relatedProduct.title} — ${entry.sku}`, href: `/catalog/${entry.id}`, detail: `Also active around ${sharedMarketplace.marketplace}.` };
-      }
-      return undefined;
-    })
-    .filter((item): item is ProductRelationship => Boolean(item))
-    .slice(0, 4);
+      if (sharedMarketplace) relationships.push({ type: "same_marketplace", label: `${relatedProduct.title} — ${entry.sku}`, href: `/catalog/${entry.id}`, detail: `Also active around ${sharedMarketplace.marketplace}.` });
+    }
+    if (relationships.length >= 4) break;
+  }
+  return relationships;
+}
+
+function activeVariantCandidates(data: OperatingData) {
+  const cached = activeVariantCache.get(data);
+  if (cached) return cached;
+  const productsById = new Map(data.products.map((entry) => [entry.id, entry]));
+  const variants = data.variants.filter((variant) => {
+    const product = productsById.get(variant.productId);
+    return Boolean(variant.active && product && !["paused", "cancelled"].includes(product.status));
+  });
+  const indexed = { variants, productsById };
+  activeVariantCache.set(data, indexed);
+  return indexed;
 }
 
 function buildRecommendation(params: {

@@ -14,6 +14,7 @@
     "typecheck": "tsc --noEmit",
     "test": "tsc -p tests/tsconfig.json && node .test-build/tests/index.test.js",
     "test:e2e": "playwright test",
+    "test:load": "tsc -p tests/tsconfig.json && node .test-build/tests/load.test.js",
     "test:journey": "tsc -p tests/tsconfig.json && node .test-build/tests/e2e.test.js",
     "test:supabase": "node --env-file=.env.integration.local scripts/supabase-integration-harness.mjs",
     "production:migrations": "node scripts/validate-migrations.mjs",
@@ -30,7 +31,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.24.0",
-    "next": "16.2.10",
+    "next": "^16.2.12",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "shadcn": "^4.13.0",
@@ -47,8 +48,12 @@
     "@types/react-dom": "^19",
     "babel-plugin-react-compiler": "1.0.0",
     "eslint": "^9",
-    "eslint-config-next": "16.2.10",
+    "eslint-config-next": "^16.2.12",
     "tailwindcss": "^4",
     "typescript": "^5"
+  },
+  "overrides": {
+    "postcss": "8.5.25",
+    "sharp": "0.35.3"
   }
 }
