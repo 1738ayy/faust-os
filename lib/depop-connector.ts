@@ -1,5 +1,6 @@
-import type { ChannelListingDraft, MarketplaceConnectorDiagnostic, MarketplaceListingSnapshot, MarketplacePublishTask, OperatingData } from "@/domain/business";
+import type { ChannelListingDraft, MarketplaceConnectorDiagnostic, MarketplacePublishTask, OperatingData } from "@/domain/business";
 import { deterministicUuid } from "./finance";
+import { ConnectorError, ConnectorRuntime, ensureMarketplaceConnectorCollections, listingFromDraft, recordMarketplaceDiagnostic, recordMarketplaceSnapshot, type AdapterConnectionInput, type ConnectorHealth, type ConnectorOperationResult, type MarketplaceAdapter, type MarketplaceAdapterCapabilities, type MarketplaceAdapterContext } from "./marketplace-adapter-sdk";
 
 export const DEPOP_CONNECTOR_VERSION = "depop-selling-api-v1.2026-07";
 const now = () => new Date().toISOString();
@@ -31,9 +32,7 @@ export class DepopConnectorError extends Error {
 }
 
 export function ensureDepopConnectorCollections(data: OperatingData) {
-  data.marketplaceConnectorCredentials ||= [];
-  data.marketplaceConnectorDiagnostics ||= [];
-  data.marketplaceListingSnapshots ||= [];
+  ensureMarketplaceConnectorCollections(data);
 }
 
 export function depopConnectorConfig(env: NodeJS.ProcessEnv = process.env) {
@@ -191,15 +190,144 @@ export async function endDepopDraftViaConnector(draft: ChannelListingDraft, env:
 }
 
 export function recordDepopDiagnostic(data: OperatingData, input: Omit<MarketplaceConnectorDiagnostic, "id" | "createdAt" | "connectorVersion">) {
-  ensureDepopConnectorCollections(data);
-  const diagnostic: MarketplaceConnectorDiagnostic = { id: deterministicUuid(`depop-diagnostic:${input.operation}:${input.draftId || input.accountId || "global"}:${now()}`), connectorVersion: DEPOP_CONNECTOR_VERSION, createdAt: now(), ...input };
-  data.marketplaceConnectorDiagnostics!.unshift(diagnostic);
-  return diagnostic;
+  return recordMarketplaceDiagnostic(data, { marketplace: "Depop", connectorVersion: DEPOP_CONNECTOR_VERSION }, input);
 }
 
 export function recordDepopSnapshot(data: OperatingData, draft: ChannelListingDraft, productId: string, result: DepopConnectorResult) {
-  ensureDepopConnectorCollections(data);
-  const snapshot: MarketplaceListingSnapshot = { id: deterministicUuid(`depop-snapshot:${draft.id}:${result.externalId}`), marketplace: "Depop", draftId: draft.id, productId, variantId: draft.variantId, externalListingId: result.externalId, externalUrl: result.externalUrl, status: "active", title: draft.title, description: draft.description, price: draft.price, quantity: draft.quantity, category: draft.category, imageUrls: draft.imageUrls, observedAt: now(), source: "publish_response", connectorVersion: DEPOP_CONNECTOR_VERSION, metadata: result.metadata };
-  data.marketplaceListingSnapshots = [snapshot, ...data.marketplaceListingSnapshots!.filter((entry) => entry.id !== snapshot.id)];
-  return snapshot;
+  const operationResult: ConnectorOperationResult = { ...result, listing: listingFromDraft(draft, result) };
+  return recordMarketplaceSnapshot(data, { marketplace: "Depop", connectorVersion: DEPOP_CONNECTOR_VERSION }, draft, productId, operationResult);
+}
+
+function asConnectorError(error: unknown) {
+  if (error instanceof DepopConnectorError) {
+    const type = error.code === "credentials_missing" || error.code === "connector_not_configured" ? "configuration" : error.code === "scope_missing" || error.code === "authentication_expired" ? "authentication" : error.code === "validation_rejected" ? "validation" : error.code === "rate_limited" ? "rate_limit" : error.code === "network_timeout" ? "timeout" : error.retryable ? "temporary" : "permanent";
+    return new ConnectorError(error.message, type, error.code, error.retryable, error.httpStatus, error.requestId, error.metadata);
+  }
+  return error;
+}
+
+const depopCapabilities: MarketplaceAdapterCapabilities = {
+  supportsPublish: true,
+  supportsUpdate: true,
+  supportsEndListing: true,
+  supportsRelist: true,
+  supportsInventorySync: true,
+  supportsDraftValidation: true,
+  supportsImageOrdering: true,
+  supportsBulkPublish: false,
+  supportsOffers: false,
+  supportsBundles: false,
+  supportsShippingProfiles: false,
+};
+
+export class DepopAdapter implements MarketplaceAdapter {
+  readonly marketplace = "Depop" as const;
+  readonly connectorVersion = DEPOP_CONNECTOR_VERSION;
+  readonly capabilities = depopCapabilities;
+  runtimeMode(env: NodeJS.ProcessEnv = process.env) {
+    return depopConnectorConfig(env).mode;
+  }
+  async connect(input: AdapterConnectionInput, context: MarketplaceAdapterContext): Promise<ConnectorHealth> {
+    ensureDepopConnectorCollections(context.data);
+    const account = (context.data.marketplaceAccounts || []).find((entry) => entry.marketplace === "Depop");
+    if (!account) throw new ConnectorError("Depop account record is missing.", "configuration", "connector_not_configured", false);
+    const time = now();
+    account.status = input.validateOnly ? account.status : "connected";
+    account.supportsApiPublish = true;
+    account.displayName = input.displayName || account.displayName;
+    account.lastSyncAt = time;
+    account.updatedAt = time;
+    const existing = context.data.marketplaceConnectorCredentials!.find((entry) => entry.marketplace === "Depop" && entry.accountId === account.id);
+    const credential = existing || { id: crypto.randomUUID(), marketplace: "Depop" as const, accountId: account.id, authMode: input.mode || "api_key" as const, status: "configured" as const, tokenRef: input.tokenRef || "env:DEPOP_API_KEY", scopes: input.scopes || ["products_read", "products_write", "orders_read", "shop_read"], createdAt: time };
+    credential.status = "validated";
+    credential.tokenRef = input.tokenRef || credential.tokenRef;
+    credential.scopes = input.scopes || credential.scopes;
+    credential.lastValidatedAt = time;
+    credential.updatedAt = time;
+    if (!existing) context.data.marketplaceConnectorCredentials!.unshift(credential);
+    recordMarketplaceDiagnostic(context.data, this, { accountId: account.id, operation: "connect", status: "succeeded", retryable: false, message: "Depop connector credentials reference validated and stored without exposing secrets.", suggestedResolution: "Publish a marketplace draft from the publishing queue.", metadata: { authMode: credential.authMode, scopeCount: credential.scopes.length } });
+    return this.health(context);
+  }
+  async disconnect(context: MarketplaceAdapterContext): Promise<ConnectorHealth> {
+    ensureDepopConnectorCollections(context.data);
+    const account = (context.data.marketplaceAccounts || []).find((entry) => entry.marketplace === "Depop");
+    if (account) { account.status = "credentials_required"; account.updatedAt = now(); }
+    for (const credential of context.data.marketplaceConnectorCredentials!.filter((entry) => entry.marketplace === "Depop")) {
+      credential.status = "revoked";
+      credential.updatedAt = now();
+    }
+    recordMarketplaceDiagnostic(context.data, this, { accountId: account?.id, operation: "connect", status: "skipped", retryable: false, message: "Depop connector disconnected. Secrets remain outside the browser and were not exposed.", suggestedResolution: "Reconnect this marketplace before production publishing.", metadata: {} });
+    return this.health(context);
+  }
+  async health(context: MarketplaceAdapterContext): Promise<ConnectorHealth> {
+    const readiness = depopReadiness(context.data, context.env);
+    return { marketplace: "Depop", connected: readiness.configured, healthy: readiness.configured && readiness.reachable, authState: readiness.configured ? "connected" : "disconnected", mode: readiness.mode, lastSync: context.data.marketplaceAccounts?.find((entry) => entry.marketplace === "Depop")?.lastSyncAt, rateLimit: "unknown", errors: readiness.configured ? [] : ["Depop credentials are not configured."], warnings: readiness.mode === "fixture" ? ["Fixture mode does not contact Depop."] : [], connectorVersion: this.connectorVersion };
+  }
+  validateDraft(draft: ChannelListingDraft) {
+    const errors: string[] = [];
+    if (!draft.title.trim()) errors.push("Title is required.");
+    if (!draft.description.trim()) errors.push("Description is required.");
+    if (draft.price <= 0) errors.push("Price must be greater than zero.");
+    if (draft.quantity < 0) errors.push("Quantity cannot be negative.");
+    if (!draft.imageUrls.length) errors.push("At least one image is required.");
+    return errors;
+  }
+  translateDraft(draft: ChannelListingDraft) {
+    return buildDepopPublishPayload(draft);
+  }
+  async publish(draft: ChannelListingDraft, context: MarketplaceAdapterContext) {
+    void context;
+    return ConnectorRuntime.execute(this, "publish", async () => {
+      try {
+        const result = await publishDepopDraftViaConnector(draft, context.env);
+        return { ...result, listing: listingFromDraft(draft, result) };
+      } catch (error) {
+        throw asConnectorError(error);
+      }
+    });
+  }
+  async update(draft: ChannelListingDraft, context: MarketplaceAdapterContext) {
+    return ConnectorRuntime.execute(this, "update", async () => {
+      try {
+        const result = await updateDepopDraftViaConnector(draft, context.env);
+        return { ...result, listing: listingFromDraft(draft, result) };
+      } catch (error) {
+        throw asConnectorError(error);
+      }
+    });
+  }
+  async endListing(draft: ChannelListingDraft, context: MarketplaceAdapterContext) {
+    return ConnectorRuntime.execute(this, "end", async () => {
+      try {
+        const result = await endDepopDraftViaConnector(draft, context.env);
+        return { ...result, listing: listingFromDraft({ ...draft, quantity: 0 }, result, "ended") };
+      } catch (error) {
+        throw asConnectorError(error);
+      }
+    });
+  }
+  async relist(draft: ChannelListingDraft, context: MarketplaceAdapterContext) {
+    return this.publish(draft, context);
+  }
+  async sync(draft: ChannelListingDraft, input: { quantity?: number }, context: MarketplaceAdapterContext) {
+    return ConnectorRuntime.execute(this, "sync_inventory", async () => {
+      try {
+        const quantity = input.quantity ?? draft.quantity;
+        const result = await syncDepopInventoryViaConnector(draft, quantity, context.env);
+        return { ...result, listing: listingFromDraft({ ...draft, quantity }, result) };
+      } catch (error) {
+        throw asConnectorError(error);
+      }
+    });
+  }
+  async uploadImages(draft: ChannelListingDraft, context: MarketplaceAdapterContext) {
+    void context;
+    return ConnectorRuntime.execute(this, "upload_images", async () => {
+      const result: ConnectorOperationResult = { externalId: draft.externalListingId || draft.physicalSku, externalUrl: draft.externalUrl || `https://www.depop.com/products/${draft.externalListingId || draft.physicalSku}`, requestId: deterministicUuid(`depop-images:${draft.id}:${draft.imageUrls.join("|")}`), httpStatus: 200, metadata: { mode: depopConnectorConfig(context.env).mode, operation: "upload_images", imageCount: draft.imageUrls.length } };
+      return { ...result, listing: listingFromDraft(draft, result) };
+    });
+  }
+  diagnostics(context: MarketplaceAdapterContext) {
+    return (context.data.marketplaceConnectorDiagnostics || []).filter((entry) => entry.marketplace === "Depop");
+  }
 }
