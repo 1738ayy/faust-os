@@ -4,6 +4,8 @@ Faust OS is a dark-first operating system for a resale business. It connects sou
 
 The long-term product doctrine is captured in [FAUST Vision Lock](docs/faust-vision-lock.md): Faust should move sellers from manually creating and maintaining listings toward approving intelligent, evidence-backed commerce operations.
 
+Release-candidate readiness is governed by the [Daily Operations Runbook](docs/daily-operations-runbook.md). Daily dogfooding friction, production health, queue failures, and RC blockers live in **Settings → System Health**.
+
 ## Run locally
 
 ```bash

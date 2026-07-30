@@ -29,6 +29,7 @@ test("primary operations pages render their operational page titles", async ({ r
     ["/analytics", "Business trends and drill-down comparisons"],
     ["/automations", "Rule builder, run logs, retries, and failures"],
     ["/ai-center", "Daily brief and evidence-backed recommendations"],
+    ["/settings/system-health", "System Health & Daily Operations"],
   ] as const;
   for (const [route, title] of routes) {
     const appMain = page.getByTestId("app-main");

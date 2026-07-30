@@ -25,11 +25,11 @@ test("production hardening profile covers import, knowledge, pipeline, drafts, p
 
 test("migration audit tracks indexes, RLS, foreign keys, and schema cache reloads", () => {
   const audit = auditMigrations();
-  assert.ok(audit.fileCount >= 35);
-  assert.equal(audit.latest, "035_intelligence_observability_studio.sql");
-  assert.ok(!audit.missingRls.includes("035_intelligence_observability_studio.sql"));
-  assert.ok(!audit.missingNotify.includes("035_intelligence_observability_studio.sql"));
-  assert.ok(!audit.destructiveStatements.includes("035_intelligence_observability_studio.sql"));
+  assert.ok(audit.fileCount >= 36);
+  assert.equal(audit.latest, "036_daily_operations_readiness.sql");
+  assert.ok(!audit.missingRls.includes("036_daily_operations_readiness.sql"));
+  assert.ok(!audit.missingNotify.includes("036_daily_operations_readiness.sql"));
+  assert.ok(!audit.destructiveStatements.includes("036_daily_operations_readiness.sql"));
 });
 
 test("security and technical debt audits catch public secret leaks and operational drift", () => {

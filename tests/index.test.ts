@@ -33,3 +33,4 @@ import "./production-connection.test";
 import "./easypost-adapter.test";
 import "./performance.test";
 import "./production-hardening.test";
+import "./daily-operations.test";
