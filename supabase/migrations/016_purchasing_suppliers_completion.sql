@@ -106,6 +106,20 @@ create table if not exists public.receiving_sessions (
   unique (business_id, idempotency_key)
 );
 
+alter table public.receiving_sessions
+  add column if not exists purchase_order_id uuid references public.purchase_orders(id) on delete cascade,
+  add column if not exists parcel_id uuid references public.inbound_parcels(id),
+  add column if not exists rows jsonb not null default '[]'::jsonb,
+  add column if not exists claim_id uuid,
+  add column if not exists idempotency_key uuid;
+
+alter table public.receiving_sessions
+  drop constraint if exists receiving_sessions_status_check;
+
+alter table public.receiving_sessions
+  add constraint receiving_sessions_status_check
+  check (status in ('open','draft','partial','completed','cancelled','issue'));
+
 create table if not exists public.supplier_claims (
   id uuid primary key default gen_random_uuid(),
   business_id uuid not null references public.businesses(id) on delete cascade,
@@ -166,6 +180,7 @@ create table if not exists public.purchasing_mutation_receipts (
 create index if not exists supplier_scorecards_supplier_idx on public.supplier_scorecards (business_id, supplier_id);
 create index if not exists purchase_payments_po_idx on public.purchase_payments (business_id, purchase_order_id);
 create index if not exists receiving_sessions_po_idx on public.receiving_sessions (business_id, purchase_order_id);
+create unique index if not exists receiving_sessions_business_idempotency_idx on public.receiving_sessions (business_id, idempotency_key) where idempotency_key is not null;
 create index if not exists supplier_claims_status_idx on public.supplier_claims (business_id, status, supplier_id);
 create index if not exists reorder_recommendations_status_idx on public.reorder_recommendations (business_id, status, variant_id);
 

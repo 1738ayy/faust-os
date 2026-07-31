@@ -78,6 +78,10 @@ test("migration inventory is ordered and includes the production connection prer
   assert.ok(inventory.files.includes("037_backfill_completion_rls_policies.sql"));
   assert.equal(inventory.files.filter((file) => file.startsWith("009_")).length, 1);
   assert.equal(inventory.files.filter((file) => file.startsWith("010_")).length, 1);
+  const extensionPhase2 = readFileSync("supabase/migrations/022_browser_extension_phase2.sql", "utf8");
+  assert.doesNotMatch(extensionPhase2, /business_memberships/);
+  assert.match(extensionPhase2, /public\.is_business_member\(business_id\)/);
+  assert.match(extensionPhase2, /public\.has_business_role\(business_id, array\['owner','admin'\]\)/);
   const guard = readFileSync("supabase/migrations/027_product_cover_dna_schema_guard.sql", "utf8");
   assert.match(guard, /add column if not exists cover_image_id uuid/);
   assert.match(guard, /create table if not exists public\.product_digital_twin_assets/);
@@ -121,8 +125,14 @@ test("migration inventory is ordered and includes the production connection prer
   assert.match(dailyOperations, /enable row level security/i);
   const completionDomain = readFileSync("supabase/migrations/003_completion_domain_and_roles.sql", "utf8");
   assert.match(completionDomain, /to_regclass\(format\('public\./);
+  assert.match(completionDomain, /faust_migration_rls_business_id_expression/);
+  assert.match(completionDomain, /No tenant RLS strategy for public\.%/);
+  assert.match(completionDomain, /public\.products parent where parent\.id = product_id/);
+  assert.match(completionDomain, /public\.orders parent where parent\.id = order_id/);
   const rlsBackfill = readFileSync("supabase/migrations/037_backfill_completion_rls_policies.sql", "utf8");
   assert.match(rlsBackfill, /drop policy if exists "tenant read"/);
+  assert.match(rlsBackfill, /faust_migration_rls_business_id_expression/);
+  assert.match(rlsBackfill, /No tenant RLS strategy for public\.%/);
   assert.match(rlsBackfill, /catalog operations write/);
   assert.match(rlsBackfill, /fulfillment write/);
   assert.match(rlsBackfill, /finance write/);
