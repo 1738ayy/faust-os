@@ -58,7 +58,7 @@ test("storage descriptors cover every required production artifact boundary", ()
 test("migration inventory is ordered and includes the production connection prerequisites", () => {
   const inventory = migrationInventory();
   assert.equal(inventory.ready, true);
-  assert.equal(inventory.latest, "036_daily_operations_readiness.sql");
+  assert.equal(inventory.latest, "037_backfill_completion_rls_policies.sql");
   assert.ok(inventory.files.includes("001_core_auth_and_tenancy.sql"));
   assert.ok(inventory.files.includes("022_browser_extension_phase2.sql"));
   assert.ok(inventory.files.includes("023_product_image_ownership.sql"));
@@ -75,6 +75,9 @@ test("migration inventory is ordered and includes the production connection prer
   assert.ok(inventory.files.includes("034_workflow_automation_engine.sql"));
   assert.ok(inventory.files.includes("035_intelligence_observability_studio.sql"));
   assert.ok(inventory.files.includes("036_daily_operations_readiness.sql"));
+  assert.ok(inventory.files.includes("037_backfill_completion_rls_policies.sql"));
+  assert.equal(inventory.files.filter((file) => file.startsWith("009_")).length, 1);
+  assert.equal(inventory.files.filter((file) => file.startsWith("010_")).length, 1);
   const guard = readFileSync("supabase/migrations/027_product_cover_dna_schema_guard.sql", "utf8");
   assert.match(guard, /add column if not exists cover_image_id uuid/);
   assert.match(guard, /create table if not exists public\.product_digital_twin_assets/);
@@ -116,6 +119,14 @@ test("migration inventory is ordered and includes the production connection prer
   assert.match(dailyOperations, /operations_feedback/);
   assert.match(dailyOperations, /dogfooding_sessions/);
   assert.match(dailyOperations, /enable row level security/i);
+  const completionDomain = readFileSync("supabase/migrations/003_completion_domain_and_roles.sql", "utf8");
+  assert.match(completionDomain, /to_regclass\(format\('public\./);
+  const rlsBackfill = readFileSync("supabase/migrations/037_backfill_completion_rls_policies.sql", "utf8");
+  assert.match(rlsBackfill, /drop policy if exists "tenant read"/);
+  assert.match(rlsBackfill, /catalog operations write/);
+  assert.match(rlsBackfill, /fulfillment write/);
+  assert.match(rlsBackfill, /finance write/);
+  assert.match(rlsBackfill, /notify pgrst, 'reload schema'/);
 });
 
 test("production health reports database, worker, storage, migrations, extension, and provider status", () => {
